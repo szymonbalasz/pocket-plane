@@ -93,7 +93,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Quest log with status | A, right after linked notes (#413) | [world-builder](specs/post-mvp/world-builder.md) | |
 | In-game calendar / time tracking | A, right after linked notes (#413) | [campaign-manager](specs/post-mvp/campaign-manager.md) | |
 | Session timeline | A, right after linked notes (#413) | [campaign-manager](specs/post-mvp/campaign-manager.md) | [ADR-0013](architecture/adr/0013-session-journal-scope.md) has no session entity: settle how they fit in the spec phase |
-| Text chat | C–D | [dice-roll-log](specs/dice-roll-log.md) | Only as part of the game log (Roll20-style): text and pasted descriptions alongside rolls. No separate chat. |
+| Text chat | C–D | [dice-roll-log](specs/dice-roll-log.md) | Only as part of the game log (Roll20-style): text and pasted descriptions alongside rolls. No separate chat. Sending an entry or sheet row's text is built: [log-share](specs/log-share.md) (#415). |
 | Random tables | D | — | |
 
 ## 5. DM tools

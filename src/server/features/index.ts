@@ -15,6 +15,7 @@ import { fixturesAdapters } from "./fixtures-adapters";
 import { fogOfWar } from "./fog-of-war";
 import { gems } from "./gems";
 import { liveSync } from "./live-sync";
+import { logShare } from "./log-share";
 import { notifications } from "./notifications";
 import { overviewScenes } from "./overview-scenes";
 import { partyBoard } from "./party-board";
@@ -59,4 +60,6 @@ export const features: readonly Feature[] = [
   spellFx,
   // Overview scenes core (fix/ovw-core)
   overviewScenes,
+  // Share to the game log (build/log-share)
+  logShare,
 ];

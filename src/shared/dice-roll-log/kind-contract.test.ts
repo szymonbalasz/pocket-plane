@@ -30,6 +30,11 @@ const rollItem = (p: Partial<RollPayloadItem> = {}): RollPayloadItem => ({
  * sentinel. A new kind must add its row here (the registry test below fails otherwise).
  */
 const SAMPLES: Record<string, { payload: unknown; dmPayload: unknown | null }> = {
+  // FR-SHARE-05: nothing DM-only: the whole text is for the table.
+  "share.entry": {
+    payload: { title: "Fireball", line: "Level 3 evocation", text: "A bright streak flashes." },
+    dmPayload: null,
+  },
   // FR-MOD-19: a part of an effect players don't receive is named only in `dmPayload`.
   roll: {
     payload: [

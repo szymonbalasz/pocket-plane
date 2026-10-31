@@ -184,6 +184,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Rule hook** | A combat rule (expiry, concentration, death failures) run inside the causing command's transaction through `hpRules` / the `combatRuleHooks` registry ([ADR-0035](architecture/adr/0035-combat-rule-hooks.md)). Not a rule trigger. | Listener; Rule trigger |
 | **Roll** | A dice expression evaluated server-side, with result. | — |
 | **Game log** | Player-facing, BG2-style log window of rolls and combat outcomes (later also text). Each entry public or DM-only. Formerly "roll log". | Event log (internal) |
+| **Share** (game log) | Posting an entry's or a sheet row's full text to the game log for everyone, with Send to game log ([log-share](specs/log-share.md)). Distinct from sharing a handout or homebrew entry, which makes it readable. | Chat |
 | **Roll category** | Kind of roll: attack, damage, saving throw, ability check, skill check, contested, initiative, healing, other. | — |
 | **Public log settings** | DM's per-category tickboxes deciding which DM rolls appear in players' game log. Changeable live. | Visibility filter (the mechanism that applies them) |
 | **Whisper** | A roll visible only to the roller and DM (or DM-to-player). | — |

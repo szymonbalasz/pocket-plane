@@ -83,6 +83,7 @@ import kitRound3 from "./kit-round3";
 import kitRound3Combat from "./kit-round3-combat";
 import lateDamage from "./late-damage";
 import logNoteColours from "./log-note-colours";
+import logShare from "./log-share";
 import lootSubtractE2e from "./loot-subtract-e2e";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
@@ -392,4 +393,6 @@ export const bundles: readonly Bundle[] = [
   diceLogMenuE2e,
   // Full session simulation after sim-16 (fix/housekeeping-sim)
   sessionSim17,
+  // Send to game log (build/log-share)
+  logShare,
 ];

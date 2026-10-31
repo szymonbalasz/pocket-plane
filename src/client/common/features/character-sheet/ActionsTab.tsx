@@ -21,6 +21,7 @@ import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
+import { SheetShare } from "../log-share/SheetShare";
 import { RowFxPicker, suggestedFx } from "../spell-fx/FxPicker";
 import { BOX_LABEL, Box } from "./boxes";
 import { SheetRoll } from "./CharacterSheet";
@@ -472,7 +473,9 @@ function AttackRow({
         rollRef={ref}
         rowId={a.id}
         overrides={overrides}
-      />
+      >
+        <SheetShare list="attacks" rowId={a.id} />
+      </RowButtons>
     </div>
   );
 }

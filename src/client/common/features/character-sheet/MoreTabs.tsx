@@ -15,6 +15,7 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Tip } from "../../components/ui/tip";
 import { useRecords, useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
+import { SheetShare } from "../log-share/SheetShare";
 import { useOpenPartyTab } from "../party-board/open-tab";
 import { Box } from "./boxes";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
@@ -181,7 +182,10 @@ function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count:
         <>
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-sm font-medium">{f.name}</span>
-            {f.source && <span className="text-[10px] text-muted-foreground">{f.source}</span>}
+            <span className="flex items-center gap-1">
+              {f.source && <span className="text-[10px] text-muted-foreground">{f.source}</span>}
+              <SheetShare list="features" rowId={f.id} />
+            </span>
           </div>
           {f.text && (
             <p className="text-xs whitespace-pre-wrap text-muted-foreground">
@@ -241,7 +245,10 @@ export function LimitedUsesBox() {
           >
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
               <span className="min-w-0 truncate text-sm font-medium">{f.name}</span>
-              <FeatureUses f={f} />
+              <span className="flex items-center gap-1">
+                <FeatureUses f={f} />
+                <SheetShare list="features" rowId={f.id} />
+              </span>
             </div>
             {line && (
               <Tooltip content={f.text}>
@@ -311,7 +318,10 @@ function ItemView({ it, index, count }: { it: ItemRow; index: number; count: num
             {it.name}
             {it.qty !== 1 && <span className="text-muted-foreground"> ×{it.qty}</span>}
           </span>
-          {it.equipped && <span className="text-[10px] text-muted-foreground">Equipped</span>}
+          <span className="flex items-center gap-1">
+            {it.equipped && <span className="text-[10px] text-muted-foreground">Equipped</span>}
+            <SheetShare list="items" rowId={it.id} />
+          </span>
         </div>
       )}
       {!e && it.notes && (

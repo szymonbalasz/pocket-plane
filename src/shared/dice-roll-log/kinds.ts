@@ -6,6 +6,7 @@ import { companionLogKind } from "../combat-tracker/companion-kind";
 import { attackLogKind, hpLogKind } from "../combat-tracker/log-kinds";
 import { sideLogKind } from "../combat-tracker/side-kind";
 import { gemAwardKind, gemSpendKind } from "../gems/log-kinds";
+import { shareLogKind } from "../log-share/kind";
 import type { AnyLogKind } from "./kind-types";
 import { rollKind } from "./roll-kind";
 
@@ -18,6 +19,7 @@ const kinds: AnyLogKind[] = [
   gemAwardKind, // gem.award (gems, FR-GEM-09; feature `gems`)
   gemSpendKind, // gem.spend (gems, FR-GEM-12; feature `gems`)
   charRestLogKind, // char.rest (character-sheet-full, FR-CHARX-124)
+  shareLogKind, // share.entry (log-share, FR-SHARE-05)
 ];
 
 const byKind = new Map<string, AnyLogKind>();

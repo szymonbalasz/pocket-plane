@@ -2876,3 +2876,12 @@ Indexes: `overview_item_overview`, `overview_item_campaign`, `overview_item_asse
 - **Visibility-relevant:** `overview.active` (scene gate through the resolver), `overview_item.hidden`. `locked` and the timestamps never reach a player.
 - **Derived (never stored):** a label's box and the party's missing list (clients and the miniatures slice).
 - **Not stored:** selection, last label style, Add hidden, camera, drag previews.
+
+## 151. Send to game log (build/log-share)
+
+From [log-share](../specs/log-share.md#8-data-model) (#415). **No new table, column or record type.** Protocol side: [protocol §191](../protocol/README.md#191-send-to-game-log-buildlog-share).
+
+- **`game_log_entry.payload`, kind `share.entry`:** `{title 1–80, line 0–120, text 0–16,000 (markdown-lite), cut?: true, folded?: true}`; `rollIds` empty, `category` `other`, `public` true at creation. The text is a copy: the entry or row isn't referenced.
+- **Fold (FR-SHARE-08):** the window's shares keep ≤ 64,000 chars of text, newest first; an older one gets `text: ""`, `folded: true` in the same transaction.
+- **Fixtures:** `share-mira-rows` (Mira: Fireball, Hedge Whisper, Moonblade Shard); bundle `log-share`.
+- **Snapshot size** (CON-44, `FR-SHARE-08 CON-44`): 100 shares of the longest text: at most +109,235 B per viewer on `log-share`, about 45 KB of it the rows themselves. 0 B while no share exists.
