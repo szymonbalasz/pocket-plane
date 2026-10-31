@@ -75,7 +75,7 @@ import {
   previewJoin,
   startBody,
 } from "./join-preview";
-import { useOpenEncounter } from "./open-encounter";
+import { useOpenEncounter, writeOpenEncounter } from "./open-encounter";
 import { partyMembers, toggleParty } from "./party";
 import { freeAreaCell } from "./place-at";
 import { combatRest } from "./rest";
@@ -938,5 +938,7 @@ export const encountersWindow = defineWindow({
   usefulSize: { w: 440, h: 412 }, // FR-CBT-148: the editor's rows readable (FR-SHELL-79)
   defaultPosition: { anchor: "top-left", dx: 56 },
   launcher: { icon: SwordsIcon, label: "Encounters", order: 55 },
+  // FR-SHELL-200: back to the list (the open encounter's memory is for reloads).
+  onClose: (you) => writeOpenEncounter(you?.campaignId ?? null, null),
   component: EncountersBody,
 });

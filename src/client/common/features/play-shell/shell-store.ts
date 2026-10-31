@@ -230,6 +230,17 @@ function nextPcClear(
     : out;
 }
 
+/** FR-SHELL-200: the kinds this change closed: shown or minimised before, closed or gone now. */
+function closedKinds(before: Windows, next: Windows): string[] {
+  return before
+    .filter((b) => {
+      if (b.state === "closed") return false;
+      const now = next.find((w) => w.kind === b.kind && w.instance === b.instance);
+      return !now || now.state === "closed";
+    })
+    .map((b) => b.kind);
+}
+
 /** Actions that run an auto placement (the auto-minimise log restarts with each). */
 const placing = (a: WindowAction) =>
   a.type === "open" || a.type === "toggle" || a.type === "appear" || a.type === "settle";
@@ -462,6 +473,14 @@ export function createShellController(opts: {
       // Transient displacements are never stored (FR-SHELL-159, -102).
       const memory = action.type === "reset" ? [] : p.memory;
       storage.write(key, serialise(persistable(next, memory), registry));
+      // A window's own reset must not take the rest of the change down with it.
+      for (const kind of closedKinds(windows, next)) {
+        try {
+          registry.get(kind)?.onClose?.(opts.you?.() ?? null);
+        } catch (err) {
+          warn(`play-shell: ${kind} onClose failed: ${String(err)}`);
+        }
+      }
       if (p.yields) opts.onYield?.();
       if (p.refit === "window") opts.onRefit?.();
       if (action.type === "reset") opts.onReset?.();

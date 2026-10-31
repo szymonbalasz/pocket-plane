@@ -190,6 +190,12 @@ export function bindCompanionMemory(key: string, listed: (id: string) => boolean
   if (patch.selectedId) companionSelection.setState({ selectedId: patch.selectedId });
 }
 
+/** FR-SHELL-200: the window closed; the next open shows the first companion. */
+export function resetCompanionSelection() {
+  companionSelection.setState({ selectedId: null });
+  memory.forget();
+}
+
 export function selectCompanion(key: string) {
   companionSelection.setState({ selectedId: key });
   memory.touched(key);

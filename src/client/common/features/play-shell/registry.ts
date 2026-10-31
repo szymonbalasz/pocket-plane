@@ -123,6 +123,12 @@ export interface WindowDef {
   /** FR-SHELL-155: runs once after this type absorbed `fromKind`'s entry (e.g. picks a tab). */
   onAbsorb?: (fromKind: string, you: You | null) => void;
   /**
+   * FR-SHELL-200: the window closed (not minimised): put back the state it keeps outside its
+   * components, so the next open starts fresh. Components unmount on their own; this is for
+   * stores and browser memory. Keep work the user would lose and per-browser preferences.
+   */
+  onClose?: (you: You | null) => void;
+  /**
    * Always mounted while the kind is available, whatever the window state (e.g. the toast
    * runtime of `note.history`). Renders its own UI, if any; gets no props.
    */

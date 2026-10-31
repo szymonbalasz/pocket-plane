@@ -19,6 +19,11 @@ export function selectHandout(handoutId: string, mode: Exclude<ViewerMode, "new"
   handoutSelection.setState({ handoutId, mode });
 }
 
+/** FR-SHELL-200: the window closed; nothing is selected until the next open picks one. */
+export function resetHandoutSelection() {
+  handoutSelection.setState({ handoutId: null, mode: "view" });
+}
+
 /** DM: the viewer opens on an empty editor (FR-PARTY-15); Cancel returns to the last handout. */
 export function startNewHandout() {
   handoutSelection.setState({ mode: "new" });

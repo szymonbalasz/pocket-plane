@@ -1,7 +1,8 @@
 // Which creature the `char.sheet` window shows (CHARX §8): the picker's selection, the NPC sheet
 // the DM last opened (FR-CHARX-31) and a pending "open in edit mode" (a just-created character,
 // FR-CHARX-30). One store per page. The selection is remembered per browser (FR-CHARX-47):
-// `localStorage` `pp.sheet.v1.<campaignId>.<dm | playerId>`, never sent to the server.
+// `localStorage` `pp.sheet.v1.<campaignId>.<dm | playerId>`, never sent to the server. Closing the
+// window forgets it (FR-SHELL-200).
 import { z } from "zod";
 import { createStore } from "zustand";
 
@@ -27,7 +28,8 @@ export const sheetMemoryKey = (
   playerId: string | null,
 ) => `pp.sheet.v1.${campaignId}.${role === "dm" ? "dm" : (playerId ?? "unknown")}`;
 
-export const SheetMemory = z.strictObject({ selectedId: z.string().min(1).max(64) });
+/** `selectedId` null: the window closed, so nothing is remembered (FR-SHELL-200). */
+export const SheetMemory = z.strictObject({ selectedId: z.string().min(1).max(64).nullable() });
 
 export type SheetMemoryBackend = Pick<Storage, "getItem" | "setItem">;
 
@@ -77,7 +79,7 @@ export function createSheetMemory(
     }
     return m.data.selectedId;
   };
-  const write = (key: string, id: string) => {
+  const write = (key: string, id: string | null) => {
     const text = JSON.stringify({ selectedId: id } satisfies z.infer<typeof SheetMemory>);
     memory.set(key, text);
     if (failed) return;
@@ -92,6 +94,11 @@ export function createSheetMemory(
     touched(id: string | null) {
       if (!boundKey) pending = true;
       else if (id) write(boundKey, id);
+    },
+    /** FR-SHELL-200: the window closed; a reload starts on the default too. */
+    forget() {
+      pending = false;
+      if (boundKey) write(boundKey, null);
     },
     /**
      * After the first snapshot of the page (and on a campaign switch): restore the stored choice
@@ -142,3 +149,9 @@ export function openSheetFor(id: string, kind: "character" | "monster") {
 
 export const requestEdit = (id: string) => choose({ selectedId: id, editId: id });
 export const clearEditRequest = () => sheetSelection.setState({ editId: null });
+
+/** FR-SHELL-200: the window closed; the next open shows FR-CHAR-04's default. */
+export function resetSheetSelection() {
+  sheetSelection.setState({ selectedId: null, npcId: null, editId: null });
+  memory.forget();
+}
