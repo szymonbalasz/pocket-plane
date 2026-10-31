@@ -4476,3 +4476,15 @@ From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57�
 
 - **Receiver:** the connection whose ephemeral has `key` ends it (`scn.template {sceneId, key, end: true}`, FR-SCN-23), so everyone drops it; others ignore it. Transient: not stored, logged or queued; a sender that is gone drops out on the 3 s silence.
 - **Client only:** the label pill moves to its own canvas layer `scn-template-labels` (order 47, `top`; Konva nodes `scn-template-label`, id = template id, with `scn-template-label-text` and the new `scn-template-label-measures`), no longer inside the `scn-template` group. `LayerContextMenu.first?(ctx)`: true = asked ahead of the other layers' menus, and its hit goes ahead of the DM's token menu.
+
+## 194. Clear damage (build/cbt-clear-damage)
+
+From [combat-tracker](../specs/combat-tracker.md#68-sprint-15-attacks-through-the-tray) FR-CBT-178 (#428). **Built by `build/cbt-clear-damage`.** No new record type.
+
+| Item | Shape | Rule | FR |
+|---|---|---|---|
+| `cbt.clearDamage` *(new, DM only)* | `{cardId, damageRollId}` → `{cardId}` | Pending card with a to-hit and damage; ended encounter, not pending, no damage, another `damageRollId` → `conflict`; damage-only → `invalid`; player → refused; nothing written | FR-CBT-178 |
+| Event `DamageCleared` *(new, logged, not undoable)* | `{cardId, encounterId, rollIds}` | Changes: the card upsert (one frame, no toast), to the DM and the card's audience | FR-CBT-178 |
+| `cbt.rollDamage`, `cbt.useRoll` | unchanged | Attach to a cleared card before a newer to-hit-only card; attaching removes `damageCleared` | FR-CBT-178 |
+
+- **Test ID:** `cbt-popup-damage-clear`.

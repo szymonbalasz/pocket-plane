@@ -108,14 +108,14 @@ function cardRef(store: RecordStore, characterId: string, ref?: RollRouteRef) {
  * FR-CBT-74: the latest pending to-hit-only card of this attacker's row among `notes` (what
  * `cbt.rollDamage` completes), or null. Used by the sheet route, the DM's Initiative row and the
  * tray route. FR-CBT-171 (#385): a card without a row matches any row; `row` null (a rowless
- * damage roll) matches any card.
+ * damage roll) matches any card. FR-CBT-178: a card the DM cleared comes first, as on the server.
  */
 export function pendingToHitCard(
   notes: readonly NotificationRecord[],
   attackerId: string,
   row: { attackId?: string; spellId?: string } | null,
 ): DamageCardPayload | null {
-  let best: { seq: number; p: DamageCardPayload } | null = null;
+  let best: { seq: number; p: DamageCardPayload; cleared: boolean } | null = null;
   for (const n of notes) {
     if (n.kind !== DAMAGE_CARD_KIND || n.state !== "pending") continue;
     const parsed = DamageCardPayload.safeParse(n.payload);
@@ -124,7 +124,10 @@ export function pendingToHitCard(
     if (p.attackerId !== attackerId || p.toHit === null || p.damage !== null) continue;
     const rowless = p.attackId === undefined && p.spellId === undefined;
     if (row && !rowless && (p.attackId !== row.attackId || p.spellId !== row.spellId)) continue;
-    if (!best || n.seq > best.seq) best = { seq: n.seq, p };
+    const cleared = p.damageCleared === true;
+    if (!best || (cleared === best.cleared ? n.seq > best.seq : cleared)) {
+      best = { seq: n.seq, p, cleared };
+    }
   }
   return best?.p ?? null;
 }

@@ -2890,3 +2890,11 @@ From [log-share](../specs/log-share.md#8-data-model) (#415). **No new table, col
 ## 152. AoE tool polish (fix/aoe-template-polish)
 
 From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57–60 ([#427](../decisions-log.md)). **No new table, column or record type.** `aoe_template.shape` keeps `cylinder` as a valid value: rows kept earlier stay as they are, the AoE tool just no longer places new ones. Protocol side: [protocol §193](../protocol/README.md#193-aoe-tool-polish-fixaoe-template-polish).
+
+## 153. Clear damage (build/cbt-clear-damage)
+
+No new table or column.
+
+| Field | Change | Rule | FR |
+|---|---|---|---|
+| `notification.payload` (kind `damage-card`) | + optional `damageCleared: true` | Set by `cbt.clearDamage` with `damage: null` (`unusedRolls`, `diceMaxed` removed); removed when new damage attaches | FR-CBT-178 |
