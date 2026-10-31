@@ -24,6 +24,8 @@ beforeAll(() => {
     removeEventListener() {},
   };
   g.document = { title: "", hidden: false };
+  // A roll sent by an earlier test file in this process leaves its pending card in the shared store.
+  diceExtras.failed();
 });
 afterAll(() => {
   delete g.window;
