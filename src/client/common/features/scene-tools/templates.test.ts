@@ -6,6 +6,7 @@ import type { LaserTimers } from "../scenes-map/laser";
 import { activeTool, isDrawing, toolsFor } from "../scenes-map/tools";
 import { cancelAoe, useAoe } from "./aoe-store";
 import {
+  AOE_TOOL_SHAPES,
   aimAngle,
   canEditTemplate,
   createEphemeralStore,
@@ -20,6 +21,7 @@ import {
   snapSize,
   type TemplateView,
   templateCaption,
+  templateMeasures,
   templateOutline,
 } from "./templates";
 
@@ -103,6 +105,21 @@ describe("FR-SCN-22 AoE gesture", () => {
       angle: 45,
     });
     expect(gestureTemplate({ ...s, shape: "cylinder" }, o, still, G).size).toBe(15);
+  });
+
+  test("FR-SCN-57 the tool offers cone, sphere, cube and line; no cylinder", () => {
+    expect(AOE_TOOL_SHAPES).toEqual(["cone", "sphere", "cube", "line"]);
+  });
+
+  test("FR-SCN-60 the label's measures fit the shape", () => {
+    const m = (shape: TemplateView["shape"], size: number, width: number | null = null) =>
+      templateMeasures({ shape, size, width });
+    expect(m("sphere", 20)).toBe("20 ft radius");
+    expect(m("cylinder", 10)).toBe("10 ft radius"); // kept before FR-SCN-57
+    expect(m("cube", 15)).toBe("15 ft sides");
+    expect(m("cone", 30)).toBe("30 ft long");
+    expect(m("line", 60, 10)).toBe("60 ft long · 10 ft wide");
+    expect(m("line", 60)).toBe("60 ft long · 5 ft wide");
   });
 
   test("FR-SCN-21 caption: ‹label› · N squares", () => {

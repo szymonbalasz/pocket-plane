@@ -15,6 +15,7 @@ import {
   type DamageCardPayload,
   UseRollInput,
   type UseRollResult,
+  withoutDamageCleared,
 } from "@shared/combat-tracker/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import {
@@ -159,7 +160,11 @@ export const useRollCommand = defineCommand({
       const type = types[0] ?? null;
       if (pending) {
         attachTo = pending.card.id;
-        payload = { ...pending.p, damage, ...(type ? { damageType: type } : {}) };
+        payload = {
+          ...withoutDamageCleared(pending.p),
+          damage,
+          ...(type ? { damageType: type } : {}),
+        };
       } else {
         payload = {
           ...base,

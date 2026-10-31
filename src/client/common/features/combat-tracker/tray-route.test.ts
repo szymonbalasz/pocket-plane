@@ -207,6 +207,17 @@ describe("FR-CBT-172 tray route", () => {
   });
 });
 
+describe("FR-CBT-178 cleared card on the client", () => {
+  test("FR-CBT-178 a cleared card comes before a newer to-hit-only card, as on the server", () => {
+    const older = card("a", 1, 11, { damageCleared: true });
+    const newer = card("b", 2, 20);
+    const picked = pendingToHitCard([older, newer] as never, "cb-brakka", null);
+    expect(picked?.damageCleared).toBe(true);
+    const plain = pendingToHitCard([card("a", 1, 11), newer] as never, "cb-brakka", null);
+    expect(plain?.toHit?.natural).toBe(20);
+  });
+});
+
 describe("FR-CBT-171 rowless match on the client", () => {
   test("FR-CBT-171 match rules", () => {
     const notes = (cards: ReturnType<typeof card>[]) =>

@@ -128,5 +128,27 @@ test("FR-CBT-87 FR-CBT-89 FR-CBT-90 Apply hit, then the late Damage fills the op
   await hit.click();
   await hitThenDamage("DM ruled hit", "Goblin 2");
 
+  // FR-CBT-178: a wrong roll: Clear empties the fields, the player is told, the next roll fills.
+  const wrong = await attack("12", goblin, "17 to hit");
+  await expect(wrong).toHaveCount(1);
+  await popup.getByTestId("cbt-popup-apply-hit").click();
+  await expect(popup.getByTestId("cbt-popup-step")).toHaveAttribute("data-value", "damage");
+  await rollNow(crossbow.getByTestId("charx-roll-damage"));
+  await rollPhysical(p1, "1");
+  const damageField = popup.getByTestId("cbt-popup-damage");
+  await expect(damageField).toHaveValue("3");
+  await damageField.fill("99");
+  await popup.getByTestId("cbt-popup-damage-clear").click();
+  await expect(popup.getByTestId("cbt-popup-waiting")).toBeVisible();
+  await expect(damageField).toHaveValue("");
+  await expect(popup.getByTestId("cbt-popup-apply")).toBeDisabled();
+  await rollNow(crossbow.getByTestId("charx-roll-damage"));
+  await rollPhysical(p1, "6");
+  await expect(popup.getByTestId("cbt-popup-waiting")).toHaveCount(0);
+  await expect(damageField).toHaveValue("8");
+  await popup.getByTestId("cbt-popup-apply").click();
+  await expect(popup).toHaveCount(0);
+  await expect(p1Lines.last()).toContainText("Mira → Goblin: 8 piercing damage");
+
   for (const page of [p1, dm]) await page.context().close();
 });

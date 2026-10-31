@@ -3,7 +3,8 @@
 // parts, FR-MOD-48). The card's offered parts muted after the damage (R7). Sprint 7: "Critical
 // changed by a reroll — roll damage again" while a crit flip waits (FR-CBT-127); maxed dice with a
 // "max" Badge (FR-CBT-131) and the card-action slot (FR-CBT-130, gems' Combat gem). Kit parity K3
-// (FR-KIT-66): the maxed and outcome lines show their totals as small Result boxes.
+// (FR-KIT-66): the maxed and outcome lines show their totals as small Result boxes. FR-CBT-178
+// (#428): the same kind of prompt while the DM's cleared damage waits for a new roll.
 
 import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import { resolutionText } from "@shared/combat-tracker/rules";
@@ -11,9 +12,11 @@ import {
   CRIT_CHANGED_TEXT,
   critChanged,
   DAMAGE_CARD_KIND,
+  DAMAGE_CLEARED_TEXT,
   DamageCardPayload,
   DamageCardResolutionRead,
   type DamageCardTargetOutcome,
+  damageClearedWaiting,
 } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { ResultBox } from "@ui/components/kit/result-box";
@@ -31,7 +34,8 @@ export function outcomeText(n: NotificationRecord): string {
   if (n.state === "pending") {
     // FR-CBT-127 (sprint 7): a reroll flipped the crit; the card waits for a new damage roll.
     const p = DamageCardPayload.safeParse(n.payload);
-    return p.success && critChanged(p.data) ? CRIT_CHANGED_TEXT : "Waiting for DM";
+    if (p.success && critChanged(p.data)) return CRIT_CHANGED_TEXT;
+    return p.success && damageClearedWaiting(p.data) ? DAMAGE_CLEARED_TEXT : "Waiting for DM";
   }
   if (n.state === "dismissed") return "Dismissed";
   // Legacy single-target rows (from before the feedback pass) read as one part.
