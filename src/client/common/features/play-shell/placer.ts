@@ -112,6 +112,8 @@ export interface Displacement {
   at: Rect | null;
   shrunk?: true;
   under?: Displacement;
+  /** A squeeze or shrink a resize down itself caused: the size it left (FR-SHELL-223). */
+  trip?: Viewport;
 }
 
 /** L2b's dry fit (FR-SHELL-108, FR-MAP-97): the cell it would draw and whether it keeps clear. */
@@ -532,6 +534,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const from = ctx.settledViewport ?? vp;
   const up = trigger.type === "viewport" && vp.w >= from.w && vp.h >= from.h;
   const grewFrom = up && (vp.w > from.w || vp.h > from.h) ? `grown:${from.w}×${from.h}` : undefined;
+  /** The size a resize down left. */
+  const left = trigger.type === "viewport" && (vp.w < from.w || vp.h < from.h) ? from : undefined;
   let out: WindowState[] = [...ws];
   const memory = new Map<string, Displacement>(
     (ctx.memory?.() ?? []).map((d) => [windowId(d.kind, d.instance), d]),
@@ -694,6 +698,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
             cause,
             at,
             ...(under && { under }),
+            ...(left && cause.startsWith("window:") && { trip: left }),
           },
     );
   };
@@ -767,6 +772,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       exact?: boolean;
       /** BL-134: L1–L2 take only spots where the map keeps its all-tokens fit (`fitKeeps`). */
       keepFit?: boolean;
+      /** FR-SHELL-222: a return leaves a squeezed protected window's full zone free. */
+      owedZones?: boolean;
     },
   ): Spot | null => {
     const still = o.push === true || o.noYield === true;
@@ -779,7 +786,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const floor = o.exact ? size : { w: Math.min(u.w, size.w), h: Math.min(u.h, size.h) };
     const full = bandTarget(w0, size, u, bandAt(registry, vp));
     const input = (): PlaceInput => ({
-      windows: obstacles(id, o.protectedOnly),
+      windows: [
+        ...obstacles(id, o.protectedOnly),
+        ...(o.owedZones ? owedZones(w0.kind).map((z) => ({ ...z, protected: true })) : []),
+      ],
       hard,
       soft,
       tokens,
@@ -1566,7 +1576,12 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       // opens only if that finds a spot.
       const was = w;
       if (w.state !== "open") setWin(id, { ...w, state: "open" });
-      const spot = ladder(id, { putAway: false, maxL2: true, prev: d.rect });
+      const spot = ladder(id, {
+        putAway: false,
+        maxL2: true,
+        prev: d.rect,
+        owedZones: trigger.type === "viewport",
+      });
       // A tool bar's put-away comes back when the bar goes, whatever holds its old spot (a
       // remembered window, walkthrough X1): the rest of the ladder places it (below useful, else
       // the least PC area), still putting nothing away. Nothing else would retry it.
@@ -1583,6 +1598,58 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         // still hold its spot, e.g. one whose own viewport cause ends one size later).
         memory.set(id, d);
       }
+    }
+  };
+
+  /**
+   * The full zones of the protected windows squeezed now, but for a squeeze `kind` itself caused:
+   * room a window coming back leaves free, so that squeeze can still end (FR-SHELL-222, BL-145).
+   */
+  const owedZones = (kind: string): Rect[] =>
+    protectedIds().flatMap((id) => {
+      const p = get(id);
+      const d = memory.get(id);
+      if (!p || !d || !squeezedNow(p) || d.cause === `window:${kind}`) return [];
+      const z = zoneOf(p);
+      return z ? [z] : [];
+    });
+
+  /**
+   * FR-SHELL-223 (BL-145): a squeeze or an L3s shrink a resize down caused ends when the screen is
+   * back at the size it left and the window that caused it no longer needs the room (clear of the
+   * full rect: a zone, a launcher window's rect before the shrink): the zone back as FR-SHELL-159,
+   * a launcher window back iff that rect is on screen, clear and PC-clear.
+   */
+  const endNeedless = () => {
+    for (const d of [...memory.values()]) {
+      if (d.at === null || !d.trip || vp.w < d.trip.w || vp.h < d.trip.h || ended(d)) continue;
+      const id = windowId(d.kind, d.instance);
+      const w = get(id);
+      if (!w || !isShown(w, ctx.available) || !sameRect(w, d.at)) continue;
+      const prot = isProt(w);
+      if (!prot && !d.shrunk) continue;
+      const full = prot ? zoneOf(w) : d.rect;
+      const kind = d.cause.slice("window:".length);
+      const held = [...shownMap()].some(([o, r]) => o.kind === kind && !!full && overlaps(full, r));
+      if (!full || held) continue;
+      if (prot) {
+        memory.delete(id);
+        zoneBack(id, d);
+        continue;
+      }
+      if (!inside(d.rect)) continue;
+      const back = shellRect(w, d.rect, d.area ?? area);
+      const r = shownRect(
+        out.map((x) => (idOf(x) === id ? back : x)),
+        back,
+        ctx,
+      );
+      if (!clearAt(r, id) || !pcFree(r)) continue;
+      memory.delete(id);
+      setWin(id, back);
+      placed.set(id, "returned");
+      pcFlags.set(id, true);
+      log.push(`${label}:${w.kind}>returned`);
     }
   };
 
@@ -1723,7 +1790,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const w = get(id);
       if (w?.state !== "minimised" || !ctx.available.has(w.kind)) continue;
       setWin(id, { ...w, state: "open" });
-      const spot = ladder(id, { putAway: false, maxL2: true, prev: d.rect });
+      const spot = ladder(id, { putAway: false, maxL2: true, prev: d.rect, owedZones: true });
       if (spot) {
         write(id, spot.rect, "grown", { rung: spot.rung });
         memory.set(id, { ...d, at: plainRect(spot.rect) });
@@ -1781,7 +1848,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       }
       returns();
       for (const id of launchersByZ()) keepOrPlace(id, cause);
-      if (vp.w >= from.w && vp.h >= from.h) growBack();
+      if (vp.w >= from.w && vp.h >= from.h) {
+        endNeedless();
+        growBack();
+      }
       break;
     }
     case "open":

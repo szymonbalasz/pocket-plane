@@ -32,3 +32,15 @@ for (const name of ["D1", "D2", "D3"]) {
     expect(at("viewport 1280×720")).not.toEqual(at("load"));
   });
 }
+
+test("FR-SHELL-223 D1 moved @1600×900 resize: Party Manager's shrink ends with the trip that caused it", () => {
+  const set = REPLAY_SETS.dm.find((s) => s.name === "D1");
+  if (!set) throw new Error("no set D1");
+  const run = runReplay(dmWindows, set, "moved", { w: 1600, h: 900 }, "resize");
+  expect(run.problems).toEqual([]);
+  const board = run.steps
+    .at(-1)
+    ?.windows.split(" ")
+    .find((e) => e.startsWith("party.board:"));
+  expect(board).toBe("party.board:open:988,328,600×560");
+});

@@ -97,3 +97,26 @@ test("FR-SHELL-226 a reload ends the trip: client memory, nothing stored (0 byte
   expect(off(run)).not.toEqual("open:1268,60,320×440");
   expect(windowsAt(run, "viewport 1600×900").get(SHEET)).toBe("open:1268,60,320×440");
 });
+
+test("FR-SHELL-222 P3 fitted @1600×900 resize: Stats waits for its spot instead of taking the Game log's full zone", () => {
+  const set = REPLAY_SETS.player.find((s) => s.name === "P3");
+  if (!set) throw new Error("no set P3");
+  const run = runReplay(playerWindows, set, "fitted", BIG, "resize");
+  // Put away by the way down; on the way up 1440×900 has room for it only in the log's full zone.
+  const stats = (step: string) => windowsAt(run, step).get("stats.board");
+  expect(stats("viewport 1280×720")?.startsWith("minimised:")).toBe(true);
+  expect(stats("viewport 1440×900")?.startsWith("minimised:")).toBe(true);
+  expect(stats("viewport 1600×900")).toBe("open:360,60,400×412");
+  expect(run.problems).toEqual([]);
+});
+
+test("FR-SHELL-223 P3 fitted @1600×900 resize: the Game log's squeeze ends with the trip that caused it", () => {
+  const set = REPLAY_SETS.player.find((s) => s.name === "P3");
+  if (!set) throw new Error("no set P3");
+  const run = runReplay(playerWindows, set, "fitted", BIG, "resize");
+  const log = (step: string) => windowsAt(run, step).get("dice.log");
+  expect(log("load")).toBe("open:68,568,850×320");
+  // Squeezed on the way down for Party Manager (the resize's own L2s), full again at 1600×900.
+  expect(log("viewport 1440×900")).toBe("open:68,688,460×200");
+  expect(log("viewport 1600×900")).toBe("open:68,568,850×320");
+});

@@ -121,3 +121,58 @@ test("FR-SHELL-226 what a layout entry stores during a trip is the rect it shows
   const down = settle(offZone(), { type: "viewport" }, ctx(SMALL, BIG));
   expect(rect(init(persistable(down.windows, down.memory)))).toEqual(rect(init(down.windows)));
 });
+
+test("FR-SHELL-223 a squeeze from before the trip stays: it is not the resize's to end", () => {
+  const log = rect(defaultLayout(dm, BIG).find((w) => w.kind === "t.log") as WindowState);
+  const squeezed = { ...log, y: log.y + 40, h: log.h - 40 };
+  const ws = defaultLayout(dm, BIG).map((w) => {
+    if (w.kind === "t.log") return { ...w, ...squeezed };
+    return w;
+  });
+  // t.a sits clear of the zone: the squeeze has outlived its reason, but no resize made it.
+  const open: WindowState = {
+    kind: "t.a",
+    instance: "main",
+    state: "open",
+    x: 500,
+    y: 60,
+    w: 320,
+    h: 360,
+    z: 9,
+    area: workArea(BIG),
+  };
+  const memory: Displacement[] = [
+    { kind: "t.log", instance: "main", rect: log, cause: "window:t.a", at: squeezed },
+  ];
+  const up = settle([...ws, open], { type: "viewport" }, ctx({ w: 1500, h: 950 }, BIG, memory));
+  expect(up.memory.some((d) => d.kind === "t.log" && d.cause === "window:t.a")).toBe(true);
+});
+
+test("FR-SHELL-222 a return with the tool bar's cause is not held back by a squeezed zone", () => {
+  // The owed zone holds for a resize only; other returns keep FR-SHELL-102's rule.
+  const log = rect(defaultLayout(dm, BIG).find((w) => w.kind === "t.log") as WindowState);
+  const squeezed = { ...log, x: log.x, w: 460 };
+  const ws = defaultLayout(dm, BIG).map((w) => (w.kind === "t.log" ? { ...w, ...squeezed } : w));
+  const away: WindowState = {
+    kind: "t.a",
+    instance: "main",
+    state: "minimised",
+    x: log.x + 480,
+    y: log.y,
+    w: 320,
+    h: 360,
+    z: 9,
+    area: workArea(BIG),
+  };
+  const memory: Displacement[] = [
+    {
+      kind: "t.a",
+      instance: "main",
+      rect: { x: 700, y: 400, w: 320, h: 360 },
+      cause: "toolbar:map.toolbar",
+      at: null,
+    },
+  ];
+  const back = settle([...ws, away], { type: "return" }, ctx(BIG, BIG, memory));
+  expect(back.windows.find((w) => w.kind === "t.a")?.state).toBe("open");
+});
