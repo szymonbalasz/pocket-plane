@@ -329,6 +329,9 @@ export const LUCK_ROWS_MAX = 70;
 export const DM_DICE_KEY = "dm-dice";
 export const DM_DICE_NAME = "DM dice";
 
+/** FR-STATS-89: a d20's faces. A row's `faces[0]` counts the 1s, `faces[19]` the 20s. */
+export const D20_FACES = 20;
+
 const luckRowFields = {
   /** A party character's id; the DM's extra row `dm-dice`. */
   key: Id,
@@ -341,6 +344,8 @@ const luckRowFields = {
   avg: z.number().min(1).max(20).nullable(),
   nat20: Count,
   nat1: Count,
+  /** FR-STATS-89: how often each face came up; adds up to `d20s`. */
+  faces: z.array(Count).length(D20_FACES),
 };
 export const DmLuckRow = z.strictObject(luckRowFields);
 export type DmLuckRow = z.infer<typeof DmLuckRow>;

@@ -1,4 +1,4 @@
-// `cbt.clearDamage` (FR-CBT-178, #427): the DM takes a wrong damage roll off a pending card, ruled
+// `cbt.clearDamage` (FR-CBT-178, #428): the DM takes a wrong damage roll off a pending card, ruled
 // or not, so a new one can fill it. The card goes back to to-hit-only: the damage (extra parts,
 // maxed dice, offers) and any unused rolls leave it, the ruling stays, and `cbt.rollDamage` /
 // `cbt.useRoll` complete it again by their usual rule. One transaction, one frame, no toast.

@@ -2887,7 +2887,11 @@ From [log-share](../specs/log-share.md#8-data-model) (#415). **No new table, col
 - **Fixtures:** `share-mira-rows` (Mira: Fireball, Hedge Whisper, Moonblade Shard); bundle `log-share`.
 - **Snapshot size** (CON-44, `FR-SHARE-08 CON-44`): 100 shares of the longest text: at most +109,235 B per viewer on `log-share`, about 45 KB of it the rows themselves. 0 B while no share exists.
 
-## 152. Clear damage (build/cbt-clear-damage)
+## 152. AoE tool polish (fix/aoe-template-polish)
+
+From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57–60 ([#427](../decisions-log.md)). **No new table, column or record type.** `aoe_template.shape` keeps `cylinder` as a valid value: rows kept earlier stay as they are, the AoE tool just no longer places new ones. Protocol side: [protocol §193](../protocol/README.md#193-aoe-tool-polish-fixaoe-template-polish).
+
+## 153. Clear damage (build/cbt-clear-damage)
 
 No new table or column.
 

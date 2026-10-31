@@ -34,13 +34,21 @@ function marks(page: Page, name: string): Promise<Mark[]> {
       text?: () => string;
     };
     const K = (window as unknown as { Konva?: { stages: { find(s: string): KNode[] }[] } }).Konva;
-    return (K?.stages[0]?.find(`.${name}`) ?? []).map((n) => ({
+    const stage = K?.stages[0];
+    // FR-SCN-59: a template's label pill is drawn in its own layer, by the template's id.
+    const pill = (n: KNode) =>
+      name === "scn-template"
+        ? stage?.find(".scn-template-label").find((l) => l.id() === n.id())
+        : n;
+    return (stage?.find(`.${name}`) ?? []).map((n) => ({
       id: n.id(),
       color: (n.getAttr("color") as string | undefined) ?? null,
       by: (n.getAttr("by") as string | undefined) ?? null,
       ephemeral: n.getAttr("ephemeral") === true,
       text: n.findOne
-        ? (n.findOne(".scn-template-label-text")?.text() ?? n.findOne("Text")?.text() ?? null)
+        ? (pill(n)?.findOne?.(".scn-template-label-text")?.text() ??
+          n.findOne("Text")?.text() ??
+          null)
         : (n.text?.() ?? null),
     }));
   }, name);

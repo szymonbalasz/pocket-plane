@@ -4,7 +4,7 @@
 // changed by a reroll — roll damage again" while a crit flip waits (FR-CBT-127); maxed dice with a
 // "max" Badge (FR-CBT-131) and the card-action slot (FR-CBT-130, gems' Combat gem). Kit parity K3
 // (FR-KIT-66): the maxed and outcome lines show their totals as small Result boxes. FR-CBT-178
-// (#427): the same kind of prompt while the DM's cleared damage waits for a new roll.
+// (#428): the same kind of prompt while the DM's cleared damage waits for a new roll.
 
 import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import { resolutionText } from "@shared/combat-tracker/rules";

@@ -1,4 +1,4 @@
-// FR-CBT-178 (#427): the DM clears a card's damage and a new roll fills it. CBTX's ambush, round
+// FR-CBT-178 (#428): the DM clears a card's damage and a new roll fills it. CBTX's ambush, round
 // 1; `player-1` plays Mira; Brakka's Divine Fury for the offers.
 import { describe, expect, test } from "bun:test";
 import {
