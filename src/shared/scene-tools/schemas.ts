@@ -27,7 +27,11 @@ export const SCN_INTENTS = {
   setDiagonalRule: "scn.setDiagonalRule",
 } as const;
 
-export const SCN_SIGNALS = { template: "scn.template" } as const;
+export const SCN_SIGNALS = {
+  template: "scn.template",
+  /** FR-SCN-58: the DM asks another connection to clear its ephemeral. */
+  templateClear: "scn.templateClear",
+} as const;
 
 /** FR-SCN-38: the wall move guard's name, the `guard` of its `map.checkMove` hint. */
 export const WALL_GUARD = "scene-tools.walls";
@@ -456,3 +460,14 @@ export const TemplateSignalEnd = z.strictObject({
 });
 export const TemplateSignalData = z.union([TemplateSignalEnd, TemplateSignalPlace]);
 export type TemplateSignalData = z.infer<typeof TemplateSignalData>;
+
+/**
+ * FR-SCN-58: signal `scn.templateClear` (DM only): the connection whose ephemeral has this `key`
+ * ends it, as its own Clear would. `playerId` = the player it belongs to; absent = a DM tab's.
+ */
+export const TemplateClearData = z.strictObject({
+  sceneId: Id,
+  key: z.string().min(1).max(64),
+  playerId: Id.optional(),
+});
+export type TemplateClearData = z.infer<typeof TemplateClearData>;

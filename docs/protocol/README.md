@@ -409,7 +409,7 @@ DM always `full`. Generic record changes only ([ADR-0021](../architecture/adr/00
 | `map.setLocked` | DM | `{sceneId, locked}` | Scene in campaign | | FR-MAP-11 |
 | `map.placeToken` | DM | `{sceneId, definitionId, col, row, name?, imageAssetId?, ownerPlayerId?, hidden?}` (never size or speed); *(feedback pass, built)* `shape?` (default: definition `tokenShape`, else `round`) | `resolveDefinition`, `assets.require`, owner ∈ campaign, footprint + caps (FR-MAP-14) | | [FR-MAP-13](../specs/scenes-map.md#6-functional-requirements) |
 | `map.moveToken` | DM, **player** | `{tokenId, col, row}` | Player: owner = `ctx.playerId`, not hidden, on active scene; can't see → `not_found`, not theirs → `forbidden`. DM: any. **Optimistic**. *(feedback pass, built)*: runs the token-changed hooks ([§25](#25-combat-token-changed-hooks), [ADR-0031](../architecture/adr/0031-token-move-hooks.md)) | | [FR-MAP-15](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-21](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-38](../specs/scenes-map.md#6-functional-requirements) |
-| `map.updateToken` | DM | `{tokenId, name?, imageAssetId?, ownerPlayerId?}`; *(feedback pass, built)* `shape?`; *(sprint 4, built, fix/cmp-art-core)* `creatureType?` (a type \| `initials`; null `invalid`, [§76](#76-sprint-4-token-creature-type-c-art-core)) | Token in campaign; `assets.require`; no size or speed | | [FR-MAP-18](../specs/scenes-map.md#6-functional-requirements) |
+| `map.updateToken` | DM | `{tokenId, name?, imageAssetId?, ownerPlayerId?}`; *(feedback pass, built)* `shape?`; *(sprint 4, built, fix/cmp-art-core)* `creatureType?` (a type \| `initials`; null `invalid`, [§76](#76-sprint-4-token-creature-type-c-art-core)); *(#429)* `size?` ([FR-MAP-150](../specs/scenes-map.md#6-functional-requirements)) | Token in campaign; `assets.require`; a new size must overlap the map (`invalid`); no speed | | [FR-MAP-18](../specs/scenes-map.md#6-functional-requirements) |
 | `map.setTokenHidden` | DM | `{tokenId, hidden}` | Token in campaign | | FR-MAP-19 |
 | `map.duplicateToken` | DM | `{tokenId}` | Token in campaign; placement rule FR-MAP-17 | `{tokenId}` | [FR-MAP-17](../specs/scenes-map.md#6-functional-requirements) |
 | `map.deleteToken` | DM | `{tokenId}` | Token in campaign | | FR-MAP-18 |
@@ -1917,7 +1917,7 @@ From [play-shell](../specs/play-shell.md) (SHELL, `complete`; #245, seams S7, re
 | `openWindow(kind, instance?, {by?})` (`useOpenWindow`) / action `{type: "open", by?: "user" \| "feature"}` | Default `"user"` (every click-driven caller unchanged): an existing window reopens at its stored rect. `"feature"` on a window not open: auto-placed if its rect overlaps a rendered open window or it still sits where auto placement put it (this page) / at its default-layout or fitted default rect; written with `area`. Already open → front only. Callers with `"feature"`: combat's Start (`start-end.ts` `startAndFollow`); `idleInitiativeOnLoad` only minimises | FR-SHELL-08, -41 |
 | `appear` (availability flip, e.g. player Initiative at Start) | Same rule as a feature open (re-placed over a window even if the user moved it there; a user spot clear of windows kept) | FR-SHELL-40, -41 |
 | `defineWindow({… restoreOpen?: false})` | Applying the layout entry loads it `closed`, geometry kept; the next open uses it. Opt-in: `party.handout` (both registries, its line in `windows.ts`) | FR-SHELL-42 |
-| Launcher fit (`launcher-fit.ts` `fitLauncher(items, vpW, metrics)`, `Launcher.tsx`) | Bar ≤ viewport − 8 px each side: labels → icon only (`data-compact="true"`, label in the Tooltip) → overflow into the "⋯" menu: closed before open / minimised, highest `order` first; menu items keep launcher order, then "Reset layout" last. Recomputed on viewport width, availability and layout restore (not on open / close: a window opened from the menu stays there until then). Label widths measured once (canvas `measureText`) | FR-SHELL-43 |
+| Launcher fit (`launcher-fit.ts` `fitLauncher(items, vpW, metrics)`, `Launcher.tsx`) | Bar ≤ viewport − 8 px each side: labels → icon only (`data-compact="true"`, label in the Tooltip) → overflow into the "⋯" menu: closed before open / minimised, closed with a count badge last among the closed, highest `order` first; menu items keep launcher order, then "Reset layout" last. Recomputed on viewport width, availability and layout restore (not on open / close: a window opened from the menu stays there until then). Label widths measured once (canvas `measureText`) | FR-SHELL-43 |
 | `freeAreas(rects, vp) → Rect[]` (`free-area.ts`), `useFreeArea().areas` | Every maximal free rectangle of the work area right of the rail (x ≥ 68), each ≥ 320×240, largest first (ties → higher, then left), ≤ 16. `freeArea` unchanged (= the first, or its fallback). Consumer: FR-MAP-58 (M5) | FR-SHELL-44 |
 
 **Test IDs:** `ui-launcher` `data-compact`; `ui-launcher-overflow` (wrapper of the "⋯" trigger `ui-launcher-menu`, `data-count` = buttons in the menu); `ui-launcher-overflow-item` + `data-record-id=<kind>` + `data-state`; `ui-window` `data-placed` = `default` (auto placement kept the fitted default rect) \| `auto` (it chose another) \| `stored` (read from the layout entry, or a move / resize end); client memory only, so every window reads `stored` after a reload.
@@ -4466,3 +4466,26 @@ From [scenes-map](../specs/scenes-map.md) FR-MAP-121–123 (#418). **Built by `b
 - **Server signal `vfx.poof`** (server-originated, transient: no event of its own, DB row, log, snapshot or `seq`): `signal {name: "vfx.poof", data: PoofCue, from: {role: "dm"}}`, `PoofCue = {id, sceneId, side, cells: [{col, row}]}` (1–2 cells, top-left of each footprint). Per connection after commit: the DM gets both ends; a player the ends where `records.view` shows them the token (the record before the move for the cell left, after it for the cell reached); neither → no signal.
 - **Canvas tool** `teleport`: DM, `offRail` (a new optional `CanvasToolDef` field: `toolsFor` leaves it off the rail).
 - **Test IDs:** `map-token-menu-teleport`, `map-teleport-panel`, `map-teleport-cancel`; canvas `map-teleport-target` (attrs `col`, `row`), `vfx-poof` (id = cue id; `x`, `y`, `size`), `vfx-over-pass` attr `lastPoof` = cue id.
+
+## 193. AoE tool polish (fix/aoe-template-polish)
+
+From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57–60 ([#427](../decisions-log.md)). **Built by `fix/aoe-template-polish`.** One new signal; no record type, event type, intent or field. `cylinder` stays valid in `TemplateShape` (old kept templates); only the tool stops offering it.
+
+| Signal | Payload | Who sends | Who receives | FR |
+|---|---|---|---|---|
+| `scn.templateClear` | `{sceneId, key, playerId?}` | DM only (`forbidden` otherwise). Scene not the campaign's → `not_found` | The DM's other tabs + the player named; no `playerId` or a non-active scene → the DM's tabs only | FR-SCN-58 |
+
+- **Receiver:** the connection whose ephemeral has `key` ends it (`scn.template {sceneId, key, end: true}`, FR-SCN-23), so everyone drops it; others ignore it. Transient: not stored, logged or queued; a sender that is gone drops out on the 3 s silence.
+- **Client only:** the label pill moves to its own canvas layer `scn-template-labels` (order 47, `top`; Konva nodes `scn-template-label`, id = template id, with `scn-template-label-text` and the new `scn-template-label-measures`), no longer inside the `scn-template` group. `LayerContextMenu.first?(ctx)`: true = asked ahead of the other layers' menus, and its hit goes ahead of the DM's token menu.
+
+## 194. Clear damage (build/cbt-clear-damage)
+
+From [combat-tracker](../specs/combat-tracker.md#68-sprint-15-attacks-through-the-tray) FR-CBT-178 (#428). **Built by `build/cbt-clear-damage`.** No new record type.
+
+| Item | Shape | Rule | FR |
+|---|---|---|---|
+| `cbt.clearDamage` *(new, DM only)* | `{cardId, damageRollId}` → `{cardId}` | Pending card with a to-hit and damage; ended encounter, not pending, no damage, another `damageRollId` → `conflict`; damage-only → `invalid`; player → refused; nothing written | FR-CBT-178 |
+| Event `DamageCleared` *(new, logged, not undoable)* | `{cardId, encounterId, rollIds}` | Changes: the card upsert (one frame, no toast), to the DM and the card's audience | FR-CBT-178 |
+| `cbt.rollDamage`, `cbt.useRoll` | unchanged | Attach to a cleared card before a newer to-hit-only card; attaching removes `damageCleared` | FR-CBT-178 |
+
+- **Test ID:** `cbt-popup-damage-clear`.

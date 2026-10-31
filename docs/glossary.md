@@ -103,7 +103,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Sees invisible** | DM-only sheet sense (truesight, See Invisibility). | — |
 | **Fog-hidden** | A record a given player can't see (not in their sight or clear area): not in that player's `seenBy`, so they don't receive it (owned / party tokens excepted). `fogged` = seen by no player. | Hidden token |
 | **Reveal all / Fog all** | DM fog actions that clear or cover a whole scene. | — |
-| **AoE template** | A shape (cone, sphere, cylinder, cube, line) placed on a scene to show an area of effect, placed freely (Ctrl) or snapped; its affected squares are the cells more than half inside it; ephemeral unless kept ([scene-tools](specs/scene-tools.md)). | Freehand drawing (out of scope) |
+| **AoE template** | A shape (cone, sphere, cube, line) placed on a scene to show an area of effect, placed freely (Ctrl) or snapped; its affected squares are the cells more than half inside it; ephemeral unless kept ([scene-tools](specs/scene-tools.md)). | Freehand drawing (out of scope) |
 | **Affected squares** | The grid cells more than half inside an AoE template ([scene-tools](specs/scene-tools.md)). | — |
 | **Ephemeral template** | An AoE template sent as a live signal, gone when cleared or its placer leaves; **Keep** saves it as a record. | AoE template |
 | **Prop** | A DM-placed image object on a scene's objects layer (barrel, table). | Token |

@@ -1,7 +1,8 @@
 // Launcher fit (FR-SHELL-43, OQ-SHELL-25): the bar never overflows its zone (kit-parity FR-KIT-14:
 // the top bar's centre, between the title and the right cluster; 8 px gutter each side). Too wide → buttons drop their labels (icon only), highest `order` first, keeping the
 // labels that fit (sprint 11 F1, BL-113); every button icon-only and still too wide → buttons move
-// into the trailing "⋯" menu, closed windows first, highest `order` first. Pure; the widths are
+// into the trailing "⋯" menu, closed windows first (those with a count badge last), highest
+// `order` first. Pure; the widths are
 // measured by the caller (`Launcher.tsx`).
 import type { LauncherState } from "./manager";
 
@@ -13,6 +14,8 @@ export interface LauncherItem {
   /** Launcher order (ascending, left to right). */
   order: number;
   state: LauncherState;
+  /** Shows a count badge: the last closed window to leave the bar, so the count stays in sight. */
+  keepInBar?: boolean;
 }
 
 export interface LauncherMetrics {
@@ -140,10 +143,9 @@ export function fitLauncher(
       overflow: [],
     };
   }
-  // Closed before open / minimised, then highest order first.
-  const leaving = [...items].sort(
-    (a, b) => Number(b.state === "closed") - Number(a.state === "closed") || b.order - a.order,
-  );
+  // Closed before open / minimised, plain before badged, then highest order first.
+  const rank = (i: LauncherItem) => (i.state !== "closed" ? 2 : i.keepInBar ? 1 : 0);
+  const leaving = [...items].sort((a, b) => rank(a) - rank(b) || b.order - a.order);
   const out = new Set<string>();
   for (const item of leaving) {
     if (fits(items.length - out.size)) break;
