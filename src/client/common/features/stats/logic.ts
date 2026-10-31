@@ -34,6 +34,9 @@ import {
 import { NOTIFICATION_TYPE } from "../notifications/logic";
 
 export const STATS_WINDOW_KIND = "stats.board";
+/** FR-STATS-90: the d20 chart, a pop-out of the Luck tab (one window, this instance). */
+export const STATS_DICE_KIND = "stats.dice";
+export const STATS_DICE_INSTANCE = "chart";
 /** FR-STATS-85 (sprint 10 T3): Campaign first, and the tab a user open lands on. */
 export const STATS_TABS = ["campaign", "fight", "session", "luck"] as const;
 export type StatsTab = (typeof STATS_TABS)[number];

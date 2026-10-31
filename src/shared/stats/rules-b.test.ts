@@ -276,6 +276,52 @@ describe("FR-STATS-31 highlights", () => {
   });
 });
 
+/** Zeros but the given `face: count` (FR-STATS-89). */
+const facesWith = (counts: Record<number, number>) => {
+  const faces = new Array<number>(20).fill(0);
+  for (const [face, n] of Object.entries(counts)) faces[Number(face) - 1] = n;
+  return faces;
+};
+
+describe("FR-STATS-89 face counts", () => {
+  test("FR-STATS-89 every d20 face counts, kept and dropped; they add up to d20s and its average", () => {
+    const t = new Map<string, LuckTally>();
+    addLuck(
+      t,
+      [
+        roll("ch-Mira", { d20: [18, 3], natural: 18 }),
+        roll("ch-Mira", { d20: [20, 20], natural: 20 }),
+        roll("ch-Mira", { d20: [], hasD20: true }),
+        roll("ch-Mira", { d20: [1], natural: 1, category: "initiative" }),
+      ],
+      chars,
+      "player",
+    );
+    const [mira] = luckRows(t, chars, "player");
+    expect(mira?.faces).toEqual(facesWith({ 3: 1, 18: 1, 20: 2 }));
+    const faces = mira?.faces ?? [];
+    expect(faces.reduce((a, b) => a + b, 0)).toBe(mira?.d20s ?? -1);
+    expect(DmLuckRow.safeParse(mira).success).toBe(true);
+    expect(DmLuckRow.safeParse({ ...mira, faces: faces.slice(1) }).success).toBe(false);
+  });
+
+  test("FR-STATS-89 a face outside 1–20 lands on no bar (nothing else breaks)", () => {
+    const t = new Map<string, LuckTally>();
+    addLuck(t, [roll("ch-Mira", { d20: [0, 21, 7] })], chars, "player");
+    expect(t.get("ch-Mira")?.faces).toEqual(facesWith({ 7: 1 }));
+  });
+
+  test("FR-STATS-89 merging tallies adds faces and never shares the source's array", () => {
+    const a = new Map<string, LuckTally>();
+    addLuck(a, [roll("ch-Mira", { d20: [20] })], chars, "player");
+    const merged = new Map<string, LuckTally>();
+    mergeLuck(merged, a);
+    mergeLuck(merged, a);
+    expect(merged.get("ch-Mira")?.faces).toEqual(facesWith({ 20: 2 }));
+    expect(a.get("ch-Mira")?.faces).toEqual(facesWith({ 20: 1 }));
+  });
+});
+
 describe("FR-STATS-38 luck formulas", () => {
   test("FR-STATS-38 every formula row: rolls, d20s (dropped too), avg 1 decimal, nats only from natural", () => {
     const t = new Map<string, LuckTally>();
@@ -306,6 +352,7 @@ describe("FR-STATS-38 luck formulas", () => {
       avg: 12.4,
       nat20: 1,
       nat1: 0,
+      faces: facesWith({ 1: 1, 3: 1, 18: 1, 20: 2 }),
     });
     expect(
       luckRows(new Map([["ch-Thorn", { ...mira, d20Sum: 0, d20s: 0 } as never]]), chars, "dm")[0]
