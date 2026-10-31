@@ -1236,8 +1236,13 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     if (isProt(w)) {
       const spot = ladder(id, { cause, prev, putAway: false, push: true });
       if (!spot) return;
+      const def = defOf(w);
+      const u = def && useful(def, vp, registry);
+      const short = u !== undefined && (spot.rect.w < u.w || spot.rect.h < u.h);
+      if (short && roomFromPushed(id, cause, prev)) return;
       write(id, spot.rect, "pushed", { cause, rung: spot.rung });
       pcFlags.set(id, spot.pcClear);
+      pushed.push(id);
       return;
     }
     const spot = ladder(id, { cause, prev, putAway: false, maxL2: true, push: true });
@@ -1248,6 +1253,46 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     }
     putAwayWin(w, cause, cause.slice(cause.indexOf(":") + 1));
     log.push(`${label}:${w.kind}>put-away`);
+  };
+
+  /** The protected windows this push has placed so far, in order. */
+  const pushed: string[] = [];
+
+  /**
+   * FR-SHELL-225 (BL-144): a protected window a push would leave below its useful size takes a spot
+   * at it where one placed earlier by the same push (a window of the push: it has its own L2) goes
+   * down to its useful size in its corner: one such window, the latest first, then all of them.
+   * They come back with the bar (FR-SHELL-102). Nothing else moves.
+   */
+  const roomFromPushed = (id: string, cause: string, prev: Rect): boolean => {
+    const others = pushed.filter((p) => {
+      const o = get(p);
+      const d = o && defOf(o);
+      if (!o || !d) return false;
+      const u = useful(d, vp, registry);
+      return o.w > u.w || o.h > u.h;
+    });
+    const sets = [...[...others].reverse().map((p) => [p]), ...(others.length > 1 ? [others] : [])];
+    for (const set of sets) {
+      const before = set.map((p) => get(p) as WindowState);
+      for (const o of before) {
+        setWin(idOf(o), { ...o, ...squeezeRect(plainRect(o), defOf(o) as WindowDef) });
+      }
+      const spot = ladder(id, { cause, prev, putAway: false, maxL2: true, push: true });
+      if (spot) {
+        for (const o of before) {
+          const now = plainRect(get(idOf(o)) as WindowState);
+          setWin(idOf(o), o);
+          write(idOf(o), now, "pushed", { cause, rung: "L2" });
+        }
+        write(id, spot.rect, "pushed", { cause, rung: spot.rung });
+        pcFlags.set(id, spot.pcClear);
+        pushed.push(id);
+        return true;
+      }
+      for (const o of before) setWin(idOf(o), o);
+    }
+    return false;
   };
 
   /**
@@ -1560,7 +1605,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       };
       const others = out.filter((x) => idOf(x) !== id && !pending.has(idOf(x)));
       const r = shownRect([...others, back], back, ctx);
-      const blocked = [...shownRects(others, ctx).values()].some((o) => overlaps(r, o));
+      // A protected window isn't kept from its rect by a remembered one (FR-SHELL-225, -151).
+      const blocked = [...shownRects(others, ctx)].some(
+        ([o, or]) => !(isProt(w) && isRemembered(o)) && overlaps(r, or),
+      );
       const free = !blocked && !hard.some((k) => overlaps(r, k));
       if (free && (d.userSpot || pcFree(r))) {
         setWin(id, back);

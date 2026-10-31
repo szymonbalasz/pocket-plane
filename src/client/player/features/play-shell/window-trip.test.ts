@@ -1,6 +1,10 @@
 // Sprint 15, window memory (BL-146, #381): the protected windows' round trip through a resize, in
 // the harness's world: the shell controller, the real pure camera, `session-sim-11` states.
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
+import type { WindowState } from "@shared/play-shell/layout";
+import { workArea } from "@ui/features/play-shell/geometry";
+import { keepOuts } from "@ui/features/play-shell/keep-outs";
+import { type ManagerContext, settle } from "@ui/features/play-shell/placer";
 import {
   REPLAY_SETS,
   type ReplayRun,
@@ -130,4 +134,69 @@ test("FR-SHELL-224 P1 fitted @1280×720 load: Stronghold opens at its useful hei
   const hold = open?.windows.split(" ").find((e) => e.startsWith("hold.stronghold:"));
   const [, h] = (hold?.split(",")[2] ?? "").split("×");
   expect(Number(h)).toBeGreaterThanOrEqual(400);
+});
+
+test("FR-SHELL-225 P2 moved @1280×800 memory: a tool-bar push keeps Initiative at its useful size", () => {
+  const set = REPLAY_SETS.player.find((s) => s.name === "P2");
+  if (!set) throw new Error("no set P2");
+  const run = runReplay(playerWindows, set, "moved", SMALL, "memory");
+  expect(run.problems).toEqual([]);
+});
+
+describe("FR-SHELL-225 a push's windows share the room", () => {
+  // The repro's scene: the bar over the sheet and Initiative, two remembered windows and the PCs
+  // around them (P2 moved @1280×800, `memory bar shown`).
+  const area = workArea(SMALL);
+  const open = (kind: string, x: number, y: number, w: number, h: number, z: number) =>
+    ({ kind, instance: "main", state: "open", x, y, w, h, z, area }) as WindowState;
+  const user = (w: WindowState): WindowState => ({ ...w, userSpot: true, userSize: true });
+  const before = [
+    open("dice.log", 68, 588, 510, 200, 1),
+    open(SHEET, 68, 60, 320, 440, 2),
+    open("cbt.initiative", 400, 60, 280, 400, 3),
+    user(open("note.history", 1091, 60, 400, 380, 4)),
+    user(open("party.board", 98, 376, 360, 360, 5)),
+  ];
+  const bar = { x: 64, y: 56, w: 360, h: 48 };
+  const pcs = [
+    { x: 1129, y: 105, w: 42, h: 42, pc: true },
+    { x: 1087, y: 273, w: 42, h: 42, pc: true },
+    { x: 1045, y: 189, w: 42, h: 42, pc: true },
+  ];
+  const ctx = (shown: boolean, memory: ManagerContext["memory"]): ManagerContext => ({
+    registry: playerWindows,
+    viewport: SMALL,
+    available: new Set(playerWindows.defs.map((d) => d.kind)),
+    avoid: () => pcs,
+    camera: () => "moved",
+    keepOuts: () => keepOuts("player", SMALL, new Map(shown ? [["map.toolbar", bar]] : [])),
+    ...(memory && { memory }),
+  });
+  const rect = (ws: readonly WindowState[], kind: string) => {
+    const w = ws.find((x) => x.kind === kind) as WindowState;
+    return { x: w.x, y: w.y, w: w.w, h: w.h };
+  };
+
+  test("FR-SHELL-225 the sheet gives up height, only down to its useful size", () => {
+    const p = settle(before, { type: "push", rect: bar }, ctx(true, undefined));
+    expect(rect(p.windows, SHEET).h).toBe(338);
+    const init = rect(p.windows, "cbt.initiative");
+    expect(init.w).toBeGreaterThanOrEqual(280);
+    expect(init.h).toBeGreaterThanOrEqual(320);
+    // Remembered windows and the Game log stay.
+    for (const kind of ["dice.log", "note.history", "party.board"]) {
+      expect(rect(p.windows, kind)).toEqual(rect(before, kind));
+    }
+  });
+
+  test("FR-SHELL-225 both come back with the bar", () => {
+    const p = settle(before, { type: "push", rect: bar }, ctx(true, undefined));
+    const back = settle(
+      p.windows,
+      { type: "return" },
+      ctx(false, () => p.memory),
+    );
+    expect(rect(back.windows, SHEET)).toEqual(rect(before, SHEET));
+    expect(rect(back.windows, "cbt.initiative")).toEqual(rect(before, "cbt.initiative"));
+  });
 });
