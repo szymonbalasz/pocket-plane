@@ -38,6 +38,8 @@ if (process.env.UPDATE_FAILING === "1") {
 // passes, its exemption retired. None left.
 // Sprint 14 F1 (BL-134): K5's D3 fitted @1280×800 push passes (the push path's I7 keeps a zone a
 // drop gave back, FR-SHELL-149 / -159): 7 → 6.
+// Sprint 15 window memory (BL-146, BL-145, FR-SHELL-220–223): D1 / D2 / D3 moved @1440×900 and
+// @1600×900 resize pass: 6 → 0.
 const EXEMPTIONS = new Map<string, string>();
 
 test("FR-SHELL-160 named exemptions are recorded failing cells (DM)", () => {
