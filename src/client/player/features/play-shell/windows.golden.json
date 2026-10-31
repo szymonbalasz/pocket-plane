@@ -289,7 +289,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "505,106,360×390",
+    "rect": "505,96,360×400",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -307,7 +307,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 hold.stronghold",
-    "rect": "464,60,480×390",
+    "rect": "474,96,406×400",
     "placed": "reopened",
     "parked": "stats.board"
   },
@@ -565,7 +565,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "505,106,360×390",
+    "rect": "505,96,360×400",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -583,7 +583,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 hold.stronghold",
-    "rect": "464,60,480×390",
+    "rect": "474,96,406×400",
     "placed": "reopened",
     "parked": "stats.board"
   },
@@ -775,7 +775,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "505,106,360×390",
+    "rect": "505,96,360×400",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -793,7 +793,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 hold.stronghold",
-    "rect": "464,60,480×390",
+    "rect": "474,96,406×400",
     "placed": "reopened",
     "parked": "stats.board"
   },
@@ -853,7 +853,7 @@
   },
   {
     "at": "open @1280×720 shell.prefs",
-    "rect": "505,106,360×390",
+    "rect": "505,96,360×400",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
@@ -871,7 +871,7 @@
   },
   {
     "at": "open @1280×720 hold.stronghold",
-    "rect": "464,60,480×390",
+    "rect": "474,96,406×400",
     "placed": "auto",
     "parked": "stats.board"
   },
@@ -919,7 +919,7 @@
   },
   {
     "at": "reopen @1280×720 shell.prefs",
-    "rect": "505,106,360×390",
+    "rect": "505,96,360×400",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -937,7 +937,7 @@
   },
   {
     "at": "reopen @1280×720 hold.stronghold",
-    "rect": "464,60,480×390",
+    "rect": "474,96,406×400",
     "placed": "reopened",
     "parked": "stats.board"
   },

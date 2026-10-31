@@ -795,6 +795,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       tokens,
       need: need(w0, def),
       size,
+      usefulH: u.h,
       memo,
       ...(o.prev && { prev: o.prev }),
     });

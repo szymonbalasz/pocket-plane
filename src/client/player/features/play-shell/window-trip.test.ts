@@ -120,3 +120,14 @@ test("FR-SHELL-223 P3 fitted @1600×900 resize: the Game log's squeeze ends with
   expect(log("viewport 1440×900")).toBe("open:68,688,460×200");
   expect(log("viewport 1600×900")).toBe("open:68,568,850×320");
 });
+
+test("FR-SHELL-224 P1 fitted @1280×720 load: Stronghold opens at its useful height, not cut by the toast corner", () => {
+  const set = REPLAY_SETS.player.find((s) => s.name === "P1");
+  if (!set) throw new Error("no set P1");
+  const run = runReplay(playerWindows, set, "fitted", { w: 1280, h: 720 }, "load");
+  expect(run.problems).toEqual([]);
+  const open = run.steps.find((s) => s.step === "open hold.stronghold");
+  const hold = open?.windows.split(" ").find((e) => e.startsWith("hold.stronghold:"));
+  const [, h] = (hold?.split(",")[2] ?? "").split("×");
+  expect(Number(h)).toBeGreaterThanOrEqual(400);
+});
