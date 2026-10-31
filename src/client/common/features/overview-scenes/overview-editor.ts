@@ -48,6 +48,8 @@ export interface OverviewEditorState {
   gesture: ItemGesture | null;
   /** A handle's cursor while hovering it. */
   cursor: string | null;
+  /** FR-OVW-49: the own miniature a player last pressed; their arrow keys move it. */
+  keyItem: string | null;
   menu: { itemId: string; at: Point } | null;
   picking: ItemPick | null;
   /** FR-OVW-32: the miniature whose Name dialog is open. */
@@ -67,6 +69,7 @@ export const initialEditor: OverviewEditorState = {
   selection: emptySelection,
   gesture: null,
   cursor: null,
+  keyItem: null,
   menu: null,
   picking: null,
   naming: null,
