@@ -5,7 +5,7 @@ import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { recapWindow } from "@ui/features/session-recap/window";
-import { statsWindow } from "@ui/features/stats/window";
+import { statsDiceWindow, statsWindow } from "@ui/features/stats/window";
 import { strongholdWindow } from "@ui/features/strongholds/window";
 import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
 import { assetsWindow } from "./features/assets-pipeline/assets-window";
@@ -58,6 +58,7 @@ const windows: WindowDef[] = [
   statBlockWindow, // ent.statblock "Stat block" (kit-parity K7, FR-KIT-100)
   assetsWindow, // asset.library "Assets" (assets-pipeline, FR-ASSET-69; #394)
   dmCompendiumEntryWindow, // cmp.entry, no launcher, one per popped-out entry (compendium, FR-CMP-76)
+  statsDiceWindow, // stats.dice, no launcher, the Luck tab's d20 chart (stats, FR-STATS-90)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);
