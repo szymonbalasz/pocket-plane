@@ -6,11 +6,11 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 **State:** no sprint running. Sprint 14 closed (#381); since then the DM's asks were built one by one on `main` with no sprint plan: the `play` command, tray attacks, Assets window, 5etools import, overview scenes, scenes list drag and folders, doors replacing walls, fog edges, exact explored memory, search clear, game log menu (#382–#412). The DM's real campaign runs from `bun run play`: never touch `%LOCALAPPDATA%/PocketPlane`, its backups or port 4090.
 
-**Next:** session-sim-17's findings if any are serious, then **linked notes with backlinks** (next big feature, #413), then the quest log, in-game calendar and session timeline.
+**Next:** **linked notes with backlinks** (next big feature, #413), then the quest log, in-game calendar and session timeline. Session-sim-17 found nothing serious.
 
-**Session-sim-17:** in progress on `fix/housekeeping-sim` (the first full run since sim-16 on 2026-10-26).
+**Session-sim-17 (#414):** 18 / 19 PASS on `main` @ 7fe68b18, no leak, digest identical. Not clean: the recheck (BL-151, BL-164, BL-171 still open). New glitches BL-174–BL-177. Evidence `.verify/20261031-102757-session-sim-17/` in the main checkout.
 
-**Backlog candidates still open:** window frame BL-146 (approved, unbuilt) with BL-143–145; BL-124 / BL-152; toasts BL-151; kit look BL-149 / BL-150; AoE label BL-153; CI flakes BL-154 / BL-158 / BL-159; slow commands BL-142; small BL-123, BL-155–157, BL-164–171. **Waiting on the DM's call on migrations:** BL-172 (schema push crash), BL-173 (upgrade check).
+**Backlog candidates still open:** window frame BL-146 (approved, unbuilt) with BL-143–145; BL-124 / BL-152; toasts BL-151; kit look BL-149 / BL-150; AoE label BL-153; CI flakes BL-154 / BL-158 / BL-159; slow commands BL-142; sim-17 BL-174–177; small BL-123, BL-155–157, BL-164–171. **Waiting on the DM's call on migrations:** BL-172 (schema push crash), BL-173 (upgrade check).
 
 **Shared-file locks:** none.
 
