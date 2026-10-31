@@ -2889,4 +2889,4 @@ From [log-share](../specs/log-share.md#8-data-model) (#415). **No new table, col
 
 ## 152. AoE tool polish (fix/aoe-template-polish)
 
-From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57–60 ([#426](../decisions-log.md)). **No new table, column or record type.** `aoe_template.shape` keeps `cylinder` as a valid value: rows kept earlier stay as they are, the AoE tool just no longer places new ones. Protocol side: [protocol §193](../protocol/README.md#193-aoe-tool-polish-fixaoe-template-polish).
+From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57–60 ([#427](../decisions-log.md)). **No new table, column or record type.** `aoe_template.shape` keeps `cylinder` as a valid value: rows kept earlier stay as they are, the AoE tool just no longer places new ones. Protocol side: [protocol §193](../protocol/README.md#193-aoe-tool-polish-fixaoe-template-polish).

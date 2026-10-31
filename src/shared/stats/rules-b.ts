@@ -17,6 +17,7 @@ import {
   type UnseenKind,
 } from "./rules";
 import {
+  D20_FACES,
   DM_DICE_KEY,
   DM_DICE_NAME,
   type DmFellEvent,
@@ -280,8 +281,17 @@ export interface LuckTally {
   d20Sum: number;
   nat20: number;
   nat1: number;
+  /** FR-STATS-89: `faces[v - 1]` = how many d20s came up `v`. */
+  faces: number[];
 }
-const luckTally = (): LuckTally => ({ rolls: 0, d20s: 0, d20Sum: 0, nat20: 0, nat1: 0 });
+const luckTally = (): LuckTally => ({
+  rolls: 0,
+  d20s: 0,
+  d20Sum: 0,
+  nat20: 0,
+  nat1: 0,
+  faces: new Array<number>(D20_FACES).fill(0),
+});
 
 /**
  * FR-STATS-37, -39: the row a counted roll lands on: a party character (a character actor), else
@@ -320,7 +330,11 @@ export function addLuck(
     }
     t.rolls += 1;
     t.d20s += r.d20.length;
-    for (const v of r.d20) t.d20Sum += v;
+    for (const v of r.d20) {
+      t.d20Sum += v;
+      const at = v - 1;
+      if (t.faces[at] !== undefined) t.faces[at] += 1;
+    }
     // FR-DICE-20: `natural` is set only for one kept d20.
     if (r.natural === 20) t.nat20 += 1;
     else if (r.natural === 1) t.nat1 += 1;
@@ -335,6 +349,9 @@ export function mergeLuck(into: Map<string, LuckTally>, from: ReadonlyMap<string
     x.d20Sum += t.d20Sum;
     x.nat20 += t.nat20;
     x.nat1 += t.nat1;
+    t.faces.forEach((n, i) => {
+      x.faces[i] = (x.faces[i] ?? 0) + n;
+    });
     into.set(k, x);
   }
 }
@@ -358,6 +375,7 @@ export function luckRows(
     avg: avgOf(t),
     nat20: t.nat20,
     nat1: t.nat1,
+    faces: [...t.faces],
   });
   const out: DmLuckRow[] = [];
   for (const [key, t] of tallies) {
