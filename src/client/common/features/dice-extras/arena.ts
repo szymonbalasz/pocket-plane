@@ -38,8 +38,25 @@ export function arenaOf(rect: Size, diePx: number): Arena {
   return { x: snap(rect.w) / 2 / perUnit, z: snap(rect.h) / 2 / perUnit };
 }
 
-/** FR-DICEX-33: the screen arena = the viewport, walls on its edges. */
-export const screenArena = (viewport: Size): Arena => arenaOf(viewport, dieSizePx(viewport));
+/**
+ * FR-DICEX-33: the screen arena = a centred box, its walls at least this share of the viewport in
+ * from every edge, so dice never roll over the chrome at the window's edges.
+ */
+export const SCREEN_MARGIN = 0.2;
+
+/** The box's side, rounded down to 50 px so the margin is never less than `SCREEN_MARGIN`. */
+const boxSide = (px: number) =>
+  Math.floor((px * (1 - 2 * SCREEN_MARGIN)) / ARENA_SNAP_PX) * ARENA_SNAP_PX;
+
+/** FR-DICEX-33: the screen arena, walls on the box. */
+export const screenArena = (viewport: Size): Arena =>
+  arenaOf({ w: boxSide(viewport.w), h: boxSide(viewport.h) }, dieSizePx(viewport));
+
+/** FR-DICEX-33: the screen camera's extents: the whole viewport, so shadows fall past the walls. */
+export function screenView(viewport: Size): Arena {
+  const perUnit = dieSizePx(viewport) / DIE_WORLD;
+  return { x: viewport.w / 2 / perUnit, z: viewport.h / 2 / perUnit };
+}
 
 /** FR-DICEX-44: the renderer's pixel ratio. */
 export const pixelRatioOf = (devicePixelRatio: number) =>

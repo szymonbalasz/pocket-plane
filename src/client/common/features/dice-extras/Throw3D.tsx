@@ -9,7 +9,7 @@ import type { DiceLook } from "@shared/dice-extras/looks";
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import { isMeshDie, type ThrowDie } from "@shared/dice-extras/throw";
 import { type RefObject, useEffect, useRef, useState } from "react";
-import { type Arena, arenaOf, dieSizePx, screenArena, shadowsFor } from "./arena";
+import { type Arena, arenaOf, dieSizePx, screenArena, screenView, shadowsFor } from "./arena";
 import type { PlayHandle, Rect, RestInfo, Still } from "./dice3d/index";
 import { rectOf } from "./layer-host";
 import { dice3d } from "./lazy3d";
@@ -28,10 +28,10 @@ export const isSlow = (medianFrameMs: number | null) =>
 
 const viewport = () => ({ w: globalThis.innerWidth || 1, h: globalThis.innerHeight || 1 });
 
-/** FR-DICEX-33: the screen arena's rect = the viewport. */
+/** FR-DICEX-33: a screen throw draws on the whole viewport; only its walls sit in the box. */
 export const viewportRect = (): Rect => ({ x: 0, y: 0, ...viewport() });
 
-/** The arena of a run: the viewport's, or the zone's dice area with the screen's die size. */
+/** The arena of a run: the screen's box, or the zone's dice area with the screen's die size. */
 function arenaFor(arena: ThrowRun["plan"]["arena"], r: Rect): Arena {
   return arena === "screen" ? screenArena(r) : arenaOf(r, dieSizePx(viewport()));
 }
@@ -70,6 +70,7 @@ export function useRun3D(
         layer,
         rect: () => input.current.rect() ?? start,
         arena: arenaFor(r.plan.arena, start),
+        ...(r.plan.arena === "screen" && { view: screenView(start) }),
         shadows: shadowsFor(viewport()),
         seed: mod.seedOf(r.t.seedId),
         dice: ds.map((d) => ({
