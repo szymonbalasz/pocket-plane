@@ -123,7 +123,7 @@ export const RESERVED_KEYS: readonly KeySpec[] = [
 /** The fixed "Map and rolls" rows of the shortcuts sheet (FR-SHELL-191, -192). */
 export const FIXED_KEYS: readonly { keys: string; title: string; dmOnly?: true }[] = [
   { keys: "Space", title: "Hold and drag to pan the map; press a focused button" },
-  { keys: "Escape", title: "Close a dialog, end a tool, dismiss a request" },
+  { keys: "Escape", title: "Clear a search, close a dialog, end a tool, dismiss a request" },
   // The DM's map tools (FR-MAP-17, fog, structure, props): no player has them.
   { keys: "Ctrl+D", title: "Duplicate the selected tokens", dmOnly: true },
   {

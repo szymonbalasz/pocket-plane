@@ -147,12 +147,12 @@ Stubs only. Not to be claimed during MVP spec phase.
 
 | Spec | Prefix | Note |
 |---|---|---|
-| [World builder](post-mvp/world-builder.md) | WORLD | Incl. location ↔ scenes |
-| [Dice extras](post-mvp/dice-extras.md) | DICEX | Whispers only (the rest is in [dice-extras](dice-extras.md)) |
-| [Campaign manager](post-mvp/campaign-manager.md) | CMGR | |
+| [World builder](post-mvp/world-builder.md) | WORLD | Incl. location ↔ scenes. **Next big feature:** linked notes with backlinks; then the quest log (#413) |
+| [Dice extras](post-mvp/dice-extras.md) | DICEX | No remaining scope: whispers removed, tier F (#413); the rest is in [dice-extras](dice-extras.md) |
+| [Campaign manager](post-mvp/campaign-manager.md) | CMGR | Calendar and session timeline: tier A, right after linked notes (#413) |
 | [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | 5etools import: books, replaced entries, token art; complete (#395), [ADR-0074](../architecture/adr/0074-user-supplied-sources.md) |
-| [Levelling workflows](post-mvp/levelling.md) | LVL | |
+| [Levelling workflows](post-mvp/levelling.md) | LVL | Tier B (#413; was A) |
 | [Agent / MCP API](agent-api.md) | AGENT | Expanded (#378), complete (#379); [ADR-0072](../architecture/adr/0072-agent-mcp-server.md) |
 | [Theme system](post-mvp/theme-system.md) | THEME | Expanded, see [Art track](#art-track-2026-10-25) |
-| [Single executable](post-mvp/single-executable.md) | PKG | |
-| [Obsidian importer](post-mvp/obsidian-importer.md) | OBS | |
+| [Single executable](post-mvp/single-executable.md) | PKG | Deferred (#413) |
+| [Obsidian importer](post-mvp/obsidian-importer.md) | OBS | Tier C, low priority (#413) |

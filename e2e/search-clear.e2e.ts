@@ -1,13 +1,13 @@
 // e2e-bundle: compendium
 // FR-KIT-108: the search fields' clear ×: Creatures, Compendium, Rules, the encounter lookup and
 // the palette. No × while empty; a click empties the field, undoes the filter and keeps the focus.
-// The Add target field: combat-tracker.e2e.ts. 5etools' books: cmpx-5etools.e2e.ts. Images:
-// image-search.e2e.ts.
+// FR-KIT-109: Esc does the same and nothing else. The Add target field: combat-tracker.e2e.ts.
+// 5etools' books: cmpx-5etools.e2e.ts. Images: image-search.e2e.ts.
 import { expect, type Locator, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
 
-/** No × while empty; × with text; a click empties the field and focuses it. */
+/** No × while empty; × with text; a click, then Esc, empties the field and focuses it. */
 async function clears(field: Locator, clear: Locator, text: string) {
   await expect(clear).toHaveCount(0);
   await field.fill(text);
@@ -16,9 +16,14 @@ async function clears(field: Locator, clear: Locator, text: string) {
   await expect(field).toHaveValue("");
   await expect(field).toBeFocused();
   await expect(clear).toHaveCount(0);
+  await field.fill(text);
+  await field.press("Escape");
+  await expect(field).toHaveValue("");
+  await expect(field).toBeFocused();
+  await expect(clear).toHaveCount(0);
 }
 
-test("FR-KIT-108 search fields clear with the ×", async ({ browser }) => {
+test("FR-KIT-108 FR-KIT-109 search fields clear with the × and Esc", async ({ browser }) => {
   const { secret, recordId } = e2eEnv();
   const dm = await rolePage(browser);
   await loginDm(dm, secret);
@@ -34,6 +39,10 @@ test("FR-KIT-108 search fields clear with the ×", async ({ browser }) => {
   await search.fill("no such creature");
   await expect(rows).toHaveCount(0);
   await clear.click();
+  await expect(rows).toHaveCount(all);
+  await search.fill("no such creature");
+  await expect(rows).toHaveCount(0);
+  await search.press("Escape");
   await expect(rows).toHaveCount(all);
   await clears(search, clear, "gob");
 
@@ -68,11 +77,15 @@ test("FR-KIT-108 search fields clear with the ×", async ({ browser }) => {
   await lookup.fill("og");
   await expect(dm.getByTestId("cbt-lookup-option").first()).toBeVisible();
   await lookup.press("Escape");
+  await expect(lookup).toHaveValue("");
+  await expect(dm.getByTestId("cbt-lookup-option")).toHaveCount(0);
 
-  // The palette stays open.
+  // The palette stays open until an Esc on the empty field.
   await dm.getByTestId("map-canvas").focus();
   await dm.keyboard.press("Control+k");
   await expect(dm.getByTestId("ui-palette")).toBeVisible();
   await clears(dm.getByTestId("ui-palette-input"), dm.getByTestId("ui-palette-input-clear"), "gob");
   await expect(dm.getByTestId("ui-palette")).toBeVisible();
+  await dm.keyboard.press("Escape");
+  await expect(dm.getByTestId("ui-palette")).toHaveCount(0);
 });

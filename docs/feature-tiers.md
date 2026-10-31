@@ -49,8 +49,8 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Drag to reorder initiative | B | [combat-extras](specs/combat-extras.md) | |
 | Auto-roll attacks + hit/miss hint vs AC | S | [combat-tracker](specs/combat-tracker.md) | MVP per #74 (DM attack popup) |
 | End-of-combat summary | B | [stats](specs/stats.md) | Plus campaign-wide stats; discuss after MVP |
-| Legendary / lair actions | C | [combat-extras](specs/combat-extras.md) | |
-| Reaction-used tracker | C | [combat-extras](specs/combat-extras.md) | |
+| Legendary / lair actions | C | [combat-extras](specs/combat-extras.md) | Stays C (#413) |
+| Reaction-used tracker | C | [combat-extras](specs/combat-extras.md) | Stays C (#413) |
 
 **Attack flow (MVP, part of damage cards):** click attack; Shift = advantage, Ctrl = disadvantage; describe the action; DM applies via a card with normal / half / none / double and can override any value.
 
@@ -70,8 +70,8 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Hidden DM rolls | S | [dice-roll-log](specs/dice-roll-log.md) | Via per-category public log settings (section 6) |
 | Spell slots tracker | B | [character-sheet-full](specs/character-sheet-full.md) | |
 | Party HP/AC summary for players | B | [play-shell](specs/play-shell.md) | Pairs with portrait strip |
-| Player whispers roll to DM | C | [dice-extras](specs/post-mvp/dice-extras.md) | |
-| Inventory weight / encumbrance | C | [character-sheet-full](specs/character-sheet-full.md) | |
+| Player whispers roll to DM | F (#413) | — | Removed: not wanted |
+| Inventory weight / encumbrance | C | [character-sheet-full](specs/character-sheet-full.md) | Stays C (#413) |
 | Short/long rest buttons | C | [character-sheet-full](specs/character-sheet-full.md) | |
 | Inspiration toggle | D | — | Use advantage instead |
 | D&D Beyond character import | F | — | |
@@ -81,7 +81,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Feature | Tier | Spec | Notes |
 |---|---|---|---|
 | Handouts: DM reveals image/text to all or chosen players | A | [party-board](specs/post-mvp/party-board.md) | |
-| Wikilinks between notes + backlinks | A | [world-builder](specs/post-mvp/world-builder.md) | Informs [ADR-0011](architecture/adr/0011-cross-references.md) |
+| Wikilinks between notes + backlinks | A, **next big feature** (#413) | [world-builder](specs/post-mvp/world-builder.md) | Informs [ADR-0011](architecture/adr/0011-cross-references.md) |
 | Party inventory with transfer to characters | A | [party-board](specs/post-mvp/party-board.md) | Grows from [party-loot](specs/party-loot.md) |
 | Gold ledger with split-among-party | A (wallets + moves: S, #150) | [party-board](specs/post-mvp/party-board.md) | Grows from [party-loot](specs/party-loot.md) |
 | NPC directory players build as they meet people | A | [world-builder](specs/post-mvp/world-builder.md) | Player-authored notes on revealed NPCs |
@@ -90,8 +90,9 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Map pins linked to notes/locations | B | [scene-tools](specs/scene-tools.md) | |
 | Shared party notes | B | [party-board](specs/post-mvp/party-board.md) | |
 | Session recap / journal | B | [session-recap](specs/session-recap.md) (recap, sprint 9); journal: [campaign-manager](specs/post-mvp/campaign-manager.md) | On-demand recap from the event log (#339); see [ADR-0013](architecture/adr/0013-session-journal-scope.md) |
-| Quest log with status | C | [world-builder](specs/post-mvp/world-builder.md) | |
-| In-game calendar / time tracking | C | [campaign-manager](specs/post-mvp/campaign-manager.md) | |
+| Quest log with status | A, right after linked notes (#413) | [world-builder](specs/post-mvp/world-builder.md) | |
+| In-game calendar / time tracking | A, right after linked notes (#413) | [campaign-manager](specs/post-mvp/campaign-manager.md) | |
+| Session timeline | A, right after linked notes (#413) | [campaign-manager](specs/post-mvp/campaign-manager.md) | [ADR-0013](architecture/adr/0013-session-journal-scope.md) has no session entity: settle how they fit in the spec phase |
 | Text chat | C–D | [dice-roll-log](specs/dice-roll-log.md) | Only as part of the game log (Roll20-style): text and pasted descriptions alongside rolls. No separate chat. |
 | Random tables | D | — | |
 
@@ -151,13 +152,14 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Multi-target select | S (#148, see §8) | [combat-extras](specs/combat-extras.md) | |
 | Open5e import | A | [compendium](specs/post-mvp/compendium.md) | Important |
 | **AI paste** (paste text found online → prefilled creature/item form) | — | [agent-api](specs/agent-api.md) | Dropped in-app (#379): the MCP server + the content skill turn any text or image into tool calls; no Paste JSON box, no importer / exporter |
-| DM homebrew file import | A | [compendium](specs/post-mvp/compendium.md) | Formats TBD |
-| Griffon's Saddlebag item import (partial mechanics) | B | [compendium](specs/post-mvp/compendium.md) | Fill in mechanics as items get used |
+| DM homebrew file import | F (#413) | — | Solved by the MCP tools ([agent-api](specs/agent-api.md)) |
+| Griffon's Saddlebag item import (partial mechanics) | D (#413) | — | No adapter: each item is so different, with so many new mechanics; use the MCP tools per item |
 | 5etools import | C | [compendium-expansion](specs/post-mvp/compendium-expansion.md) | Separate project |
-| Obsidian vault tie-in to notes | C | [obsidian-importer](specs/post-mvp/obsidian-importer.md) | Story/world-building |
+| Obsidian vault tie-in to notes | C, low priority (#413) | [obsidian-importer](specs/post-mvp/obsidian-importer.md) | Story/world-building. Structuring story design into the app should emerge after a few months of playtesting |
 | Agent features (NPC creation, map work, note grooming) | C | [agent-api](specs/agent-api.md) | Keep design SOLID: everything is a server command |
-| Character builder (players create characters); full editing of PCs and NPCs, players fill in their own sheets | A (design for later, #154) | [levelling](specs/post-mvp/levelling.md) | MVP uses fixture characters; speed, scores and saves come from fixtures / the API until then |
-| Import existing characters | C | — | Once-off scripts, way post-MVP |
+| Character builder (players create characters) and guided level-up; full editing of PCs and NPCs, players fill in their own sheets | B (#413; was A, #154) | [levelling](specs/post-mvp/levelling.md) | Manual sheet edits are fine. With 5etools imported, classes carry huge complexity: possibly the biggest update ever, not clearly worth it now |
+| Import existing characters | F (#413) | — | The MCP tools cover it fully |
+| Single executable | Deferred (#413) | [single-executable](specs/post-mvp/single-executable.md) | Nice, not needed now; revisit if other people start using it, since running it is developer-centric today |
 | Session tracking | F | [ADR-0013](architecture/adr/0013-session-journal-scope.md) | Encounters instead |
 
 ## 8. DM feedback after the Combat build (#145)

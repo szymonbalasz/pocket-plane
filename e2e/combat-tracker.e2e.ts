@@ -188,6 +188,15 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await popup.getByTestId("cbt-popup-target-add-clear").click();
   await expect(popup.getByTestId("cbt-popup-target-add")).toHaveValue("");
   await expect(dm.getByTestId("cbt-popup-target-option").first()).toBeVisible();
+  // FR-KIT-109: Esc does the same; a second Esc closes the list, not the popup.
+  await popup.getByTestId("cbt-popup-target-add").fill("no such target");
+  await expect(dm.getByTestId("cbt-popup-target-option")).toHaveCount(0);
+  await popup.getByTestId("cbt-popup-target-add").press("Escape");
+  await expect(popup.getByTestId("cbt-popup-target-add")).toHaveValue("");
+  await expect(dm.getByTestId("cbt-popup-target-option").first()).toBeVisible();
+  await popup.getByTestId("cbt-popup-target-add").press("Escape");
+  await expect(dm.getByTestId("cbt-popup-target-option")).toHaveCount(0);
+  await expect(popup).toBeVisible();
   for (const id of [goblin, goblin2]) {
     await popup.getByTestId("cbt-popup-target-add").click();
     await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${id}"]`).click();

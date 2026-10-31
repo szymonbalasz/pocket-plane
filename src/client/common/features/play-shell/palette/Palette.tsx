@@ -1,8 +1,8 @@
 // The palette (FR-SHELL-181–183, -194, -196, -197): a modal Dialog (`role="dialog"`, FR-SHELL-13
 // keeps map keys out) 560 px wide (≤ 90 vw), top at 12 vh: the input, then the grouped listbox
 // (≤ 60 vh, scrolls). Local rows answer every keystroke; compendium and rule rows arrive debounced
-// under their headings. ↑ / ↓ move, Enter or a click runs; Escape, a click outside or a pick closes
-// it, and focus goes back where it was.
+// under their headings. ↑ / ↓ move, Enter or a click runs; Escape clears typed text (FR-KIT-109);
+// Escape on an empty input, a click outside or a pick closes it, and focus goes back where it was.
 import {
   AppWindowIcon,
   BookOpenIcon,
@@ -15,7 +15,7 @@ import {
 import { Dialog as D } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../../components/ui/button";
-import { ClearSearchButton } from "../../../components/ui/search-input";
+import { ClearSearchButton, useEscapeClears } from "../../../components/ui/search-input";
 import { cn } from "../../../lib/utils";
 import type { PaletteEnv } from "./context";
 import { isMac } from "./context";
@@ -269,6 +269,7 @@ export function Palette({ env }: { env: PaletteEnv }) {
   useEffect(() => setActive(0), [input]);
   const at = Math.min(active, Math.max(rows.length - 1, 0));
   const inputRef = useRef<HTMLInputElement>(null);
+  useEscapeClears(inputRef, () => setInput(""));
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     listRef.current

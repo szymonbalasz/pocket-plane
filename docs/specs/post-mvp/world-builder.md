@@ -8,6 +8,8 @@ phase: post-mvp
 
 # World builder (post-MVP stub)
 
+> **2026-10-31 (DM, [#413](../../decisions-log.md)): order. Linked notes with backlinks are the **next big feature**; the quest log (tier C → A) follows right after them.**
+
 Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). Absorbs the former "deeper world builder" stub.
 
 - **What:**
