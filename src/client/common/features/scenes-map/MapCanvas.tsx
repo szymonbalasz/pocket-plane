@@ -14,6 +14,7 @@ import {
   cellToPx,
   dropCell,
   footprint,
+  overlapsMap,
   pxToCell,
   tokenDrawOrder,
 } from "@shared/scenes-map/geometry";
@@ -78,6 +79,7 @@ import {
 } from "./drag-preview";
 import { DragProbe, probesDrag } from "./drag-probe";
 import { toastReject, useLive, useMapIntent } from "./intents";
+import { grownBy, ownKeyTarget, panToShow, useArrowSteps } from "./key-move";
 import { labelHitAt, labelRowItems, tokenIdAt } from "./label-hit";
 import { LaserSender } from "./laser";
 import {
@@ -720,10 +722,47 @@ export function MapCanvas(props: MapCanvasProps) {
     [sendIntent],
   );
 
+  // ---- FR-MAP-124: arrow keys move what a drag would, a cell a press ----
+  /** The own token a player last pressed; their keys move it (they have no selection). */
+  const lastOwn = useRef<string | null>(null);
+  const keyTargets = (): TokenView[] => {
+    const movable = tokensRef.current.filter(canMove);
+    if (client === "dm") return movable.filter((t) => selectedRef.current.has(t.id));
+    const own = ownKeyTarget(movable, lastOwn.current);
+    return own ? [own] : [];
+  };
+  useArrowSteps(
+    scene.id,
+    () => liveRef.current && useMapTool.getState().tool === "select" && keyTargets().length > 0,
+    (step) => {
+      if (!liveRef.current || useMapTool.getState().tool !== "select") return null;
+      if (dragRef.current || boxing.current) return null;
+      // The overlay holds the last step until the render showing its record.
+      const moved = keyTargets().map((t) => {
+        const at = shownCell(overlayRef.current, t);
+        return { t, col: at.col + step.dx, row: at.row + step.dy };
+      });
+      // At the map's edge nothing moves, and a group keeps its shape (FR-MAP-14).
+      if (moved.some((m) => !overlapsMap(sceneRef.current, m.col, m.row, m.t.size))) return null;
+      const grid = gridRef.current;
+      const seen = footprintBox(
+        moved.map((m) => ({ col: m.col, row: m.row, size: m.t.size })),
+        grid,
+      );
+      const next = seen ? panToShow(cam, grownBy(seen, grid.gridCellSize), visibleArea(size)) : cam;
+      if (next !== cam) {
+        setCam(next);
+        onCamera("pan");
+      }
+      return Promise.all(moved.map((m) => move(m.t, m.col, m.row)));
+    },
+  );
+
   const { onTokenClick, onTokenDoubleClick } = props;
   const tokenHandlers = useMemo<CanvasContextValue["token"]>(
     () => ({
       dragStart(t, node) {
+        lastOwn.current = t.id;
         const n = footprint(t.size);
         pointers.setState({
           drag: {
@@ -775,6 +814,7 @@ export function MapCanvas(props: MapCanvasProps) {
       },
       click(t, toggle) {
         if (!tokenTakesLeftPress(toolDefRef.current)) return;
+        if (t.ownerPlayerId === myPlayerId) lastOwn.current = t.id;
         onTokenClick?.(t, toggle);
       },
       dblClick(t) {
@@ -782,7 +822,17 @@ export function MapCanvas(props: MapCanvasProps) {
         onTokenDoubleClick?.(t);
       },
     }),
-    [pointers, previews, probe, client, onTokenClick, onTokenDoubleClick, move, sendSignal],
+    [
+      pointers,
+      previews,
+      probe,
+      client,
+      myPlayerId,
+      onTokenClick,
+      onTokenDoubleClick,
+      move,
+      sendSignal,
+    ],
   );
 
   // ---- incoming signals (FR-MAP-25): only for the scene this client shows ----

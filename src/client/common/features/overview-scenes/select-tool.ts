@@ -136,6 +136,7 @@ export const selectPointer: OverviewPointerHandlers = {
   down(e) {
     if (sending(useOverviewEditor.getState().gesture)) return;
     if (e.client !== "dm") {
+      if (e.item && ownMiniature(e)) useOverviewEditor.setState({ keyItem: e.item.id });
       if (e.item && e.live && ownMiniature(e)) startMove(e, e.item, [e.item.id]);
       return;
     }

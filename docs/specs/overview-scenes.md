@@ -23,6 +23,7 @@ phase: post-mvp
 | FR-OVW-39–41 | What players receive | Core | `FR-OVW-39 visibility`, `FR-OVW-40 leak scan` |
 | FR-OVW-42–45 | Fights, pets, images in use | Core, Canvas | `FR-OVW-42 fight runs on`, `FR-OVW-43 start needs a scene` |
 | FR-OVW-46–48 | Fixtures, reconnect, crash | Core | `overview-scenes loads from empty`, `FR-OVW-47 reconnect`, `FR-OVW-48 crash` |
+| FR-OVW-49 | Arrow keys | Miniatures | `FR-OVW-49 arrow keys` |
 
 ## 1. Summary
 
@@ -138,6 +139,7 @@ Campaign = `env.actor.campaignId`; IDs and time from `env.ctx` ([ADR-0022](../ar
 | FR-OVW-36 | **Name:** under the miniature, centred, drawn with the label text style fields (`font`, `size`, `color`, `strokeColor`, `strokeWidth`). Same style panel, without the dot. Default size = 14 ÷ the placer's zoom, clamped 8–512 (#406). Drawn whole however wide. | |
 | FR-OVW-37 | **Live drag:** signal `ovw.drag {overviewId, moves ≤ 50} \| {overviewId, itemIds, end}`, at most one frame per 50 ms, as [FR-MAP-39](scenes-map.md#6-functional-requirements). No DB, log or `seq`. Audience hook: a player sender per FR-OVW-35; a frame holding any hidden item, or on an overview not shown, goes to the DM only. | ADR-0026 |
 | FR-OVW-38 | **Between overviews:** miniatures stay where they are. **Add party** on the next overview adds who's missing. | |
+| FR-OVW-49 | *(#420)* **Arrow keys** move what a drag would, with the Select tool and focus outside windows and fields. **DM:** every selected unlocked item, one `ovw.moveItems` a press; a locked item stays. **Player:** the own miniature last pressed, else their character's, else their first (FR-OVW-35). No grid here: a press is 32 screen px at the current zoom. The position bound stops it, a group keeping its shape; pacing and the camera as [FR-MAP-124](scenes-map.md#6-functional-requirements). | |
 
 ### 6.7 Visibility
 

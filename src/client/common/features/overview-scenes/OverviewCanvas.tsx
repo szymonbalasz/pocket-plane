@@ -3,7 +3,8 @@
 // overview's ID as `sceneId` (FR-OVW-13), and the seam for the editing slices: every stage pointer
 // event goes to the active tool of `overview-tools.ts`. `MapCanvas` is not involved: no grid,
 // tokens, fog, walls or templates. No feature logic: the server decides.
-import { ItemDragData, OVW_SIGNALS } from "@shared/overview-scenes/schemas";
+import { ItemDragData, OVERVIEW_ITEM_TYPE, OVW_SIGNALS } from "@shared/overview-scenes/schemas";
+import { recordsOf } from "@shared/protocol/store";
 import { LaserData, MAP_SIGNALS, PingData } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -19,11 +20,13 @@ import {
   centreOn,
   createSettledRefit,
   placerSettled,
+  visibleArea,
   zoomAt,
 } from "../scenes-map/camera";
 import { CanvasContext, type CanvasContextValue } from "../scenes-map/canvas-context";
 import { clearPreviews, prunePreviews } from "../scenes-map/drag-preview";
 import { useLive, useMapIntent } from "../scenes-map/intents";
+import { grownBy, panToShow, useArrowSteps } from "../scenes-map/key-move";
 import { LaserSender } from "../scenes-map/laser";
 import type { CanvasClient } from "../scenes-map/layers";
 import { PointersLayer } from "../scenes-map/layers/PointersLayer";
@@ -41,6 +44,7 @@ import { deferredMove } from "../scenes-map/right-press";
 import { isClick } from "../scenes-map/selection-logic";
 import { useCanvasColors } from "../scenes-map/theme";
 import { useMapFit, useMapTool } from "../scenes-map/tool-store";
+import { keyItems, stepItems } from "./item-keys";
 import { fontsIn, itemBands, type OverviewItemView } from "./item-layout";
 import { ItemNode } from "./items/ItemNode";
 import { measureText, useLabelFonts } from "./label-fonts";
@@ -49,6 +53,7 @@ import { fitOverview, itemsBox, rememberCamera, rememberedCamera } from "./overv
 import {
   OverviewCanvasContext,
   type OverviewCanvasContextValue,
+  SELECT_TOOL_ID,
   useOverviewTool,
 } from "./overview-canvas-context";
 import { itemIdsOf, itemPreviews, receiveItemDrag } from "./overview-drag";
@@ -420,6 +425,36 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
     window.addEventListener("keydown", on, true);
     return () => window.removeEventListener("keydown", on, true);
   }, []);
+  // ---- FR-OVW-49: arrow keys move what a drag would ----
+  /** The latest records: a step follows its ack, perhaps before the render that shows it. */
+  const latestItems = () => {
+    const held = syncStore
+      ? recordsOf<OverviewItemView>(syncStore.getState().store, OVERVIEW_ITEM_TYPE)
+      : itemsRef.current;
+    return held.filter((i) => i.overviewId === overviewId);
+  };
+  useArrowSteps(
+    overviewId,
+    () =>
+      tool.id === SELECT_TOOL_ID &&
+      live &&
+      useOverviewEditor.getState().gesture === null &&
+      keyItems(latestItems(), client, myPlayerId).length > 0,
+    (step) => {
+      if (!liveRef.current || toolRef.current.id !== SELECT_TOOL_ID) return null;
+      if (useOverviewEditor.getState().gesture) return null;
+      const targets = keyItems(latestItems(), client, myPlayerId);
+      const done = stepItems(sendIntent, overviewId, targets, step, cam.scale);
+      if (!done) return null;
+      const seen = itemsBox(done.moved, measureText);
+      const next = seen ? panToShow(cam, grownBy(seen, done.by), visibleArea(size)) : cam;
+      if (next !== cam) {
+        setCam(next);
+        onCamera("pan");
+      }
+      return done.sent;
+    },
+  );
   // A gesture in progress is dropped on a tool switch, on leaving `live` and on unmount.
   useEffect(
     () => () => {
