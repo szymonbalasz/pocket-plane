@@ -66,7 +66,9 @@ describe("scenes-map schemas", () => {
     expect(PlaceTokenInput.safeParse({ ...base, size: "huge" }).success).toBe(false);
     expect(PlaceTokenInput.safeParse({ ...base, creatureType: "beast" }).success).toBe(false);
     expect(PlaceTokenInput.safeParse({ ...base, col: 1.5 }).success).toBe(false);
-    expect(UpdateTokenInput.safeParse({ tokenId: "t", size: "huge" }).success).toBe(false);
+    // FR-MAP-150: the token menu may set a size; only a real one.
+    expect(UpdateTokenInput.safeParse({ tokenId: "t", size: "huge" }).success).toBe(true);
+    expect(UpdateTokenInput.safeParse({ tokenId: "t", size: "enormous" }).success).toBe(false);
   });
 
   test("FR-ENT-27 token creatureType: 14 types | initials | null on the record; update never null", () => {

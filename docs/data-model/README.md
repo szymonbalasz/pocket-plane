@@ -416,7 +416,8 @@ An instance of a creature definition: own name, read-only display copies, play s
 | definitionId | ID → Entity | Via `resolveDefinition`: global or same campaign. **Never sent to players** | [FR-MAP-13](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-26](../specs/scenes-map.md#6-functional-requirements) |
 | name | text 1–40 | **Token-owned** instance state; numbered `B <N>` on place/duplicate; never changed by a definition edit | [FR-MAP-16](../specs/scenes-map.md#6-functional-requirements), #126 |
 | imageAssetId | ID → Asset \| null | **Display copy**: portrait at place; refreshed by the hook only while it equals the old portrait (#127); DM may set custom art | FR-MAP-13, [FR-MAP-18](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-20](../specs/scenes-map.md#6-functional-requirements) |
-| size | `tiny`…`gargantuan` | **Display copy** of `statBlock.size`; never per-token editable; refreshed by the hook | FR-MAP-13, FR-MAP-20, #120 |
+| size | `tiny`…`gargantuan` | **Display copy** of `statBlock.size`, refreshed by the hook, unless the DM set this token's size (`sizeOverridden`) | FR-MAP-13, FR-MAP-20, #120, FR-MAP-150 |
+| sizeOverridden *(#429)* | bool | Column `size_overridden` not null default false. The DM set `size` from the token menu; the hook leaves it. Copied by token and scene duplicate. Server only: on no wire | [FR-MAP-150](../specs/scenes-map.md#6-functional-requirements) |
 | col, row | int | Top-left cell; footprint must overlap the map | [FR-MAP-14](../specs/scenes-map.md#6-functional-requirements) |
 | ownerPlayerId | ID → Player \| null | One owner; defaults from the character's owner; DM reassigns | FR-MAP-13, FR-MAP-18, #124 |
 | hidden | bool | Visibility flag on the record | [FR-MAP-19](../specs/scenes-map.md#6-functional-requirements) |
