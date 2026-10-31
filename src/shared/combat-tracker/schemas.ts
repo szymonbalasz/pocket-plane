@@ -35,6 +35,13 @@ export const HP_CHANGE_TYPE = "hp-change";
 export const HIT_RULING_TYPE = "hit-ruling";
 export const DAMAGE_CARD_KIND = "damage-card";
 export const LOG_KIND_ATTACK = "cbt.attack";
+
+/**
+ * BL-177 (sim-17 l05: "Brakka · Attack attack"): "Longbow attack"; a name that already says so
+ * stays as it is (a used plain roll's "Attack", FR-CBT-173; a homebrew "Sneak attack").
+ */
+export const attackPhrase = (name: string): string =>
+  /(^|\s)attack\s*$/i.test(name) ? name : `${name} attack`;
 export const LOG_KIND_HP = "cbt.hp";
 /** Sprint 5 (#252, FR-CBT-99): "Goblin 2 is now an ally". */
 export const LOG_KIND_SIDE = "cbt.side";

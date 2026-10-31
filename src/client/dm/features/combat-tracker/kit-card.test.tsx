@@ -63,7 +63,8 @@ function render(note: NotificationRecord, wrap: (n: ReactElement) => ReactElemen
   );
 }
 
-const DM_CARD = cardNote(flameCard(), { audience: "dm", audiencePlayerId: null });
+const DM_AUDIENCE = { audience: "dm", audiencePlayerId: null } as const;
+const DM_CARD = cardNote(flameCard(), DM_AUDIENCE);
 const at = (html: string, needle: string) => html.indexOf(needle);
 
 // A static render reads a zustand store's initial state (the server snapshot): the Goblin as an
@@ -91,6 +92,12 @@ describe("FR-KIT-62 title bar", () => {
 });
 
 describe("FR-KIT-63 result lines", () => {
+  test("BL-177 Use as attack on a plain roll: the to-hit line reads 'Brakka · Attack', one 'attack'", () => {
+    const html = render(cardNote({ ...flameCard(), attackName: "Attack" }, DM_AUDIENCE));
+    expect(html).toContain("</strong> · Attack</span>");
+    expect(html).not.toMatch(/Attack attack/i);
+  });
+
   test("FR-KIT-63 result lines: 'To hit' and 'Damage, <type>' lines end in Result-box inputs (to-hit outcome by natural, damage → damage); dice stay small in the label", () => {
     const html = render(DM_CARD);
     expect(html).toMatch(
