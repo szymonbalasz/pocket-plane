@@ -1,7 +1,7 @@
 ---
 title: Linked notes
 prefix: NOTES
-status: draft
+status: in-review
 owner: spec-linked-notes
 phase: post-mvp
 ---
@@ -188,7 +188,7 @@ The DM writes: `Ask [[Duke Varen]] about [[Duke Varen|the old sailor]]. Beware [
 | `note-dm` | `ids`, `audience: dm` | Never | `id, campaignId, rawBody, rawDm, rev` |
 
 - **Why raw text lives in `note-dm`:** the type a player can load holds no raw text at all, so a redaction bug can't send an ID or alias of a hidden target.
-- `note-links` is computed by joining `note_link` to each target's current reveal, so no copy can go stale. The per-link audience is server-only and stripped on the wire. *Builder check:* `derived` with `lazy` together; the registry allows it on reading, no type does it yet.
+- `note-links` is computed by joining `note_link` to each target's current reveal, so no copy can go stale. The per-link audience is server-only and stripped on the wire. *Builder check:* `derived` with `lazy` together; the registry has no guard against it (read in `records.ts`), N0 proves it end to end.
 - A span with `aliased: false` covers `(unknown)` in `publicText`: the client shows the target's name there. `name?` carries a compendium or character name; a note target's title comes from its `note` header.
 
 ### 8.3 Field visibility
@@ -214,7 +214,7 @@ The DM writes: `Ask [[Duke Varen]] about [[Duke Varen|the old sailor]]. Beware [
 | Total note count | ✓ | Own visible rows only | Same | FR-NOTES-08 |
 | Event log entry | DB only | No client path: `readEventLog` has no non-test caller (checked). `cause.name` only on a frame already carrying a visible change | None | FR-NOTES-09, -18 |
 | Notification | Own view | Own row, generic text, `noteId` of a note they gained | No row | FR-NOTES-16 |
-| Session recap | No note data | No note data: `compose.ts` reads `game_log_entry`, `roll` and `session-recap` rows only (checked) | Same | FR-NOTES-18 |
+| Session recap | No note data | No note data: `compose.ts` reads the game log, rolls, combat facts, loot and `session-recap` rows, no note table (checked) | Same | FR-NOTES-18 |
 | Game log | No post in this slice | Same | Same | FR-NOTES-18 |
 | MCP | DM caller, full; results go to the model provider ([OQ-AGENT-12](agent-api.md#15-open-questions)) | No player path (DM secret only) | Same | [ADR-0072](../architecture/adr/0072-agent-mcp-server.md) |
 | Error wording | Names the note | Same `forbidden` / empty for any ID | Same | FR-NOTES-15 |
