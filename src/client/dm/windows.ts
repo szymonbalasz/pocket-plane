@@ -5,7 +5,7 @@ import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { recapWindow } from "@ui/features/session-recap/window";
-import { statsWindow } from "@ui/features/stats/window";
+import { statsDiceWindow, statsWindow } from "@ui/features/stats/window";
 import { strongholdWindow } from "@ui/features/strongholds/window";
 import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
 import { assetsWindow } from "./features/assets-pipeline/assets-window";
@@ -13,7 +13,10 @@ import { dmCompanionWindow } from "./features/character-sheet/companion-window";
 import { dmCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { encountersWindow } from "./features/combat-tracker/encounters-window";
 import { dmInitiativeWindow } from "./features/combat-tracker/initiative-window";
-import { dmCompendiumWindow } from "./features/compendium/compendium-window";
+import {
+  dmCompendiumEntryWindow,
+  dmCompendiumWindow,
+} from "./features/compendium/compendium-window";
 import { dmRulesWindow } from "./features/compendium/rules-window";
 import { requestsWindow } from "./features/dice-extras/requests-window";
 import { dmTrayWindow } from "./features/dice-extras/tray-window";
@@ -54,6 +57,8 @@ const windows: WindowDef[] = [
   dmDiceDetailsWindow, // dice.details, no launcher (dice-roll-log, FR-DICE-106)
   statBlockWindow, // ent.statblock "Stat block" (kit-parity K7, FR-KIT-100)
   assetsWindow, // asset.library "Assets" (assets-pipeline, FR-ASSET-69; #394)
+  dmCompendiumEntryWindow, // cmp.entry, no launcher, one per popped-out entry (compendium, FR-CMP-76)
+  statsDiceWindow, // stats.dice, no launcher, the Luck tab's d20 chart (stats, FR-STATS-90)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

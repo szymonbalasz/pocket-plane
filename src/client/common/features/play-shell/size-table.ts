@@ -39,6 +39,13 @@ const shared: Record<string, SizeRow> = {
     min: s(320, 360),
     criterion: "search, filters, 5 rows",
   },
+  // FR-CMP-76: an entry popped out of the Compendium, no launcher.
+  "cmp.entry": {
+    default: all(400, 500),
+    useful: all(360, 360),
+    min: s(300, 240),
+    criterion: "an entry's actions row, heading and first lines",
+  },
   // PM2 (FR-SHELL-156, OQ-SHELL-78 A): Party Manager (shown band-capped); BL-106 (H2): 550 → 600.
   "party.board": {
     default: all(600, 560),
@@ -99,6 +106,13 @@ const shared: Record<string, SizeRow> = {
     useful: all(400, 360),
     min: s(340, 320),
     criterion: "header + the first 4 fight lines",
+  },
+  // FR-STATS-90: the Luck tab's d20 chart, no launcher.
+  "stats.dice": {
+    default: all(440, 400),
+    useful: all(400, 340),
+    min: s(320, 280),
+    criterion: "pickers, Count / Percent, 20 bars with their axis and the fair-die note",
   },
   // FR-DICE-106: Roll details, no launcher; one roll fills it, long content scrolls.
   "dice.details": {

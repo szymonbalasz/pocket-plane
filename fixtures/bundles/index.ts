@@ -138,6 +138,7 @@ import statsBE2e from "./stats-b-e2e";
 import statsBPast from "./stats-b-past";
 import statsBUiE2e from "./stats-b-ui-e2e";
 import statsCampaignE2e from "./stats-campaign-e2e";
+import statsDiceE2e from "./stats-dice-e2e";
 import statsE2e from "./stats-e2e";
 import statsPast from "./stats-past";
 import statsWindowE2e from "./stats-window-e2e";
@@ -398,4 +399,6 @@ export const bundles: readonly Bundle[] = [
   logShare,
   // Sprint 15 (fix/s15-toasts): toasts off the PCs and sheet buttons e2e alias of session-sim-13
   s15ToastsE2e,
+  // The Luck tab's d20 chart e2e alias of stats-b (build/luck-d20-chart)
+  statsDiceE2e,
 ];

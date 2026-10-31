@@ -39,6 +39,7 @@ import { openSheetFor } from "@ui/features/character-sheet/selection";
 import { CHAR_SHEET_KIND } from "@ui/features/character-sheet/window";
 import type { CompanionsDmParts } from "@ui/features/party-board/Companions";
 import { type CompanionRow, LOST_PET, PET_IN_FIGHT_HINT } from "@ui/features/party-board/logic";
+import { RowError } from "@ui/features/party-board/RowError";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { useRecords } from "@ui/sync/store";
 import { EllipsisVerticalIcon, PlusIcon } from "lucide-react";
@@ -118,11 +119,7 @@ function RowMenu({ row, disabled }: { row: CompanionRow; disabled: boolean }) {
   const fight = petMenuLock(row);
   return (
     <>
-      {open === null && put.error && (
-        <span role="alert" className="max-w-24 truncate text-xs text-destructive">
-          {put.error}
-        </span>
-      )}
+      {open === null && put.error && <RowError>{put.error}</RowError>}
       <DropdownMenu>
         <Tip content={`Actions for ${row.name}`}>
           <DropdownMenuTrigger asChild>

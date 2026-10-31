@@ -17,7 +17,7 @@ import {
 } from "@ui/components/ui/overlays";
 import { Tip } from "@ui/components/ui/tip";
 import { useLive } from "@ui/features/combat-tracker/store";
-import { backToList } from "@ui/features/compendium/nav";
+import { backToList, refetch } from "@ui/features/compendium/nav";
 import { CopyIcon, CopyPlusIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -115,6 +115,7 @@ export function EntryActions({
       await deleteEntry(api, e.id);
       toast.success(`Deleted ${e.name}`);
       backToList();
+      refetch(); // FR-CMP-76: a popped-out copy learns it's gone.
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Something went wrong");
     }

@@ -113,6 +113,9 @@ describe("FR-REM-18 rows", () => {
     expect(dm).toContain("Fresh bread: +1 HP on a short rest\nAsk the cook");
     expect(dm).toContain("Greystone Keep: Steam Rooms");
     expect(attrs(dm, "rem-row-roll", "data-record-id")).toEqual(["rl-steam", "rl-charm"]);
+    // Full text: a long roll label wraps inside its button, never cut.
+    expect(tags(dm, "rem-row-roll")[0]).toContain("whitespace-normal");
+    expect(dm).not.toContain("truncate");
     expect(dm).not.toContain('data-testid="rem-row-link"');
     const linked = renderWith(DM, <RemindersTab onOpenLink={() => {}} />);
     expect(tags(linked, "rem-row-link")).toHaveLength(1);

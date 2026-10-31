@@ -408,7 +408,7 @@ describe("FR-CHARX-48 pinned header", () => {
     // The Tooltip trigger is the picker wrapper (it carries the select); the name clamps at 2 lines.
     expect(tagOf(html, "charx-name-picker")).toContain("data-tip");
     expect(html).toMatch(/<span class="line-clamp-2 min-w-0 break-normal text-balance">Mira</);
-    expect(html).not.toContain("break-words");
+    expect(html).not.toMatch(/<span class="[^"]*overflow-wrap[^"]*">Mira</);
     // K11: portrait and name column in a grid; the actions (K13: floated top-right in the name
     // column) stack in a column when narrow (the name keeps its room), a row once wide.
     expect(html).toContain(
@@ -529,7 +529,10 @@ const controlOf = (r: TrayRequest | null) => {
 };
 
 describe("FR-CHARX-127 click stages, Alt rolls", () => {
-  afterEach(() => diceExtras.clear());
+  afterEach(() => {
+    diceExtras.clear();
+    diceExtras.failed(); // An Alt+click rolled: no pending left for the next test file.
+  });
 
   test("FR-CHARX-127 click stages, Alt rolls: click → a tray request (dice, purpose, types, label), no intent; Shift → advantage; Alt+click → one char.roll, no tray; the tray's Roll sends the staged parts", () => {
     const sent: [string, unknown][] = [];
@@ -626,7 +629,10 @@ describe("FR-CHARX-127 click stages, Alt rolls", () => {
 });
 
 describe("FR-CHARX-132 disconnect", () => {
-  afterEach(() => diceExtras.clear());
+  afterEach(() => {
+    diceExtras.clear();
+    diceExtras.failed(); // An Alt+click rolled: no pending left for the next test file.
+  });
 
   test("FR-CHARX-132 staged roll offline: not live → staging works, the tray's Roll is disabled, the request is kept; nothing sent", () => {
     const sent: [string, unknown][] = [];
