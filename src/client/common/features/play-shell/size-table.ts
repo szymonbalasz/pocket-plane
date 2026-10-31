@@ -107,6 +107,13 @@ const shared: Record<string, SizeRow> = {
     min: s(340, 320),
     criterion: "header + the first 4 fight lines",
   },
+  // FR-STATS-90: the Luck tab's d20 chart, no launcher.
+  "stats.dice": {
+    default: all(440, 400),
+    useful: all(400, 340),
+    min: s(320, 280),
+    criterion: "pickers, Count / Percent, 20 bars with their axis and the fair-die note",
+  },
   // FR-DICE-106: Roll details, no launcher; one roll fills it, long content scrolls.
   "dice.details": {
     default: all(420, 300),
