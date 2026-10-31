@@ -5,14 +5,20 @@ import { DiagonalRule } from "@shared/scene-tools/schemas";
 import { z } from "zod";
 import { defineEvent } from "./types";
 
-export const STRUCTURE_OPS = ["addWalls", "addDoor", "removeSegments", "setDoor"] as const;
+export const STRUCTURE_OPS = [
+  "addWalls",
+  "addDoor",
+  "removeSegments",
+  "setDoor",
+  "flipWalls",
+] as const;
 export const StructureOp = z.enum(STRUCTURE_OPS);
 
 const logged = { logged: true, undoable: false } as const;
 const propPayload = z.object({ propId: z.string() }).strict();
 const templatePayload = z.object({ templateId: z.string() }).strict();
 
-/** `scn.addWalls` / `addDoor` / `removeSegments` / `setDoor`: the `n`s touched. */
+/** `scn.addWalls` / `addDoor` / `removeSegments` / `setDoor` / `flipWalls`: the `n`s touched. */
 export const StructureEdited = defineEvent({
   type: "StructureEdited",
   payload: z

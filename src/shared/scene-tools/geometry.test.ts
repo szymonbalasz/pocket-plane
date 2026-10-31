@@ -502,7 +502,9 @@ describe("FR-SCN-10 blocking on freeform segments (sprint 3)", () => {
           ? [1, half(), half(), half(), half()]
           : [1, dec(span), dec(span), dec(span), dec(span)];
       const want =
-        from.col === to.col && from.row === to.row ? false : touchRef(from, to, n, w.slice(1));
+        from.col === to.col && from.row === to.row
+          ? false
+          : touchRef(from, to, n, w.slice(1) as number[]);
       if (want) blocked++;
       expect([k, blockingSegments(from, to, n, [w], []).length > 0]).toEqual([k, want]);
     }
