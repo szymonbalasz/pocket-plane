@@ -45,8 +45,8 @@ import { canvasBlind } from "../../fog-of-war/blind";
 import { useCanvas } from "../../scenes-map/canvas-context";
 import {
   byAttr,
-  CASING_COLOR,
   CASING_NAME,
+  casingOf,
   casingWidth,
   type MarkPerson,
   markColor,
@@ -138,14 +138,11 @@ function OriginCell() {
     height: cell.n * cs,
   };
   const swPx = 2;
+  const stroke = markColor(store, selfOf(client, myPlayerId));
   return (
     <Group name="scn-aoe-origin-cell" col={cell.col} row={cell.row} n={cell.n} listening={false}>
-      <Rect {...rect} stroke={CASING_COLOR} strokeWidth={casingWidth(swPx, cam.scale)} />
-      <Rect
-        {...rect}
-        stroke={markColor(store, selfOf(client, myPlayerId))}
-        strokeWidth={swPx / cam.scale}
-      />
+      <Rect {...rect} stroke={casingOf(stroke)} strokeWidth={casingWidth(swPx, cam.scale)} />
+      <Rect {...rect} stroke={stroke} strokeWidth={swPx / cam.scale} />
     </Group>
   );
 }
@@ -190,7 +187,7 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
   const sw = swPx / cam.scale;
   const dash = d.hidden || d.ephemeral ? [6 / cam.scale, 4 / cam.scale] : undefined;
   // FR-MAP-72: the coloured outline over an opaque casing (hidden: grey styling, no casing).
-  const casing = { name: CASING_NAME, id: d.id, stroke: CASING_COLOR, dash };
+  const casing = { name: CASING_NAME, id: d.id, stroke: casingOf(stroke), dash };
   const casingSw = casingWidth(swPx, cam.scale);
   // FR-SCN-59: the pill is drawn above the tokens, by `scn-template-labels`.
   const byName = hovered || d.selected === true ? personName(store, d.who) : null;

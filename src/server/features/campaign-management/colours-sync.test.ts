@@ -163,12 +163,7 @@ describe("FR-CAMP-29 colours visibility (player-colours)", () => {
       [c, { playerId: null, color: sky }, "forbidden", undefined],
       [dm, { playerId: p["Player 2"].id, color: rose }, "conflict", "Taken by Player 1"],
       [dm, { playerId: p["Player 2"].id, color: "rose" }, "invalid", undefined],
-      [
-        dm,
-        { playerId: p["Player 2"].id, color: "#3d6ec9" },
-        "invalid",
-        "Too dark to read on the map",
-      ],
+      [dm, { playerId: p["Player 2"].id, color: "#00008b" }, "invalid", "Too dark to see"],
     ] as const;
     for (const [x, payload, code, message] of rejects) {
       const f = await reply(x, "camp.setColor", payload);

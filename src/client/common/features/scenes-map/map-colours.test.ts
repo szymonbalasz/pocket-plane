@@ -9,7 +9,14 @@ import type { TokenView } from "@shared/scenes-map/schemas";
 import { ROLE_ACCENT_FALLBACK } from "../campaign-management/colors";
 import { pathPaint } from "./drag-path";
 import { LASER_FADE_MS } from "./laser";
-import { CASING_COLOR, CASING_EXTRA_PX, casingWidth, markColor } from "./mark-colors";
+import {
+  CASING_COLOR,
+  CASING_EXTRA_PX,
+  casingOf,
+  casingWidth,
+  LIGHT_CASING_COLOR,
+  markColor,
+} from "./mark-colors";
 import {
   addPing,
   addTrailPoints,
@@ -118,6 +125,16 @@ describe("FR-MAP-70 path colour", () => {
 });
 
 describe("FR-MAP-72 casing", () => {
+  test("FR-MAP-72 casing: dark under every palette colour; light under a colour nearer black (deep red, pure blue); a non-hex keeps the dark casing", () => {
+    for (const hex of Object.values(PLAYER_COLORS)) expect(casingOf(hex)).toBe(CASING_COLOR);
+    for (const hex of ["#8b0000", "#0000ff", "#800080", "#006400"]) {
+      expect(casingOf(hex)).toBe(LIGHT_CASING_COLOR);
+    }
+    for (const other of ["var(--primary)", "oklch(0.2 0 0)", null, undefined]) {
+      expect(casingOf(other)).toBe(CASING_COLOR);
+    }
+  });
+
   test("FR-MAP-72 casing: opaque black, 2 screen px wider than the stroke at any zoom; unknown colour → role accent", () => {
     expect(CASING_COLOR).toBe("#000");
     for (const scale of [0.5, 1, 2.5]) {

@@ -5,7 +5,7 @@
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { useCallback } from "react";
 import { useSync } from "../../sync/store";
-import { type ColorPerson, colorHex, colorKeyOf } from "../campaign-management/colors";
+import { type ColorPerson, colorKeyOf, colorText } from "../campaign-management/colors";
 
 export type ColorKeyOf = (person: ColorPerson) => string | null;
 
@@ -46,7 +46,7 @@ export function RollerName({ entryId, name }: { entryId: string; name: string })
       data-testid="dicex-popup-actor"
       data-color={key ?? undefined}
       className="shrink-0 font-semibold"
-      style={key ? { color: colorHex(key) } : undefined}
+      style={key ? { color: colorText(key) } : undefined}
     >
       {name}
     </strong>

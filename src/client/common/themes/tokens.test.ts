@@ -298,7 +298,7 @@ describe("FR-THEME-18 player colours on both surfaces", () => {
       expect(colorProblem(hex)).toBeNull();
     }
     // A dark colour reads worse on gilt's darker surface: the check uses the lower ratio.
-    const dark = "#3d6ec9";
+    const dark = "#00008b";
     const ratios = Object.values(WINDOW_SURFACES).map((s) => contrastRatio(dark, s));
     expect(surfaceContrast(dark)).toBe(Math.min(...ratios));
     expect(colorProblem(dark)).toBe("too-dark");

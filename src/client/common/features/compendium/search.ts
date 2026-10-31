@@ -1,7 +1,13 @@
 // FR-CMP-10 client side: `GET /api/compendium/search` over the Hono RPC client (DM: secret,
 // player: `Authorization: Player`, set by the client's `Api`), and a debounced hook for lookups
 // and the Creatures window (FR-CMP-17: 150 ms). Results are read on demand, never pushed (FR-CMP-23).
-import { type SearchQuery, SearchResponse } from "@shared/compendium/rest";
+import {
+  type NameLookupBody,
+  NameLookupResponse,
+  type NameMatch,
+  type SearchQuery,
+  SearchResponse,
+} from "@shared/compendium/rest";
 import { useEffect, useState } from "react";
 import { type Api, call } from "../../api";
 import { loadChunk } from "../../lib/lazy-chunk";
@@ -42,6 +48,16 @@ export async function searchCompendium(
   for (const [k, v] of Object.entries(params)) if (v !== undefined) query[k] = v;
   const body = await call<unknown>(api.api.compendium.search.$get({ query }));
   return SearchResponse.parse(body);
+}
+
+/** FR-CMP-77: the entries behind exact names (a sheet's rows); one request. */
+export async function lookupCompendiumNames(
+  source: ApiSource,
+  names: NameLookupBody["names"],
+): Promise<NameMatch[]> {
+  const api = await resolveApi(source);
+  const body = await call<unknown>(api.api.compendium.names.$post({ json: { names } }));
+  return NameLookupResponse.parse(body).matches;
 }
 
 export interface CompendiumSearch {

@@ -92,7 +92,7 @@ test("FR-CAMP-35 picker, FR-DICEX-57/58: Preferences colour + dice, DM Players p
   await expect(status).toHaveAttribute("data-reason", "too-dark");
   const held = (await sv.getAttribute("aria-valuetext")) ?? "";
   const v = Number(/brightness (\d+) %/.exec(held)?.[1]);
-  expect(v).toBeGreaterThan(30);
+  expect(v).toBeGreaterThan(15);
   await b.mouse.up();
   await expect(status).not.toHaveAttribute("data-reason", /.+/);
   await expect(apply).toBeEnabled(); // the clamped colour is allowed
@@ -103,7 +103,7 @@ test("FR-CAMP-35 picker, FR-DICEX-57/58: Preferences colour + dice, DM Players p
   for (const [value, text] of [
     ["#a0c814", "Too close to DM's colour for colour-blind players"],
     [LAVENDER, "Taken by Player 2"],
-    ["#3d6ec9", "Too dark to read on the map"],
+    ["#00008b", "Too dark to see"],
     ["#9e9e9e", "Too grey"],
     ["#f05555", "Too close to the danger red"],
   ] as const) {

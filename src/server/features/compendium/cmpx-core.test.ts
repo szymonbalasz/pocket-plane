@@ -26,6 +26,7 @@ import { servicesFromBundle, snapshotSizes } from "../../ws/testing/snapshot-siz
 import { adaptOpen5e } from "./adapter/open5e";
 import { DERIVE_MONSTER } from "./derive";
 import { IMPORT_RECORDED, type ImportResult } from "./import";
+import { lookupNames } from "./name-lookup";
 import { readEntry } from "./read";
 import { searchEntries } from "./search";
 import { searchIndex } from "./search-index";
@@ -544,5 +545,16 @@ describe("imported_art table (compendium-expansion §8)", () => {
     ).toThrow(/UNIQUE|PRIMARY/);
     s.db.delete(asset).where(eq(asset.id, assetId)).run();
     expect(s.db.select().from(importedArt).all()).toEqual([]);
+  });
+});
+
+describe("FR-CMP-77 name lookup and replaced entries", () => {
+  test("FR-CMP-77 FR-CMPX-14 a replaced entry doesn't count: the name has its one live entry", () => {
+    const { s, dm, row } = fresh();
+    const live = row(TB1_SOURCE, "spell/hunters-mark")?.id;
+    expect(live).toBeString();
+    expect(lookupNames(s.db, dm, [{ kind: "spell", name: "Hunter's Mark" }])).toEqual([
+      { kind: "spell", name: "Hunter's Mark", entryId: live as string },
+    ]);
   });
 });
