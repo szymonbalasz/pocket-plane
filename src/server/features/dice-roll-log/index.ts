@@ -1,4 +1,4 @@
-// dice-roll-log (DICE): intents `dice.roll`, `dice.setCategoryPublic`; record types
+// dice-roll-log (DICE): intents `dice.roll`, `dice.setCategoryPublic`, `dice.setEntryHidden`; record types
 // `game-log-entry`, `game-log-settings`; internal helpers `dice.evaluate`, `gameLog.append`,
 // `gameLog.markUndone` (FR-DICE-19, protocol §21) for character-sheet and combat-tracker;
 // sprint 7: `dice.reroll` (FR-DICE-62) and `gameLog.supersede` (FR-DICE-63) for gems.
@@ -6,6 +6,7 @@ import type { Feature } from "../../services";
 import { rollCommand } from "./commands";
 import { evaluate, rollDmPayload, rollIdsOf, rollPayloadItem } from "./evaluate";
 import { append, markUndone, markUsed, supersede } from "./game-log";
+import { setEntryHidden } from "./hidden";
 import { gameLogEntryType, gameLogSettingsType } from "./records";
 import { reroll } from "./reroll";
 import { setCategoryPublic } from "./settings";
@@ -41,6 +42,7 @@ export const diceRollLog: Feature = {
   register(r) {
     r.command(rollCommand, { intent: true });
     r.command(setCategoryPublic, { intent: true });
+    r.command(setEntryHidden, { intent: true });
     r.recordType(gameLogEntryType);
     r.recordType(gameLogSettingsType);
   },

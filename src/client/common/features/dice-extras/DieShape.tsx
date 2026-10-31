@@ -39,18 +39,20 @@ export function d100Faces(value: number): [string, string] {
 
 /**
  * Pixel size per `size` (FR-DICEX-42): `sm` game log, `md` tray / flat zone, `lg` a roll popup
- * cell (FR-DICEX-46: 44 px, never scaled).
+ * cell (FR-DICEX-46: 44 px, never scaled), `xl` the Roll details equation (FR-DICE-107: no facet
+ * lines through the digit, a dropped die struck but not faint).
  */
-export const DIE_PX = { sm: 18, md: 36, lg: 44 } as const;
+export const DIE_PX = { sm: 18, md: 36, lg: 44, xl: 60 } as const;
 
 /** The round chip per `size`. */
 const ROUND: Record<keyof typeof DIE_PX, string> = {
   sm: "h-[18px] min-w-[18px] px-1 text-[10px] leading-[16px]",
   md: "h-9 min-w-9 px-1.5 text-sm leading-[32px]",
   lg: "h-11 min-w-11 px-1.5 text-base leading-[40px]",
+  xl: "h-[60px] min-w-[60px] px-2 text-2xl leading-[56px]",
 };
 /** The round chip's font px per `size` (its class), for a scaled chip. */
-const ROUND_FONT: Record<keyof typeof DIE_PX, number> = { sm: 10, md: 14, lg: 16 };
+const ROUND_FONT: Record<keyof typeof DIE_PX, number> = { sm: 10, md: 14, lg: 16, xl: 24 };
 
 // Outlines in a 100 × 100 box; `cy` = where the number sits.
 const OUTLINE: Record<Exclude<DieShapeKind, "round">, { d: string; cy: number; scale?: number }> = {
@@ -91,6 +93,7 @@ function Outline({
   kept,
   offered,
   px,
+  facets,
 }: {
   kind: Exclude<DieShapeKind, "round">;
   /** "" = blank. */
@@ -101,6 +104,8 @@ function Outline({
   kept: boolean;
   offered: boolean;
   px: number;
+  /** The d20's facet lines (not at `xl`: nothing runs through the digit). */
+  facets: boolean;
 }) {
   const o = OUTLINE[kind];
   const stroke = {
@@ -123,7 +128,7 @@ function Outline({
         className="inline-block overflow-visible align-top"
       >
         <path d={o.d} fill={look.body} {...stroke} strokeDasharray={offered ? "12 9" : undefined} />
-        {kind === "d20" && (
+        {kind === "d20" && facets && (
           <path d={D20_FACE} fill="none" {...stroke} strokeWidth={d20FaceStroke(px)} />
         )}
         {!kept && !offered && (
@@ -219,7 +224,7 @@ export function DieShape({
       }
       className={cn(
         "inline-block shrink-0 whitespace-nowrap align-middle leading-none",
-        dimmed && "opacity-40",
+        dimmed && (size === "xl" ? "opacity-75" : "opacity-40"),
       )}
     >
       {kind === "round" ? (
@@ -258,6 +263,7 @@ export function DieShape({
               look={look}
               kept={kept}
               offered={offered}
+              facets={size !== "xl"}
               px={px}
             />
           ))}

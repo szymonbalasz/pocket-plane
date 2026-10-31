@@ -31,6 +31,17 @@ export const DiceRolled = defineEvent({
   undoable: false,
 });
 
+/**
+ * `dice.setEntryHidden` (FR-DICE-99): changes = the `game-log-entry` upsert of each line of the
+ * rerolled chain that moved (players: delete on hide, upsert on reveal).
+ */
+export const LogEntryHiddenSet = defineEvent({
+  type: "LogEntryHiddenSet",
+  payload: z.object({ entryIds: z.array(z.string()).min(1), hidden: z.boolean() }).strict(),
+  logged: true,
+  undoable: false,
+});
+
 /** `dice.setCategoryPublic`: changes = `game-log-settings` upsert (DM only). */
 export const PublicLogCategorySet = defineEvent({
   type: "PublicLogCategorySet",

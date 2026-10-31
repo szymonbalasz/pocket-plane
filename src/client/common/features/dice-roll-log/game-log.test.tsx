@@ -471,7 +471,7 @@ describe("FR-DICE-40 log line held", () => {
     expect(tip).not.toContain("natural");
     // Actor, label and category are not held.
     expect(tip).toContain("Mira");
-    expect(tip).toContain("Skill check");
+    expect(tip).not.toContain("Skill check"); // FR-DICE-110: the category moved to the details window
 
     const shown = rowOf(html, "e2");
     expect(shown).toContain('data-landed="true"');

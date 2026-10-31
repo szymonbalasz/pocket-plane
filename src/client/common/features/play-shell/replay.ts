@@ -85,6 +85,7 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
         "hold.stronghold", // RS2 (S4, FR-SHELL-171)
         "cmp.rules", // SP2 (S4): untouched
         "recap.session", // SP3 (S4, FR-RECAP-10)
+        "dice.details", // FR-DICE-106
       ],
     },
   ],

@@ -87,6 +87,10 @@ const frame = (data: unknown[], cause = "AttackApplied"): Frame => ({
 const texts = (f: Frame, role: "dm" | "player") => feedLinesOf(f, role).map((l) => l.text);
 
 describe("FR-STATS-26 FR-STATS-27 feed lines", () => {
+  test("FR-DICE-102 a revealed line never toasts, whichever kill it tells of", () => {
+    expect(texts(frame([redacted(attack())], "LogEntryHiddenSet"), "player")).toEqual([]);
+  });
+
   test("FR-STATS-26 kill / down read from the line's fell: a monster kill, a PC down (the line's names)", () => {
     const down = attack({ actorName: "Goblin 2" }, { targetName: "Brakka", fell: "down" });
     delete (down.payload as { callout?: unknown }).callout;

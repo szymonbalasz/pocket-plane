@@ -6,6 +6,7 @@
 import { COMBATANT_TYPE, ENCOUNTER_TYPE, HP_CHANGE_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
+import { LogEntryHiddenSet } from "@shared/events/dice-roll-log";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import type { RecordChange } from "../../events/types";
 import type { Feature, Services } from "../../services";
@@ -83,6 +84,8 @@ export const stats: Feature = {
     // FR-STATS-46: the same listener drops the touched sessions' partials (ADR-0062 §2).
     r.afterCommit("stats-version", ({ event }) => {
       if (event.campaignId === null) return;
+      // FR-DICE-102: the session spans keep each line's `public`, which a hide or reveal changes.
+      if (event.type === LogEntryHiddenSet.type) cache.drop(event.campaignId);
       if (!event.changes.some((c) => FACT_TYPES.has(c.type) || tokenOwnerChanged(c))) return;
       gate.bump(event.campaignId);
       partials.invalidate(event.campaignId, event.changes);

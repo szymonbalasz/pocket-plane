@@ -442,6 +442,17 @@ function outcomeText(hit: boolean, crit: boolean, ruled: boolean, dmView: boolea
   return hit ? (crit ? " — DM: critical hit! " : " — DM: hit. ") : " — DM: miss";
 }
 
+/** FR-DICE-107: the same words alone ("hit!", "DM: miss"), for the Roll details window. */
+export const attackOutcomeText = (
+  hit: boolean,
+  crit: boolean,
+  ruled: boolean,
+  dmView: boolean,
+): string =>
+  outcomeText(hit, crit, ruled, dmView)
+    .replace(/^ — /, "")
+    .replace(/\.? *$/, "");
+
 /**
  * "Goblin attacks Mira: 12 + 4 = 16 — hit! 6 slashing damage" (FR-CBT-24); "physical" after a
  * manual roll (FR-CBT-53 a), **one per line** (FR-CBT-73, item 12): both rolls manual → one at

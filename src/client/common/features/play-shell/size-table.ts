@@ -100,6 +100,13 @@ const shared: Record<string, SizeRow> = {
     min: s(340, 320),
     criterion: "header + the first 4 fight lines",
   },
+  // FR-DICE-106: Roll details, no launcher; one roll fills it, long content scrolls.
+  "dice.details": {
+    default: all(420, 300),
+    useful: all(400, 280),
+    min: s(320, 240),
+    criterion: "header, a one-roll equation and the footer, or the empty state",
+  },
 };
 
 /** The Game log's row (both clients): FR-SHELL-100's useful 460 × 200 (kit-parity K5). */

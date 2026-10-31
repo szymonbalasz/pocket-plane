@@ -633,6 +633,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
 | `char.sheet` | DM | 320×412 | 320×360 | as the player's | 280×320 |
 | `dicex.requests` *(pending, TT, S3)* | DM | 360×460 → 412 | TT's row; **must be ≤ 412 at 1280×720** or band-capped like `note.history` | TT's | TT's |
 | `party.summary` *(pending, CB, S12)* | both | CB's row | CB's row | CB's | CB's |
+| `dice.details` *([FR-DICE-106](dice-roll-log.md#6-functional-requirements))* | both | 420×300 (all four) | 400×280 | header, a one-roll equation and the footer, or the empty state | 320×240 |
 
 - Only the ★ rows change; the others keep today's values, now with a criterion. Other sizes: the sprint-7 table (DM `dice.log` 1150×240, player 850×280 at 1440 / 1600; player sheet 320×418 / 440 / 440). Zones = the sprint-5 table.
 

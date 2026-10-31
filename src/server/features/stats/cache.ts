@@ -1,5 +1,5 @@
 // Stats server memory (ADR-0059 §4): the session boundary cache (FR-STATS-14: append-only, extended
-// from the last `n`, warmed at server start) and the query gate (FR-STATS-16: ≤ 4 computed answers
+// from the last `n`, warmed at server start; a hide or reveal drops it) and the query gate (FR-STATS-16: ≤ 4 computed answers
 // per connection per second; the excess is coalesced into the last answer). Never persisted.
 
 import { extendSessions, type SessionBounds } from "@shared/stats/rules";
@@ -27,6 +27,11 @@ export class SessionCache {
       c.lastN = (tail.at(-1) as (typeof tail)[number]).n;
     }
     return c.sessions;
+  }
+
+  /** FR-DICE-102: a line's `public` changed under the cached spans; the next read starts over. */
+  drop(campaignId: string): void {
+    this.byCampaign.delete(campaignId);
   }
 
   /** The cached last `n` (tests: warmed / extended), or null = never read. */

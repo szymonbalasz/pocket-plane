@@ -4,6 +4,7 @@ import { recordsOf } from "@shared/protocol/store";
 import { ScrollTextIcon } from "lucide-react";
 import type { Viewport } from "../play-shell/geometry";
 import { isTall, isWide, type Size, type WindowDef } from "../play-shell/registry";
+import { DICE_DETAILS_KIND, RollDetailsRuntime } from "./details";
 import { makeLogFocusRuntime } from "./focus";
 
 export const DICE_LOG_KIND = "dice.log";
@@ -46,4 +47,20 @@ export const diceLogWindowBase = {
     recordsOf<{ n: number }>(store, GAME_LOG_ENTRY_TYPE).reduce((m, e) => Math.max(m, e.n), 0),
   // FR-DICE-37: `focusLogEntry` opens / fronts the log whatever its state.
   companion: makeLogFocusRuntime(DICE_LOG_KIND),
+} satisfies Omit<WindowDef, "component" | "clients">;
+
+/**
+ * FR-DICE-106: `dice.details` "Roll details" geometry, both clients: no launcher (opened from a log
+ * row), one instance that follows the row picked; its target is client memory, so it loads closed.
+ */
+export const diceDetailsWindowBase = {
+  kind: DICE_DETAILS_KIND,
+  title: "Roll details",
+  defaultSize: { w: 420, h: 300 },
+  minSize: { w: 320, h: 240 },
+  usefulSize: { w: 400, h: 280 },
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  defaultOpen: false,
+  restoreOpen: false,
+  companion: RollDetailsRuntime,
 } satisfies Omit<WindowDef, "component" | "clients">;

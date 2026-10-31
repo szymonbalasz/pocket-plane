@@ -830,6 +830,57 @@ export function copiedRows<R>(
   return lines.length > 0 ? lines.join("\n") : null;
 }
 
+/** FR-DICE-103: the creature a log line is by. */
+export interface ActorCreature {
+  /** Its definition. */
+  id: string;
+  kind: "character" | "monster";
+  /** The one monster combatant of that name, so its stat block binds to it (FR-KIT-104). */
+  combatantId?: string;
+}
+
+/**
+ * FR-DICE-103: the one creature an actor name stands for (the DM client): the definitions named so
+ * and those behind tokens and combatants named so ("Goblin 2"), the same case-insensitive match as
+ * `actorPortraits`. A definition may be global, so not in the store: what a token or combatant
+ * reaches and the store doesn't hold is a monster. Several of one name on ONE definition are one
+ * creature; a name reaching two or more definitions, or none → null.
+ */
+export function actorCreature(
+  name: string,
+  records: {
+    entities: readonly Pick<EntityRecord, "id" | "kind" | "name">[];
+    combatants: readonly {
+      id: string;
+      name: string;
+      entityId: string;
+      kind?: string;
+      removed?: boolean;
+    }[];
+    tokens: readonly { name: string; definitionId?: string }[];
+  },
+): ActorCreature | null {
+  const key = name.toLowerCase();
+  const ids = new Set<string>();
+  for (const e of records.entities) if (e.name.toLowerCase() === key) ids.add(e.id);
+  const named = records.combatants.filter((c) => c.name.toLowerCase() === key);
+  for (const c of named) ids.add(c.entityId);
+  for (const t of records.tokens) {
+    if (t.definitionId && t.name.toLowerCase() === key) ids.add(t.definitionId);
+  }
+  if (ids.size !== 1) return null;
+  const [id] = ids as unknown as [string];
+  if (records.entities.find((x) => x.id === id)?.kind === "character") {
+    return { id, kind: "character" };
+  }
+  const bound = named.filter((c) => c.kind === "monster" && !c.removed);
+  return {
+    id,
+    kind: "monster",
+    ...(bound.length === 1 ? { combatantId: (bound[0] as { id: string }).id } : {}),
+  };
+}
+
 type Named = { name: string; imageAssetId?: string | null };
 
 /**

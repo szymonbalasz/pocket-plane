@@ -59,6 +59,8 @@ const GEM_BUNDLES = [
   "fx-dice-e2e",
   // sprint 10 T3: the Stats Campaign tab e2e alias of `stats-b` (STATS §13.4)
   "stats-campaign-e2e",
+  // the game log's row menu e2e alias of `gems` (DICE FR-DICE-99–110)
+  "dice-log-menu-e2e",
 ];
 
 async function frames(bundle: string) {

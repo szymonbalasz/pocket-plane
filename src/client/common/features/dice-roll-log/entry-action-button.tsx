@@ -35,10 +35,15 @@ function EntryActionButton({
   action,
   entry,
   store,
+  requested,
+  onRequestDone,
 }: {
   action: EntryAction;
   entry: GameLogEntryView;
   store: RecordStore;
+  /** FR-DICE-105: the row menu asked for this action: act as a click on this Button would. */
+  requested: boolean;
+  onRequestDone: () => void;
 }) {
   const connection = useSync((s) => s.connection);
   const live = useSync((s) => s.state === "live");
@@ -76,6 +81,15 @@ function EntryActionButton({
   const formOpen = control.manual !== null;
   useEffect(() => confirm.form(formOpen), [confirm, formOpen]);
   const disabled = !live || busy;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per request from the menu
+  useEffect(() => {
+    if (!requested) return;
+    onRequestDone();
+    if (disabled) return;
+    if (action.confirm !== undefined) confirm.ask();
+    else if (roll) control.roll({});
+    else go();
+  }, [requested]);
   const ids = { "data-value": action.id, "data-record-id": entry.id };
   const Icon = action.Icon;
   // A roll action keeps the line's mode: the control rolls without Shift / Ctrl (Alt stages it).
@@ -180,9 +194,14 @@ function EntryActionButton({
 export function EntryActions({
   e,
   actions,
+  request = null,
+  onRequestDone = () => {},
 }: {
   e: GameLogEntryView;
   actions: readonly EntryAction[];
+  /** FR-DICE-105: the action the row menu picked, once the menu closed. */
+  request?: string | null;
+  onRequestDone?: () => void;
 }) {
   const store = useSync((s) => s.store);
   const shown = useMemo(() => actionsFor(actions, store, e), [actions, store, e]);
@@ -193,7 +212,14 @@ export function EntryActions({
       className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover/entry:opacity-100 has-[[data-testid=dice-log-action-confirm]]:opacity-100 [@media(hover:none)]:opacity-100"
     >
       {shown.map((a) => (
-        <EntryActionButton key={a.id} action={a} entry={e} store={store} />
+        <EntryActionButton
+          key={a.id}
+          action={a}
+          entry={e}
+          store={store}
+          requested={request === a.id}
+          onRequestDone={onRequestDone}
+        />
       ))}
     </span>
   );

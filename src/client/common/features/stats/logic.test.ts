@@ -81,6 +81,16 @@ const frame = (data: unknown[], cause = "AttackApplied"): Frame => ({
 });
 
 describe("FR-STATS-17 refresh", () => {
+  test("FR-DICE-102 a hide re-queries every tab, though a player's frame holds only a delete", () => {
+    const hide = {
+      cause: { name: "LogEntryHiddenSet" },
+      changes: [{ type: GAME_LOG_ENTRY_TYPE, id: "e1", op: "delete" as const }],
+    };
+    for (const tab of ["campaign", "fight", "session", "luck"] as const) {
+      expect(refreshes(hide, { tab, pickedFight: "enc-1" })).toBe(true);
+    }
+  });
+
   test("FR-STATS-17 refresh encounter filter: a picked fight re-queries on its own lines only; the default fight on any fight's line; the Session tab on any line", () => {
     const own = frame([entry()]);
     const other = frame([entry({ encounterId: "enc-2" })]);

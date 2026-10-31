@@ -167,7 +167,7 @@ describe("FR-KIT-40 row grid", () => {
     ].map((id) => at(r.body, id));
     expect(order.every((x) => x >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    // The category chip moved into the Tooltip (FR-KIT-45).
+    // The category chip moved out of the row (FR-KIT-45), to the details window (FR-DICE-110).
     expect(r.body).not.toContain(">Damage<");
   });
 
@@ -473,22 +473,17 @@ describe("K8 combat rows (K6 gaps 1, 2)", () => {
 });
 
 describe("FR-KIT-45 tooltip content", () => {
-  test("FR-KIT-45 tooltip content: time, the dice per roll, the full line with its chips, then the category", () => {
+  test("FR-KIT-45 FR-DICE-110 tooltip content: the time, then the full line with its chips; the dice dump and the category moved to the details window", () => {
     const html = render([damage], "player", <EntryDetails e={damage} />);
     const text = html.replace(/<[^>]+>/g, "|");
     const time = new Date(damage.at).toLocaleTimeString();
-    const order = [
-      time,
-      "2d8+4: [5, 7] + 4",
-      "Mira — Longbow damage: 5 + 7 + 4 = 16",
-      "Damage",
-    ].map((s) => text.indexOf(s.split(" ")[0] as string));
+    const order = [time, "Mira"].map((s) => text.indexOf(s));
     expect(html).toContain(time);
-    expect(html).toContain("2d8+4: [5, 7] + 4");
+    expect(html).not.toContain("2d8+4: [5, 7] + 4");
     expect(html.match(/data-testid="dice-log-die"/g)).toHaveLength(2);
     expect(order.every((x) => x >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(html).toContain(">Damage</span>");
+    expect(html).not.toContain(">Damage</span>");
     // The physical badge keeps its text in the line; the row chip has the test ID.
     expect(html).not.toContain("dice-log-entry-manual");
   });

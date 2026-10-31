@@ -9,12 +9,17 @@ import {
 import { Button } from "@ui/components/ui/button";
 import { Checkbox, Popover, PopoverContent, PopoverTrigger } from "@ui/components/ui/controls";
 import { Tip } from "@ui/components/ui/tip";
+import { openSheetFor } from "@ui/features/character-sheet/selection";
+import { CHAR_SHEET_KIND } from "@ui/features/character-sheet/window";
 import { GameLog } from "@ui/features/dice-roll-log/GameLog";
+import type { ActorCreature } from "@ui/features/dice-roll-log/logic";
 import { diceLogWindowBase, LOG_USEFUL, logSize } from "@ui/features/dice-roll-log/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
+import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { useRecords, useSync } from "@ui/sync/store";
 import { SettingsIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useOpenStatBlock } from "../entities/statblock/store";
 
 /** FR-DICE-23: one checkbox per category; each change sends `dice.setCategoryPublic`. */
 function SettingsPopover() {
@@ -70,8 +75,28 @@ function SettingsPopover() {
   );
 }
 
+/**
+ * FR-DICE-103: a line's creature: a character's sheet, else its stat block with the token menu's
+ * opener (bound to its combatant when the name is one).
+ */
+function useOpenCreature() {
+  const openStatBlock = useOpenStatBlock();
+  const openWindow = useOpenWindow();
+  return (c: ActorCreature) => {
+    if (c.kind === "character") {
+      openSheetFor(c.id, "character");
+      openWindow(CHAR_SHEET_KIND);
+    } else {
+      openStatBlock({
+        definitionId: c.id,
+        ...(c.combatantId ? { combatantId: c.combatantId } : {}),
+      });
+    }
+  };
+}
+
 function DmLogBody() {
-  return <GameLog dmTools={<SettingsPopover />} />;
+  return <GameLog dmTools={<SettingsPopover />} openCreature={useOpenCreature()} />;
 }
 
 export const dmDiceLogWindow = defineWindow({

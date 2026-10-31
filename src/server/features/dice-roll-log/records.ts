@@ -26,7 +26,7 @@ export const entryVisibility = (r: GameLogEntryRecord, v: Viewer): Visibility =>
     : "hidden";
 
 export function redactEntry(r: GameLogEntryRecord): RedactedGameLogEntry {
-  const { dmPayload: _dm, ...rest } = r;
+  const { dmPayload: _dm, hiddenFrom: _from, ...rest } = r;
   return rest;
 }
 

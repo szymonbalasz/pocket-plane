@@ -12,6 +12,7 @@ import {
 } from "@shared/combat-tracker/log-kinds";
 import { LOG_KIND_ATTACK, LOG_KIND_HP } from "@shared/combat-tracker/schemas";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
+import { LogEntryHiddenSet } from "@shared/events/dice-roll-log";
 import type { EventFrame } from "@shared/protocol/frames";
 import { type FeedEvent, feedText } from "@shared/stats/feed";
 import { logUpserts } from "./logic";
@@ -83,6 +84,8 @@ export function feedLinesOf(
   role: "dm" | "player",
 ): FeedLine[] {
   const out: FeedLine[] = [];
+  // FR-DICE-102: a revealed line is no new event, whichever kill it tells of.
+  if (frame.cause.name === LogEntryHiddenSet.type) return out;
   for (const e of logUpserts(frame)) {
     if (e.undone || e.supersededBy !== null) continue;
     const ev = eventOf(e, role);
