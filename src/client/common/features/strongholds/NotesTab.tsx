@@ -83,7 +83,7 @@ function DmNotes({ hold }: { hold: StrongholdRecord }) {
 export function NotesTab({ parts }: { parts: HoldParts }) {
   if (parts.dm) return <DmNotes hold={parts.hold as StrongholdRecord} />;
   return (
-    <p data-testid="hold-notes" className="whitespace-pre-wrap break-words text-sm">
+    <p data-testid="hold-notes" className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm">
       {parts.hold.notes ?? ""}
     </p>
   );

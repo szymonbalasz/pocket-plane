@@ -55,6 +55,28 @@ test("FR-DICEX-39 FR-DICEX-40 FR-DICEX-41 a sheet roll pops on every client in i
     });
   }
 
+  // C's big d20, watched from before the roll: a throw lasts about 3 s, and under CI load the click
+  // alone can take that long, so looking for it afterwards can find it already gone.
+  const rested = webgl
+    ? p2.waitForFunction(
+        () => {
+          const die = document.querySelector(
+            '[data-testid="dicex-throw"][data-arena="screen"][data-state="rest"] [data-testid="dicex-throw-die"][data-settled]',
+          );
+          const id = die?.closest("[data-record-id]")?.getAttribute("data-record-id");
+          return (
+            die && {
+              id,
+              value: die.getAttribute("data-value"),
+              settled: die.getAttribute("data-settled"),
+            }
+          );
+        },
+        undefined,
+        { polling: 50, timeout: 20_000 },
+      )
+    : null;
+
   // B: Mira's sheet → Athletics.
   const sheet = await openWindow(p1, "char.sheet");
   await sheet.locator('[data-testid="charx-roll-skill"][data-value="athletics"]').click();
@@ -71,13 +93,10 @@ test("FR-DICEX-39 FR-DICEX-40 FR-DICEX-41 a sheet roll pops on every client in i
   ).toContainText("Athletics");
 
   // C: the big d20 rests on the server's face (WebGL), then the popup holds the same one die.
-  if (webgl) {
-    const thrown = p2.locator(
-      `[data-testid="dicex-throw"][data-record-id="${entryId}"][data-arena="screen"]`,
-    );
-    await expect(thrown).toHaveAttribute("data-state", "rest", { timeout: 6_000 });
-    const die = thrown.getByTestId("dicex-throw-die");
-    await expect(die).toHaveAttribute("data-settled", (await die.getAttribute("data-value")) ?? "");
+  if (rested) {
+    const die = await (await rested).jsonValue();
+    expect(die?.id).toBe(entryId);
+    expect(die?.settled).toBe(die?.value);
   }
   for (const page of [p2, p1, dm]) {
     const popup = popupOf(page, entryId);

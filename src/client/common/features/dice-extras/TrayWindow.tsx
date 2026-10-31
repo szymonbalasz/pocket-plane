@@ -1134,7 +1134,7 @@ export function TrayWindow() {
       <div
         ref={diceArea}
         data-testid="dicex-tray-area"
-        className="flex min-h-0 flex-1 flex-wrap content-start items-center gap-1 overflow-y-auto overflow-x-hidden py-1.5 pr-1.5"
+        className="flex min-h-5 flex-1 flex-wrap content-start items-center gap-1 overflow-y-auto overflow-x-hidden py-1.5 pr-1.5"
       >
         {crit && stagedRoll && (state === "compose" || state === "adjust") && (
           <Tooltip content={CRIT_TIP}>
@@ -1234,7 +1234,7 @@ export function TrayWindow() {
           )}
         </div>
       )}
-      {/* A long message takes the dice area's room, then scrolls here: the bar stays in the tray. */}
+      {/* A long message scrolls here once the dice area is at its least: dice and bar stay. */}
       {((issue && state !== "result") || error || control.error) && (
         <div
           data-testid="dicex-tray-messages"

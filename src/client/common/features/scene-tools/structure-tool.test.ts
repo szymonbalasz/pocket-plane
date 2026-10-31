@@ -110,6 +110,7 @@ describe("FR-SCN-08 Structure tool", () => {
             [1, 1, 3, 1],
             [3, 1, 3, 4],
           ],
+          replace: true,
         },
       ],
     ]);

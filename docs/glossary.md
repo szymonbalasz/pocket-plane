@@ -107,7 +107,9 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Affected squares** | The grid cells more than half inside an AoE template ([scene-tools](specs/scene-tools.md)). | — |
 | **Ephemeral template** | An AoE template sent as a live signal, gone when cleared or its placer leaves; **Keep** saves it as a record. | AoE template |
 | **Prop** | A DM-placed image object on a scene's objects layer (barrel, table). | Token |
-| **Wall** | A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight. | Door |
+| **Wall** | A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight. | Door, Window, One-way wall |
+| **Window** | A wall that blocks player token moves but not sight. | Wall |
+| **One-way wall** | A wall that blocks player token moves both ways and sight one way: its arrows show the way sight passes. Used for elevation. | Wall |
 | **Wall hint** | The red piece of the first wall crossed, shown while a player drags a token (from a server dry-run check). | — |
 | **Door** | A wall segment the DM sets open, closed or locked; closed / locked doors block sight; hidden from a player until a point beside it is in their sight. | Wall |
 | **Structure** | A scene's walls and doors, stored as one record per scene. | — |

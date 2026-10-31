@@ -160,7 +160,7 @@ describe("FR-DICEX-53 tray Roll visible at min", () => {
     expect(tag(/<button[^>]*data-testid="dicex-tray-mode-option"[^>]*>/)).toContain("h-[26px]");
     // The one flexible part: the dice area, padded for tags, scrolling on its own.
     const area = tag(/<div[^>]*data-testid="dicex-tray-area"[^>]*>/);
-    expect(area).toMatch(/min-h-0 flex-1/);
+    expect(area).toMatch(/min-h-5 flex-1/);
     expect(area).toContain("overflow-y-auto");
     expect(area).toContain("py-1.5");
     expect(DICE_AREA_PAD).toBe(12);

@@ -4,7 +4,7 @@
 import type { DiceRollIntent } from "@shared/dice-roll-log/schemas";
 import { formatCoins } from "@shared/party-loot/format";
 import { COINS, type Coins, ZERO_COINS } from "@shared/party-loot/schemas";
-import { REMINDER_SOURCE_MAX, REMINDER_TEXT_MAX } from "@shared/reminders/schemas";
+import { REMINDER_SOURCE_MAX } from "@shared/reminders/schemas";
 import {
   FACILITY_STATES,
   FacilityInput,
@@ -409,7 +409,7 @@ export interface ReminderPrefill {
 
 /**
  * FR-HOLD-29: **Add reminder** (link = the stronghold, source "‹Stronghold›") or, with a facility,
- * **Make reminder** (text = its effect cut to 500, source "‹Stronghold›: ‹Facility›", link = the
+ * **Make reminder** (text = its whole effect, source "‹Stronghold›: ‹Facility›", link = the
  * facility, target Party). Source cut to REM's 60.
  */
 export function reminderPrefill(
@@ -419,7 +419,7 @@ export function reminderPrefill(
   const source = facility ? `${hold.name}: ${facility.name}` : hold.name;
   return {
     target: { kind: "party" },
-    text: facility ? facility.effect.slice(0, REMINDER_TEXT_MAX) : "",
+    text: facility ? facility.effect : "",
     source: source.slice(0, REMINDER_SOURCE_MAX),
     strongholdId: hold.id,
     facilityId: facility?.id ?? null,

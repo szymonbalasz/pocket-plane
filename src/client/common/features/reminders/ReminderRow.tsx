@@ -183,7 +183,7 @@ export function ReminderRow({
       {r.source !== "" && (
         <p
           data-testid="rem-row-source"
-          className="flex min-w-0 items-center gap-1 text-xs break-words text-muted-foreground"
+          className="flex min-w-0 items-center gap-1 text-xs [overflow-wrap:anywhere] text-muted-foreground"
         >
           {r.strongholdId && onOpenLink && (
             <Tip content="Open the stronghold">

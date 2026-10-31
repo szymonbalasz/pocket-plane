@@ -64,8 +64,12 @@ test("full text: a long tray error scrolls inside a minimum-height tray; the Rol
     atEnd: true,
     sideways: 0,
   });
-  // Two lines at least of the message show at the minimum, the rest a scroll away.
-  expect(facts.seen).toBeGreaterThanOrEqual(32);
+  // At the minimum a line of the message shows, the rest a scroll away, and the dice area keeps its
+  // least height, so the staged dice aren't hidden until the error clears.
+  expect(facts.seen).toBeGreaterThanOrEqual(14);
+  expect((await tray.getByTestId("dicex-tray-area").boundingBox())?.height).toBeGreaterThanOrEqual(
+    20,
+  );
   // The bar hasn't moved for it.
   expect((await tray.getByTestId("dicex-tray-bar").boundingBox())?.y).toBe(barBefore?.y);
   await tray.screenshot({ path: test.info().outputPath("tray-240.png") });

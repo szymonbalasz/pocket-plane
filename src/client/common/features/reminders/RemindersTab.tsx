@@ -54,7 +54,7 @@ function GroupHeader({ g, count }: { g: ReminderGroup; count: number }) {
           aria-hidden
         />
       )}
-      <span className="min-w-0 text-sm font-medium break-words">{g.title}</span>
+      <span className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{g.title}</span>
       <span data-testid="rem-group-count" className="text-xs text-muted-foreground tabular-nums">
         {count}
       </span>

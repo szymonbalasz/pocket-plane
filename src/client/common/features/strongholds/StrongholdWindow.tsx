@@ -278,7 +278,10 @@ function Loaded({
   return (
     <div className="flex h-full min-h-0 flex-col gap-1.5">
       <header className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-        <h3 className="min-w-0 break-words text-base font-semibold" data-testid="hold-name">
+        <h3
+          className="min-w-0 text-base font-semibold [overflow-wrap:anywhere]"
+          data-testid="hold-name"
+        >
           {parts.hold.name}
         </h3>
         <DefendersChip parts={parts} />

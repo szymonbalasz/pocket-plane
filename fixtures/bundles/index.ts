@@ -159,6 +159,7 @@ import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
 import visualKit from "./visual-kit";
+import wallKinds from "./wall-kinds";
 import wfFrame from "./wf-frame";
 import wfFrameE2e from "./wf-frame-e2e";
 import windowsS5 from "./windows-s5";
@@ -400,6 +401,8 @@ export const bundles: readonly Bundle[] = [
   s15FrameE2e,
   // Send to game log (build/log-share)
   logShare,
+  // Windows and one-way walls (build/wall-kinds): `vision` in its own server
+  wallKinds,
   // The Luck tab's d20 chart e2e alias of stats-b (build/luck-d20-chart)
   statsDiceE2e,
   // Sheet names linking to compendium entries (build/sheet-compendium-links)
