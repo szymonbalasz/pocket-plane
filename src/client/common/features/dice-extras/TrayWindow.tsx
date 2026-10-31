@@ -1234,35 +1234,24 @@ export function TrayWindow() {
           )}
         </div>
       )}
-      {issue && state !== "result" && (
-        <p
-          data-testid="dicex-tray-issue"
-          role="status"
-          className="shrink-0 truncate text-xs text-destructive"
-          title={issue}
+      {/* A long message takes the dice area's room, then scrolls here: the bar stays in the tray. */}
+      {((issue && state !== "result") || error || control.error) && (
+        <div
+          data-testid="dicex-tray-messages"
+          className="min-h-0 overflow-y-auto [overflow-wrap:anywhere] text-xs text-destructive"
         >
-          {issue}
-        </p>
-      )}
-
-      {error && (
-        <p
-          data-testid="dicex-tray-error"
-          role="alert"
-          className="shrink-0 truncate text-xs text-destructive"
-          title={error}
-        >
-          {error}
-        </p>
-      )}
-      {control.error && (
-        <p
-          className="shrink-0 truncate text-xs text-destructive"
-          role="alert"
-          title={control.error}
-        >
-          {control.error}
-        </p>
+          {issue && state !== "result" && (
+            <p data-testid="dicex-tray-issue" role="status">
+              {issue}
+            </p>
+          )}
+          {error && (
+            <p data-testid="dicex-tray-error" role="alert">
+              {error}
+            </p>
+          )}
+          {control.error && <p role="alert">{control.error}</p>}
+        </div>
       )}
 
       {/* Bottom bar, like the roll bar (DICEX §7). */}

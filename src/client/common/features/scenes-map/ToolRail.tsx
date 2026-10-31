@@ -267,12 +267,12 @@ export function ToolRail({
         })}
       </ToggleGroup>
       {/* FR-MAP-45: camera only, so it works while not live too. */}
-      <Tooltip content="Fit tokens to the free area">
+      <Tooltip content="Zoom to fit tokens">
         <Button
           size="icon"
           variant="ghost"
           className={RAIL_TOOL}
-          aria-label="Fit"
+          aria-label="Zoom to fit"
           data-testid="map-tool-fit"
           onClick={requestFit}
         >

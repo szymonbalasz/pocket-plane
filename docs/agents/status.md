@@ -8,7 +8,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Track | Branch | Agent | Worktree | State |
 |---|---|---|---|---|
-| Upgrade guards | `fix/upgrade-guards` | `build-upgrade-guards` | `fix-upgrade-guards` (slot 2) | building |
+| Upgrade guards | `fix/upgrade-guards` | — | — | **merged** (#424) |
 | Play fixes: toasts | `fix/s15-toasts` | `build-s15-toasts` | `fix-s15-toasts` (slot 4) | building |
 | Play fixes: frame and map | `fix/s15-frame` | `build-s15-frame` | `fix-s15-frame` (slot 6) | building |
 | Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | writing; then a review; then the DM's gate |
