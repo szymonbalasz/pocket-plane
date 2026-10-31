@@ -89,6 +89,8 @@ export function createHoldMemory(
     },
     select: (strongholdId: string) => set({ strongholdId }),
     chooseTab: (tab: HoldTab) => set({ tab }),
+    /** FR-SHELL-200: the window closed; nothing selected, the first tab, stored as such. */
+    reset: () => set(EMPTY),
   };
 }
 

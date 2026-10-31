@@ -263,14 +263,6 @@ export const avgText = (avg: number | null) => (avg === null ? "—" : avg.toFix
 
 // ---------- Campaign (FR-STATS-81–85) ----------
 
-/**
- * FR-STATS-85: a user open lands on Campaign, so the window's close (not a minimise or put-away)
- * sends the tab back to it; a feature open (End, Show awards) sets its own tab before opening.
- * True when the window went from shown or minimised to closed / gone.
- */
-export const closedNow = (prev: string | undefined, next: string | undefined) =>
-  (prev === "open" || prev === "minimised") && next !== "open" && next !== "minimised";
-
 /** FR-STATS-81: "2 sessions · 5 fights · 14 monsters slain". */
 export function campaignHeaderText(c: { sessions: number; fights: number; slain: number }) {
   const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;

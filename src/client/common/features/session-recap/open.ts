@@ -27,6 +27,8 @@ export function createRecapViews() {
       if (!key) return;
       state.setState({ views: { ...state.getState().views, [key]: view } });
     },
+    /** FR-SHELL-200: the window closed; the next open starts on the newest session. */
+    reset: () => state.setState({ views: {} }),
   };
 }
 

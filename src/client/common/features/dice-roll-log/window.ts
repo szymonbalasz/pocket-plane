@@ -4,7 +4,7 @@ import { recordsOf } from "@shared/protocol/store";
 import { ScrollTextIcon } from "lucide-react";
 import type { Viewport } from "../play-shell/geometry";
 import { isTall, isWide, type Size, type WindowDef } from "../play-shell/registry";
-import { DICE_DETAILS_KIND, RollDetailsRuntime } from "./details";
+import { DICE_DETAILS_KIND, RollDetailsRuntime, rollDetails } from "./details";
 import { makeLogFocusRuntime } from "./focus";
 
 export const DICE_LOG_KIND = "dice.log";
@@ -63,4 +63,6 @@ export const diceDetailsWindowBase = {
   defaultOpen: false,
   restoreOpen: false,
   companion: RollDetailsRuntime,
+  // FR-SHELL-200: the picked roll. `seq` stays: the companion opens only on a new pick.
+  onClose: () => rollDetails.setState({ entryId: null }),
 } satisfies Omit<WindowDef, "component" | "clients">;

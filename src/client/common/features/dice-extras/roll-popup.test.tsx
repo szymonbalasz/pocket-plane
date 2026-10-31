@@ -1,6 +1,6 @@
 // The roll popup stack's rendering (FR-DICEX-09, -38–42; DICEX §7 test IDs): static render of
 // the lazy `RollPopupStack` inside a shell (1280×720) over the page's popup store.
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { emptyStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -29,6 +29,8 @@ afterAll(() => {
   delete g.window;
   delete g.document;
 });
+// Another file in this process may leave a roll pending on the shared store ("Rolling…" popup).
+beforeEach(() => diceExtras.failed());
 afterEach(() => {
   diceExtras.failed();
   rollPopups.api.setState({ popups: [] });

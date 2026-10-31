@@ -7,6 +7,7 @@
 import { ScrollTextIcon } from "lucide-react";
 import { isTall, type WindowDef } from "../../play-shell/registry";
 import { RULES_KIND } from "./logic";
+import { resetRulesNav } from "./nav";
 
 type Base = Omit<WindowDef, "component" | "clients">;
 
@@ -19,4 +20,5 @@ export const rulesWindowBase = {
   defaultPosition: { anchor: "top-left", dx: 56 },
   defaultOpen: false,
   launcher: { icon: ScrollTextIcon, label: "Rules", order: 66 },
+  onClose: resetRulesNav, // FR-SHELL-200: page, search, open cards (pins are kept)
 } satisfies Base;

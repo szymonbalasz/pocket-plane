@@ -7,6 +7,7 @@ import type { WindowDef } from "../play-shell/registry";
 import { handoutActivity, PARTY_BOARD_KIND, PARTY_HANDOUT_KIND, STATUS_TAB } from "./logic";
 import { tabKeyOf } from "./open-tab";
 import { partyMemory } from "./seen";
+import { resetHandoutSelection } from "./selection";
 import { PARTY_SUMMARY_KIND } from "./summary-logic";
 
 type Base = Omit<WindowDef, "component" | "clients">;
@@ -33,6 +34,8 @@ export const partyBoardWindowBase = {
   // Party Manager in that state, on the Party status tab.
   absorbs: [PARTY_SUMMARY_KIND],
   onAbsorb: (_from, you) => partyMemory().tabs.choose(tabKeyOf(you), STATUS_TAB),
+  // FR-SHELL-200: back on the default tab.
+  onClose: (you) => partyMemory().tabs.choose(tabKeyOf(you), STATUS_TAB),
 } satisfies Base;
 
 export const partyHandoutWindowBase = {
@@ -44,4 +47,5 @@ export const partyHandoutWindowBase = {
   // FR-PARTY-14: images need the room; opens on top rather than shrinking to a slot.
   minOpenH: 400,
   defaultOpen: false,
+  onClose: resetHandoutSelection, // FR-SHELL-200
 } satisfies Base;
