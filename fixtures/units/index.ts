@@ -105,6 +105,7 @@ import gemsHidden from "./gems/gems-hidden";
 import gemsOn from "./gems/gems-on";
 import gemsRolls from "./gems/gems-rolls";
 import syncProbes from "./live-sync/sync-probes";
+import shareMiraRows from "./log-share/share-mira-rows";
 import kitNotices from "./notifications/kit-notices";
 import kitNoticesApplied from "./notifications/kit-notices-applied";
 import noteColours from "./notifications/note-colours";
@@ -344,4 +345,6 @@ export const units: readonly Fixture[] = [
   ovwSwordCoast,
   ovwPhandalin,
   ovwCrowd,
+  // Send to game log (build/log-share)
+  shareMiraRows,
 ];

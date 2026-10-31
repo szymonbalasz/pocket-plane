@@ -4435,3 +4435,18 @@ Every item ID must be on `overviewId`, else `not_found`, nothing written. **Buil
 **CON-44** (measured, `FR-OVW-08 CON-44`, bundle `overview-scenes` with `ovw-crowd` shown, 300 items and 50 overviews): item row label 594 B, image 436 B, widest (80-char text) 684 B; overview row 277 B (the spec's estimates: 500 B, 200 B). Snapshot DM 184,803 B, player 136,837 B, under the ceilings (DM 1.5 MiB since #256, players 512 KiB). In the DM snapshot in place of the battle scene's tokens and props.
 
 **Fixtures** (FR-OVW-46): units `ovw-sword-coast` (shown; locked `map-large`, three styled labels, one hidden; hidden scroll, `fixtures/assets/props/scroll.svg`), `ovw-phandalin`, `ovw-crowd` (200 labels + 100 images); bundle `overview-scenes` = `scenes` + those. Party miniatures join `ovw-sword-coast` and the crowd's mix with `ovw.addParty` in the miniatures slice. Tests insert miniatures through `overview-scenes/testing.ts` until then.
+
+## 191. Send to game log (build/log-share)
+
+From [log-share](../specs/log-share.md) FR-SHARE-01–11 (#415). **Built by `build/log-share`.** No new record type: a share is a `game-log-entry` of kind `share.entry` (`game-log-entry` rules unchanged, FR-DICE-15).
+
+| Intent | Payload | Rule | Event | FR |
+|---|---|---|---|---|
+| `share.toLog` (DM, player) | `{from: "compendium", entryId}` or `{from: "sheet", creatureId, list: attacks | spells | features | items, rowId}` → `{entryId}` | Strict: no text can be sent; the server builds it. Unreadable or unknown entry → `not_found`; monster → `invalid`; another player's character → `forbidden`; other campaign, monster creature or a row that's gone → `not_found` | `LogEntryShared` | FR-SHARE-03, -10 |
+
+| Domain event | Owner | Emitted by | Payload | Changes | Undoable | Source |
+|---|---|---|---|---|---|---|
+| `LogEntryShared` | SHARE | `share.toLog` | `{entryId, from, title}` | The new `game-log-entry` upsert, stamped public; an upsert per older share folded (FR-SHARE-08) | no (the DM's Hide takes it back) | FR-SHARE-05 |
+
+- **Log kind** `share.entry`, payload `{title, line, text, cut?, folded?}`, no `dmPayload`, category `other`; registered in `src/shared/dice-roll-log/kinds.ts`.
+- **Test IDs:** `share-send` (`data-value` = `compendium` or the list, `data-record-id`), `share-confirm-dialog`, `share-confirm-send`, `share-confirm-cancel`, `share-entry-body`, `share-entry-line`, `share-entry-folded`, `share-entry-cut`.

@@ -10,6 +10,7 @@ import {
 } from "@shared/combat-tracker/log-kinds";
 import { LOG_KIND_ATTACK, LOG_KIND_HP } from "@shared/combat-tracker/schemas";
 import type { RollCategory } from "@shared/events/dice-roll-log";
+import { LOG_KIND_SHARE, SharePayload } from "@shared/log-share/schemas";
 import type { LineSegment } from "./kind-types";
 import { type EntryLike, formatEntry } from "./line";
 import { itemRuns, itemsAfterActor, ROLL_KIND, runName } from "./roll-kind";
@@ -73,6 +74,13 @@ function combatAction(entry: EntryLike): string | null {
   return null;
 }
 
+/** FR-SHARE-05: a `share.entry` line's payload; null = another kind, or unreadable. */
+export function shareOf(entry: Pick<EntryLike, "kind" | "payload">): SharePayload | null {
+  if (entry.kind !== LOG_KIND_SHARE) return null;
+  const p = SharePayload.safeParse(entry.payload);
+  return p.success ? p.data : null;
+}
+
 /**
  * FR-KIT-42: `roll` → its runs' names joined with " + " (a label, else the expression; a weapon's
  * part run by its name); `cbt.attack` / `cbt.hp` → a short action whose numbers are boxes (K8);
@@ -82,6 +90,9 @@ function combatAction(entry: EntryLike): string | null {
 export function rowAction(entry: EntryLike): RowAction {
   const combat = combatAction(entry);
   if (combat !== null) return { actor: entry.actorName, text: combat };
+  // FR-SHARE-05: the row's head only; its text shows below the row (`shareOf`).
+  const share = shareOf(entry);
+  if (share) return { actor: entry.actorName, text: `shares ${share.title}` };
   if (entry.kind === ROLL_KIND) {
     const p = RollEntryPayload.safeParse(entry.payload);
     if (p.success) {

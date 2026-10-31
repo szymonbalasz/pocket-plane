@@ -22,6 +22,7 @@ import {
   seenByPlayers,
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
+import { LOG_KIND_SHARE } from "@shared/log-share/schemas";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
 import {
   CopyIcon,
@@ -103,7 +104,8 @@ export function entryMenuItems(o: {
     group: 0,
     disabled: false,
   });
-  const items = [view("details", "Roll details…", InfoIcon)];
+  // FR-SHARE-07: a share's row already shows everything; no Roll details.
+  const items = e.kind === LOG_KIND_SHARE ? [] : [view("details", "Roll details…", InfoIcon)];
   if (landed && trayRequestOf(e)) {
     items.push({ ...view("tray", "Copy to dice tray", DicesIcon), disabled: !live });
   }

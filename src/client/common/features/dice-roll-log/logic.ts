@@ -746,6 +746,14 @@ export function createStickToBottom(slack = 8): StickToBottom {
   };
 }
 
+/**
+ * FR-SHARE-12: where a pinned list lands for a new share: the row's top when it is taller than the
+ * list, so the reader starts at its head, not its last line; else null (stay pinned).
+ */
+export function tallRowTop(top: number, height: number, viewHeight: number): number | null {
+  return height > viewHeight ? top : null;
+}
+
 /** The part of `ResizeObserver` `keepPinned` uses (a fake in tests). */
 export type ResizeObserverLike = new (
   cb: () => void,

@@ -141,6 +141,12 @@ DM picks #351 (ADR-0069), #355–#356 (Gilt & Stone default, Simple Dark; kit pa
 |---|---|---|---|
 | [Overview scenes](overview-scenes.md) | OVW | complete (#398), [ADR-0075](../architecture/adr/0075-overview-scenes.md) | spec-overview-scenes |
 
+## Send to game log (2026-10-31)
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Send to game log](log-share.md) | SHARE | in-review (#415) | build-log-share |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.
