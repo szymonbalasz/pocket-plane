@@ -29,7 +29,7 @@
 **A** (DM, #120):
 
 - Players never receive monster definitions (custom or imported). Own character: full. Other characters: `{id, kind, name, portraitAssetId, ownerPlayerId}`.
-- Tokens carry read-only copies of display name, image and size. No per-token stat or size editing.
+- Tokens carry read-only copies of display name, image and size. No per-token stat or size editing. *(Amended, #427: the DM may set one token's size from the token menu, FR-MAP-150. No per-token stat editing still holds.)*
 - Copies are refreshed in the **same transaction** as the definition edit, never by a listener that mutates state ([ADR-0016](0016-domain-events-pending-actions.md)).
 
 ## Consequences

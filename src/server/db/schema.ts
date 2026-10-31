@@ -491,6 +491,8 @@ export const token = sqliteTable(
     seenBy: text("seen_by", { mode: "json" }).$type<string[]>(),
     /** FR-FOG-45 (#210): DM-only token state; DM wire only when true, never to players. */
     invisible: integer("invisible", { mode: "boolean" }).notNull().default(false),
+    /** FR-MAP-150 (#427): the DM set this token's size; the definition's no longer follows. Never on a wire. */
+    sizeOverridden: integer("size_overridden", { mode: "boolean" }).notNull().default(false),
     /**
      * FR-MAP-65 (sprint 5): JSON leaf `{cells}` (2–21) | null: this turn's combat trail, written
      * only by scenes-map's `appendTrail` / `clearTrails` (combat calls them). Players: player

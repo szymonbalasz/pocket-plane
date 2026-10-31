@@ -250,6 +250,8 @@ export const TokenRecord = z.object({
   invisible: z.literal(true).optional(),
   /** Server only (never on a wire). */
   seenBy: z.array(z.string()).nullable().optional(),
+  /** FR-MAP-150 (#427): `size` is the DM's, not the definition's. Server only, only when true. */
+  sizeOverridden: z.literal(true).optional(),
 });
 export type TokenRecord = z.infer<typeof TokenRecord>;
 
@@ -340,8 +342,10 @@ export const UpdateTokenInput = z.strictObject({
   name: TokenName.optional(),
   imageAssetId: Id.nullable().optional(),
   ownerPlayerId: Id.nullable().optional(),
-  /** FR-MAP-35; never `size` or `speed`. */
+  /** FR-MAP-35; never `speed`. */
   shape: TokenShape.optional(),
+  /** FR-MAP-150 (#427): this token only; the definition's own size puts it back on the definition. */
+  size: TokenSize.optional(),
   /** FR-ENT-27: a type or `"initials"`; null is never sent (it only means "not known yet"). */
   creatureType: TokenCreatureType.optional(),
 });
