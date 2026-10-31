@@ -61,3 +61,4 @@ DM decision [#416](../decisions-log.md): items 1–4 of the [priority build list
 | Date | What |
 |---|---|
 | 2026-10-31 | Planned (DM #416) |
+| 2026-10-31 | Started: upgrade guards, toasts, frame and map, linked notes spec, all from `origin/main` @ 69bf60c1 |

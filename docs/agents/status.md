@@ -4,9 +4,22 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Now (2026-10-31)
 
-**State:** [sprint 15](sprint-15.md) planned (#416), not started. Sprint 14 closed (#381); since then the DM's asks were built one by one on `main` with no sprint plan: the `play` command, tray attacks, Assets window, 5etools import, overview scenes, scenes list drag and folders, doors replacing walls, fog edges, exact explored memory, search clear, game log menu (#382–#412). The DM's real campaign runs from `bun run play`: never touch `%LOCALAPPDATA%/PocketPlane`, its backups or port 4090.
+**State:** [sprint 15](sprint-15.md) running (DM kickoff 2026-10-31). The DM's real campaign runs from `bun run play` in the main checkout: never touch `%LOCALAPPDATA%/PocketPlane`, its backups or port 4090, and don't build or start servers in the main checkout. Other sessions are merging to `main`: leave their branches and worktrees alone (`build/cmp-popout`, `fix/sheet-full-text`). Test agents start with `--strict-mcp-config --mcp-config .mcp.json`, so the real campaign's MCP tools can't reach them.
 
-**Next:** [sprint 15](sprint-15.md): upgrade guards, play fixes, window position memory, **linked notes**. Whole order: [priority build list](../roadmap.md#priority-build-list-2026-10-31). Session-sim-17 found nothing serious.
+| Track | Branch | Agent | Worktree | State |
+|---|---|---|---|---|
+| Upgrade guards | `fix/upgrade-guards` | `build-upgrade-guards` | `fix-upgrade-guards` (slot 2) | building |
+| Play fixes: toasts | `fix/s15-toasts` | `build-s15-toasts` | `fix-s15-toasts` (slot 4) | building |
+| Play fixes: frame and map | `fix/s15-frame` | `build-s15-frame` | `fix-s15-frame` (slot 6) | building |
+| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | writing; then a review; then the DM's gate |
+| Window position memory | `fix/window-memory` | — | — | waits for the frame merge |
+| Linked notes build | split by the spec | — | — | waits for the DM's gate and the upgrade guards |
+
+**Landing:** from the detached worktree `s15-integrate`: `git fetch`, `git checkout --detach origin/main`, `git merge --no-ff <branch>`, `git push origin HEAD:main`, `ci:watch` in the background. Status and decisions-log edits go the same way; the main checkout is only fast-forwarded.
+
+**Reserved requirement numbers:** frame `FR-SHELL-210`–`-219`, `FR-MAP-125` up, `FR-SYNC-41` up; toasts `FR-NOTE-80` up; window memory `FR-SHELL-220`–`-229`.
+
+**Next:** [sprint 15](sprint-15.md). Whole order: [priority build list](../roadmap.md#priority-build-list-2026-10-31). Session-sim-17 found nothing serious.
 
 **Session-sim-17 (#414):** 18 / 19 PASS on `main` @ 7fe68b18, no leak, digest identical. Not clean: the recheck (BL-151, BL-164, BL-171 still open). New glitches BL-174–BL-177. Evidence `.verify/20261031-102757-session-sim-17/` in the main checkout.
 
@@ -80,7 +93,6 @@ Sprint 10:
 
 
 
-- Migrations: BL-172 and BL-173 wait on the DM's call.
 - Session timeline (tier A, #413) vs ADR-0013's "no session entity": settle in the spec phase.
 
 ## Resolved locally (report at gate)
