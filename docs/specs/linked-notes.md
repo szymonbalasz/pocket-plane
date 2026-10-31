@@ -83,7 +83,7 @@ Test names start with the FR ID (`FR-NOTES-08 …`). Leak tests: [§13](#13-test
 | FR-NOTES-31 | **List:** search box, filter All · Hidden · Revealed, New note. Row: title, reveal Badge ("Hidden" muted / "Everyone" / player names), dead-link mark. By title. Empty: "No notes yet". | |
 | FR-NOTES-32 | **Note header** always shows the state in words: "Hidden from players" or "Visible to: Player 1". Actions: Edit, Reveal…, Preview as ▾, Delete (inline confirm naming how many notes link here). | At a glance |
 | FR-NOTES-33 | **Editor:** plain text box for body, a second for the DM part under a "DM only" label, title, tags, images (`FR-ASSET-20` attach control). `[[` opens a suggestion list (shared matcher; ↑ ↓ Enter; `\|` adds an alias). The editor shows `[[Title]]`; the title ⇄ ID map is taken at edit start, so a rename during editing keeps the link. While revealed: "Saving updates what Player 1 sees". Live counter from 80 % of the limit. | *(pick OQ-NOTES-06)* |
-| FR-NOTES-34 | **Following:** click follows in place, with back / forward in the window. Note → that note; unresolved → create with that title (DM); character → sheet (a player: own only; another's name stays plain); creature → stat block (DM); compendium → its window. Middle-click isn't special: one window, one note. | Windows have one instance today (`MAIN_INSTANCE`) |
+| FR-NOTES-34 | **Following:** click follows in place, with back / forward in the window. Note → that note; unresolved → create with that title (DM); character → sheet (a player: own only; another's name stays plain); creature → stat block (DM); compendium → its window. | |
 | FR-NOTES-35 | **DM's rendering of a link:** live link; eye-off mark + Tooltip when some reader of this note can't see the target ("Player 2 reads: (unknown)"); dead: struck-through `lastTitle` "(deleted)" with Remove; unresolved: dotted, "create". | |
 | FR-NOTES-36 | **Backlinks:** a "Linked from (n)" panel under the note, title + snippet per row, click follows; refreshes on any received `note` / `note-links` change (debounced 300 ms). DM rows tag "DM part". | |
 | FR-NOTES-37 | **Reveal dialog:** radio Hidden / Everyone / Chosen players (as the handout Share dialog), checkbox "Tell them" (`notify`), and **What they'll read**: every link the audience can't see, with its rendering, each with "Reveal that too" (a separate intent). Hint on images. Two clicks minimum; no one-click reveal. | |
@@ -95,6 +95,7 @@ Test names start with the FR ID (`FR-NOTES-08 …`). Leak tests: [§13](#13-test
 | FR-NOTES-42 | A note that goes hidden or is deleted while open: "This note isn't available", same words for both. Same for a stale notification's or a palette result's Open. | |
 | **Shared** | | |
 | FR-NOTES-43 | Palette: search provider group "Notes" (both clients, `notes.search`, ≥ 2 characters, debounced); commands Open Notes, New note (DM) ([ADR-0067](../architecture/adr/0067-command-registry.md)). | |
+| FR-NOTES-45 | *(proposed)* **Pop out** (`notes-popout`, both clients): the note header opens it in its own `notes.entry` window, a [pop-out type](play-shell.md#6-functional-requirements) (FR-SHELL-201, as `cmp.entry`, #422): one window per note, read-only, title bar = its title, same load, links and "isn't available". So the DM can read two notes side by side. | Client only, 0 B |
 | FR-NOTES-44 | Fixtures and bundle per §13; `fixtures:reset-load linked-notes` works from empty and is deterministic. | |
 
 ## 7. UI/UX notes
@@ -107,6 +108,7 @@ Per [visual-direction](../design/visual-direction.md) and the Gilt & Stone kit (
 |---|---|---|---|---|---|
 | `notes.window` | DM | 720 × 600 | 440 × 400 | 340 × 360 | Header + state line, 8 body lines, list toggle |
 | `notes.window` | player | 600 × 560 | 440 × 400 | 340 × 360 | Same |
+| `notes.entry` | both | 480 × 560 | 360 × 400 | 320 × 320 | Header + state line, 8 body lines |
 
 Launcher window, not default-open, not protected: the placer's ladder while untouched, remembered once moved. `restoreOpen` default (it shows the list without a target).
 
@@ -152,7 +154,7 @@ The DM writes: `Ask [[Duke Varen]] about [[Duke Varen|the old sailor]]. Beware [
 - **States:** empty (FR-NOTES-31, -41); loading (skeleton while `useLazyRecords` loads); error (load reject → Retry); not available (FR-NOTES-42); disconnected (banner per [FR-SYNC-24](live-sync.md#6-functional-requirements); viewing stays; editor stays typeable, Save disabled, "Saved on this browser").
 - **DM view:** every note; state line; all controls; DM part; Preview as.
 - **Player view:** only notes visible to them, read-only; no state line beyond "Shared with you" / "Everyone"; never a count of anything else.
-- **Test IDs:** `notes-window`, `notes-list`, `notes-row` (+ `data-record-id`), `notes-filter`, `notes-search`, `notes-new`, `notes-state`, `notes-edit`, `notes-editor-body`, `notes-editor-dm`, `notes-save`, `notes-counter`, `notes-draft`, `notes-conflict`, `notes-reveal-open`, `notes-reveal-dialog`, `notes-reveal-will-read`, `notes-preview-as`, `notes-link` (+ `data-record-id` when it has a target), `notes-link-suggest`, `notes-backlinks`, `notes-backlink-row`, `notes-dm-part`, `notes-unavailable`.
+- **Test IDs:** `notes-window`, `notes-list`, `notes-row` (+ `data-record-id`), `notes-filter`, `notes-search`, `notes-new`, `notes-state`, `notes-edit`, `notes-editor-body`, `notes-editor-dm`, `notes-save`, `notes-counter`, `notes-draft`, `notes-conflict`, `notes-reveal-open`, `notes-reveal-dialog`, `notes-reveal-will-read`, `notes-preview-as`, `notes-link` (+ `data-record-id` when it has a target), `notes-link-suggest`, `notes-backlinks`, `notes-backlink-row`, `notes-popout`, `notes-dm-part`, `notes-unavailable`.
 
 ## 8. Data model
 
@@ -427,7 +429,7 @@ graph LR
 | N0 | `fix/notes-core` | Tables, four record types, create / save / delete / reveal, compile, visibility, `notes.backlinks`, `notes.previewAs`, `note-revealed` kind, units + bundle, **all leak tests except search**, CON-44 test, docs | `src/server/db/schema.ts`, `src/shared/events/linked-notes.ts` (new file + index), `src/server/features/index.ts`, `notifications/kinds.ts`, `fixtures/bundles/index.ts`, `docs/data-model/`, `docs/protocol/` | Alone in the schema lane |
 | N1 | `build/notes-window` | DM window: list, viewer, editor, draft, conflict, images | `dm/windows.ts`, `size-table.ts`, golden window lists, replay-harness sets, `assets-pipeline/manage.ts` (`assetUses`), `ASSET_USE_KINDS` | N6 |
 | N2 | `build/notes-reveal` | Reveal dialog, state line, Preview as, player window, seen marks, notification views | `player/windows.ts`, `size-table.ts`, `dm/` + `player/notification-views.ts` | N3, N4, N6 |
-| N3 | `build/notes-links` | `[[` suggestions, following, back / forward, dead and unresolved links, backlinks panel | `MarkdownLite` / `markdown.ts` seam (compendium's files: a small span overlay, or a wrapper) | N2, N4, N6 |
+| N3 | `build/notes-links` | `[[` suggestions, following, back / forward, dead and unresolved links, backlinks panel, Pop out | `MarkdownLite` / `markdown.ts` seam (compendium's files: a small span overlay, or a wrapper); `dm/` + `player/windows.ts`, `size-table.ts` | N2, N4, N6 |
 | N4 | `build/notes-search` | Word cache, `notes.search`, search leak tests, window search box, palette provider, bench | `play-shell/commands.ts`, `scripts/` bench list | N2, N3, N6 |
 | N5 | `build/notes-link-kinds` | Character, creature, compendium targets *(gate)* | Compendium read import | N2, N4, N6 |
 | N6 | `build/notes-mcp` | Five tools, `src/mcp/tools/notes.ts`, walkthrough 15 *(gate)* | `src/mcp/server.ts` one line; agent-api docs | Anything after N0 |
