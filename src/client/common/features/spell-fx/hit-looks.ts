@@ -23,7 +23,8 @@ export interface HitLookFrame {
 }
 
 export interface HitLook {
-  key: HitLookKey;
+  /** A hit look's key, or `poof` (FR-MAP-122: same drawing contract, not in this registry). */
+  key: HitLookKey | "poof";
   /** Seconds, 0.4–1.4 (FR-VFX-18). */
   duration: number;
   /** Draws one frame on the over pass's 2D context; `t` runs 0 → `duration`. */

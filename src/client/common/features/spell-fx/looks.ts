@@ -68,7 +68,7 @@ interface LookDef extends HitLook {
 }
 
 function look(
-  key: HitLookKey,
+  key: HitLook["key"],
   duration: number,
   particles: number,
   draw: (ctx: CanvasRenderingContext2D, f: HitLookFrame, p: number, R: number) => void,
@@ -478,5 +478,30 @@ export const LOOKS = {
   glance,
 } satisfies Record<HitLookKey, LookDef>;
 
+/** FR-MAP-122: the teleport's puff of smoke, playing on its own cell (not a hit look: no token). */
+export const POOF_KEY = "poof";
+const POOF_PUFFS = 14;
+export const POOF = look(POOF_KEY, 0.9, POOF_PUFFS, (ctx, f, p, R) => {
+  // Bursts out at once, then drifts: a cloud as wide as the token within a third of its life.
+  const out = 1 - (1 - p) ** 3;
+  const fade = p < 0.08 ? p / 0.08 : (1 - (p - 0.08) / 0.92) ** 1.2;
+  for (let i = 0; i < POOF_PUFFS; i++) {
+    const angle = f.random() * TAU;
+    const dist = 0.2 + f.random() * 0.3;
+    const size = 0.3 + f.random() * 0.14;
+    const tone = f.random() < 0.5 ? "236, 236, 240" : "150, 152, 160";
+    dot(
+      ctx,
+      tone,
+      f.x + Math.cos(angle) * R * dist * out,
+      // Smoke rises a little as it thins.
+      f.y + Math.sin(angle) * R * dist * out - R * 0.08 * p,
+      R * size * (0.5 + 0.5 * out),
+      0.9 * fade,
+    );
+  }
+});
+
 /** FR-VFX-29: particles a playing look holds (0 for line-only looks). */
-export const lookParticles = (key: HitLookKey): number => LOOKS[key].particles;
+export const lookParticles = (key: HitLook["key"]): number =>
+  key === POOF_KEY ? POOF.particles : LOOKS[key].particles;

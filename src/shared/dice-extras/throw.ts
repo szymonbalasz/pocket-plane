@@ -36,6 +36,8 @@ export interface ThrowDie {
   /** Offered trigger part (Divine Fury): "on a hit", outside the total (R1). */
   offered?: true;
   d100?: "tens" | "units";
+  /** FR-DICEX-106: a damage part's die: its type (the client's effect while rolling). */
+  damage?: string;
 }
 
 export interface DiceThrow {
@@ -104,6 +106,7 @@ const Item = z.looseObject({
   label: z.string().nullable(),
   mods: z.array(Part).optional(),
   offered: z.array(Part).optional(),
+  part: z.looseObject({ type: z.string().nullable() }).optional(),
 });
 type Item = z.infer<typeof Item>;
 
@@ -193,6 +196,8 @@ function partDice(p: Part, offered: boolean, physical: boolean): DieInit[] {
 
 function itemDice(item: Item): DieInit[] {
   const out: DieInit[] = [];
+  // FR-DICEX-106: the part's own dice carry its type (MOD and offered dice have their own text).
+  const typed = item.part?.type ? { damage: item.part.type } : {};
   if (item.manual) {
     const physical = { physical: true as const, flat: true };
     if (item.dice.some((d) => d.value === null)) {
@@ -205,12 +210,14 @@ function itemDice(item: Item): DieInit[] {
           ...dieOf(
             d.faces,
             d.value ?? 0,
-            d.auto ? { kept: d.kept } : { ...physical, kept: d.kept },
+            d.auto ? { kept: d.kept, ...typed } : { ...physical, kept: d.kept },
           ),
         );
     }
   } else {
-    for (const d of item.dice) out.push(...dieOf(d.faces, d.value ?? 0, { kept: d.kept }));
+    for (const d of item.dice) {
+      out.push(...dieOf(d.faces, d.value ?? 0, { kept: d.kept, ...typed }));
+    }
   }
   for (const m of item.mods ?? []) out.push(...partDice(m, false, item.manual && !m.auto));
   for (const o of item.offered ?? []) out.push(...partDice(o, true, item.manual && !o.auto));

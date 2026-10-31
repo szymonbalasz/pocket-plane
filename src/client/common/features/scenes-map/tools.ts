@@ -71,6 +71,8 @@ export interface CanvasToolDef {
   clients: readonly CanvasClient[];
   /** Rail position after the base tools. */
   order: number;
+  /** FR-MAP-121: no rail button; another control (a token menu entry) picks the tool. */
+  offRail?: boolean;
   /** Shown beside the rail while the tool is active. */
   panel?: () => unknown;
   /** CSS cursor over the canvas while active (default `crosshair`). */
@@ -94,7 +96,7 @@ export function orderTools(tools: readonly CanvasToolDef[]): CanvasToolDef[] {
 
 /** The registry tools a client shows. */
 export function toolsFor(tools: readonly CanvasToolDef[], client: CanvasClient): CanvasToolDef[] {
-  return tools.filter((t) => t.clients.includes(client));
+  return tools.filter((t) => t.clients.includes(client) && !t.offRail);
 }
 
 /** The active registry tool for a client, or null (a base tool, or one the client lacks). */
