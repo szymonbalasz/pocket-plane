@@ -10,7 +10,7 @@ phase: post-mvp-9
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
-> **Sprint 15, frame (`fix/s15-frame`, 2026-10-31; session-sim-17 glitch 1, BL-174).** Attack on a stat block no longer puts that stat block away: the window a Dice tray was opened from counts as in use. [FR-SHELL-210–212](#6-functional-requirements), within [ADR-0060](../architecture/adr/0060-one-window-placer.md)'s ladder. Browser-only, 0 bytes.
+> **Sprint 15, frame (`fix/s15-frame`, 2026-10-31; session-sim-17 glitch 1, BL-174).** Attack on a stat block no longer puts that stat block away: the window a Dice tray was opened from counts as in use. [FR-SHELL-210–212](#6-functional-requirements), within [ADR-0060](../architecture/adr/0060-one-window-placer.md)'s ladder. Browser-only, 0 bytes. A player's map the tray pushed comes back when the tray closes ([scenes-map FR-MAP-125, -126](scenes-map.md#6-functional-requirements), BL-176).
 
 > **Close resets, minimise keeps (DM [#421](../decisions-log.md), 2026-10-31; `build/window-close-reset`).** Closing a window now also resets what it was showing; minimising keeps it. [FR-SHELL-200](#6-functional-requirements), amends FR-SHELL-11, -36. Browser-only, 0 bytes.
 

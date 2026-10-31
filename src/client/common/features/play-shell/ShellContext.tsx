@@ -114,7 +114,9 @@ export function ShellProvider({
         // FR-SHELL-108, FR-MAP-97: the map canvas's base port (players' L2b, the map yields).
         dryFit: (windows, reason) => fitPort()?.dryFit(windows, reason) ?? null,
         lastFullCell: () => fitPort()?.lastFullCell() ?? null,
-        onYield: () => fitPort()?.yieldRefit(),
+        onYield: (undoable) => fitPort()?.yieldRefit(undoable),
+        // FR-MAP-125: the window the map yielded to went: the refit is undone.
+        onYieldEnd: () => fitPort()?.yieldEnded(),
         // FR-MAP-114: a squeezed protected window back in its zone over a PC → one `window` refit.
         onRefit: () => fitPort()?.yieldRefit(),
         // FR-SHELL-155: `onAbsorb` learns who this page is.

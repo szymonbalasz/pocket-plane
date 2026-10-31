@@ -263,8 +263,13 @@ export function createShellController(opts: {
   dryFit?: (obstacles: readonly Rect[], reason?: "window" | "resize") => DryFit | null;
   /** The last full fit's cell px (FR-SHELL-108). */
   lastFullCell?: () => number | null;
-  /** The placer accepted a yield (L2b): the map refits once (FR-MAP-97). */
-  onYield?: () => void;
+  /**
+   * The placer accepted a yield (L2b): the map refits once (FR-MAP-97). `undoable`: the refit ends
+   * with its window (FR-MAP-125).
+   */
+  onYield?: (undoable: boolean) => void;
+  /** The window a yield was undoable for is no longer open (FR-MAP-125). */
+  onYieldEnd?: () => void;
   /** A protected window went back to its zone over a PC (FR-MAP-114): one `window` refit. */
   onRefit?: () => void;
   /** Reset layout was applied (FR-SHELL-80): the page requests one Fit of the map. */
@@ -297,6 +302,8 @@ export function createShellController(opts: {
   let blocked = false;
   /** FR-SHELL-210: the window the last open came from; its `settle` runs with the same one. */
   let opener: string | undefined;
+  /** FR-MAP-125: the window whose end undoes the map's yield. */
+  let yieldedFor: string | undefined;
   const queued = new Map<string, { action: WindowAction; available: ReadonlySet<string> }>();
   const queueKey = (a: WindowAction) =>
     isLayoutAction(a) ? a.type : `${a.type}:${windowId(a.kind, a.instance)}`;
@@ -341,6 +348,7 @@ export function createShellController(opts: {
         moves,
       );
       const r = restoreLayout(registry, storage.read(key), vp, tokens, regions, ctx);
+      yieldedFor = undefined;
       if (r.warning) warn(`play-shell: ${r.warning}; using the default layout`);
       const placed = new Map<string, Placed>();
       const hard = hardRects(regions);
@@ -487,7 +495,15 @@ export function createShellController(opts: {
           warn(`play-shell: ${kind} onClose failed: ${String(err)}`);
         }
       }
-      if (p.yields) opts.onYield?.();
+      if (p.yields) opts.onYield?.(p.undoFor !== undefined);
+      if (p.undoFor) yieldedFor = p.undoFor;
+      else if (
+        yieldedFor &&
+        !next.some((w) => windowId(w.kind, w.instance) === yieldedFor && w.state === "open")
+      ) {
+        yieldedFor = undefined;
+        opts.onYieldEnd?.();
+      }
       if (p.refit === "window") opts.onRefit?.();
       if (action.type === "reset") opts.onReset?.();
     },

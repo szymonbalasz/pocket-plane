@@ -267,7 +267,10 @@ export function freeAreas(rects: readonly Rect[], vp: Viewport): Rect[] {
 export interface FitPort {
   dryFit(windows: readonly Rect[], reason?: "window" | "resize"): DryFitResult | null;
   lastFullCell(): number | null;
-  yieldRefit(): void;
+  /** `undoable`: the refit ends with its window (FR-MAP-125: the Dice tray). */
+  yieldRefit(undoable?: boolean): void;
+  /** That window is no longer open: the refit is undone (FR-MAP-125, -126). */
+  yieldEnded(): void;
 }
 
 let port: FitPort | null = null;

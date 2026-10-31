@@ -193,6 +193,8 @@ export interface Plan {
   log: readonly string[];
   /** L2b accepted: the map refits once (`window`, FR-MAP-97). */
   yields: boolean;
+  /** FR-MAP-125: that yield was for this window id, and it is undone when the window ends. */
+  undoFor?: string;
   /**
    * FR-MAP-114: a squeezed protected window went back to its zone over a PC footprint + 4 with a
    * `fitted` camera: the map runs one `window` refit after this settle.
@@ -525,6 +527,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const putAway = new Map<string, string>();
   const log: string[] = [];
   let yields = false;
+  let undoFor: string | undefined;
   /** FR-MAP-114: a protected window went back to its zone over a PC (`fitted`): one refit. */
   let refit: "window" | undefined;
   const late = new Set<string>();
@@ -1121,7 +1124,13 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       if (!p?.clear || p.pcClear) continue;
       const fit = ctx.dryFit([...(input.windows ?? []).map(plainRect), p.rect]);
       if (!fit?.clear || fit.cellPx < Math.max(YIELD_SHARE * last, YIELD_MIN_CELL)) continue;
-      if (!dry) yields = true;
+      if (!dry) {
+        yields = true;
+        // FR-MAP-125: the Dice tray is a moment's window; the others keep FR-MAP-97.
+        if (def.kind === DICEX_TRAY_KIND && "kind" in trigger) {
+          undoFor = windowId(trigger.kind, trigger.instance);
+        }
+      }
       return { rect: p.rect, rung: "L2b", pcClear: true };
     }
     return null;
@@ -1778,6 +1787,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     putAway,
     log,
     yields,
+    ...(undoFor && { undoFor }),
     ...(refit && { refit }),
   };
 }

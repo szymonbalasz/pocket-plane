@@ -50,6 +50,7 @@ import {
   createSettledRefit,
   createSizeCameras,
   dryFitScene,
+  endsYieldMemory,
   type FitInputs,
   type FitReason,
   type FitVisible,
@@ -60,9 +61,12 @@ import {
   layoutKey,
   placerSettled,
   refitsOnReveal,
+  rememberYield,
   revealRefit,
   type SizeCamera,
   visibleArea,
+  type YieldMemory,
+  yieldBack,
   zoomAt,
 } from "./camera";
 import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./canvas-context";
@@ -312,10 +316,35 @@ export function MapCanvas(props: MapCanvasProps) {
   const layoutNow = useRef((): string => "");
   layoutNow.current = () =>
     layoutKey(scene.id, fitTokensOf(tokensRef.current), freeRef.current.layout);
+  /** FR-MAP-125: the camera and fit state before the Dice tray's yield refit. */
+  const yieldMemory = useRef<YieldMemory<SizeCamera | null> | null>(null);
+  /** The next `window` fit is the tray's yield. */
+  const yieldPending = useRef(false);
+  /** The next `window` fit is the tray's end: undo the yield, unless the camera moved on. */
+  const yieldEnding = useRef(false);
   const fitNow = useRef((_reason: FitReason) => {});
   fitNow.current = (reason) => {
     const inputs = fitInputs.current();
     if (!inputs) return;
+    if (reason === "window" && yieldEnding.current) {
+      yieldEnding.current = false;
+      const mem = yieldMemory.current;
+      yieldMemory.current = null;
+      const back = yieldBack(mem, camRef.current, cameraModeRef.current, inputs);
+      if (back === "leave") return;
+      if (back === "restore" && mem) {
+        setCam(mem.from);
+        const was = mem.before;
+        if (was) {
+          setFitFloor(was.floor);
+          setFitVisible(was.visible);
+          setFitRect(`${was.rect.x},${was.rect.y},${was.rect.w},${was.rect.h}`);
+          setFitReason(was.reason);
+        }
+        fitState.current = was;
+        return;
+      }
+    }
     // H2 FAIL 5 (FR-MAP-113 note): back at a size whose layout is the one it showed before, the
     // camera it had there (a resize round trip restores the map too).
     const kept = reason === "resize" ? sizeCams.take(size, layoutNow.current()) : null;
@@ -325,6 +354,14 @@ export function MapCanvas(props: MapCanvasProps) {
       ...fitFor(reason, inputs, lastFullCell.current),
       lastFull: lastFullCell.current,
     };
+    if (reason === "window" && yieldPending.current) {
+      yieldPending.current = false;
+      yieldMemory.current = rememberYield(yieldMemory.current, camRef.current, fitState.current, {
+        x: fit.x,
+        y: fit.y,
+        scale: fit.scale,
+      });
+    }
     setCam({ x: fit.x, y: fit.y, scale: fit.scale });
     setFitFloor(fit.floor);
     setFitVisible(fit.visible);
@@ -410,6 +447,12 @@ export function MapCanvas(props: MapCanvasProps) {
   const onCamera = useCallback(
     (e: CameraEvent, deferred = false, reason: FitReason = e as FitReason) => {
       const next = cameraOn(cameraModeRef.current, e);
+      // FR-MAP-126: the camera is the user's now (or a full fit's): the tray's closing leaves it.
+      if (endsYieldMemory(e)) {
+        yieldMemory.current = null;
+        yieldPending.current = false;
+        yieldEnding.current = false;
+      }
       cameraModeRef.current = next.mode;
       setCameraMode(next.mode);
       if (!next.fit) return;
@@ -433,7 +476,17 @@ export function MapCanvas(props: MapCanvasProps) {
       },
       lastFullCell: () => lastFullCell.current,
       // The placer wrote the windows; the refit frames them once they render.
-      yieldRefit: () => onCamera("window", true),
+      yieldRefit: (undoable) => {
+        yieldPending.current = undoable === true;
+        onCamera("window", true);
+      },
+      yieldEnded: () => {
+        // A refit still waiting has nothing to undo: it frames the windows as they are by then.
+        yieldPending.current = false;
+        if (yieldMemory.current === null) return;
+        yieldEnding.current = true;
+        onCamera("window", true);
+      },
     });
     return () => setFitPort(null);
   }, [onCamera]);
