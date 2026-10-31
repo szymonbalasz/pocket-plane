@@ -616,6 +616,52 @@ test.describe("miniatures", () => {
     await dm.context().close();
   });
 
+  test("FR-OVW-49 arrow keys: a player steps their own, the DM their selection; others see it", async ({
+    browser,
+  }) => {
+    const { secret, link, recordId } = e2eEnv();
+    const mira = recordId("ovw-sword-coast", "overview-item", 5);
+    const thorn = recordId("ovw-sword-coast", "overview-item", 6);
+    const dm = await rolePage(browser);
+    await loginDm(dm, secret);
+    await live(dm);
+    const player = await rolePage(browser);
+    await player.goto(link("Player 1"));
+    await live(player);
+    for (const p of [dm, player]) {
+      await expect.poll(async () => (await konvaNodes(p, "ovw-item", mira)).length).toBe(1);
+      await expect(p.getByTestId("ovw-canvas")).toHaveAttribute("data-camera", "fitted");
+    }
+
+    // A player has no selection: the key moves their own, one step, on every screen; right is right.
+    const fromP = await pressPoint(player, mira);
+    const fromDm = await pressPoint(dm, mira);
+    const thornDm = await pressPoint(dm, thorn);
+    await player.keyboard.press("ArrowRight");
+    await expect.poll(async () => (await pressPoint(player, mira)).x).toBeGreaterThan(fromP.x + 10);
+    await expect.poll(async () => (await pressPoint(dm, mira)).x).toBeGreaterThan(fromDm.x);
+    expect((await pressPoint(player, mira)).y).toBeCloseTo(fromP.y, 0);
+    expect(sameSpot(await pressPoint(dm, thorn), thornDm)).toBe(true);
+
+    // The DM: nothing selected, nothing moves; selected, it moves; Esc lets go.
+    const before = await pressPoint(dm, thorn);
+    await dm.keyboard.press("ArrowDown");
+    await dm.waitForTimeout(100);
+    expect(sameSpot(await pressPoint(dm, thorn), before)).toBe(true);
+    await dm.mouse.click(before.x, before.y);
+    await dm.keyboard.press("ArrowDown");
+    await expect.poll(async () => (await pressPoint(dm, thorn)).y).toBeGreaterThan(before.y + 10);
+    const moved = await pressPoint(dm, thorn);
+    expect(moved.x).toBeCloseTo(before.x, 0);
+    await dm.keyboard.press("Escape");
+    await dm.keyboard.press("ArrowDown");
+    await dm.waitForTimeout(100);
+    expect(sameSpot(await pressPoint(dm, thorn), moved)).toBe(true);
+
+    await player.context().close();
+    await dm.context().close();
+  });
+
   test("FR-OVW-31 FR-OVW-33 Add party twice: placed once, then the toast; linked entries off", async ({
     browser,
   }) => {

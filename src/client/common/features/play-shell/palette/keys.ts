@@ -125,6 +125,7 @@ export const FIXED_KEYS: readonly { keys: string; title: string; dmOnly?: true }
   { keys: "Space", title: "Hold and drag to pan the map; press a focused button" },
   { keys: "Escape", title: "Clear a search, close a dialog, end a tool, dismiss a request" },
   // The DM's map tools (FR-MAP-17, fog, structure, props): no player has them.
+  { keys: "Arrow keys", title: "Move the selected tokens or your own token on the map" },
   { keys: "Ctrl+D", title: "Duplicate the selected tokens", dmOnly: true },
   {
     keys: "Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y",

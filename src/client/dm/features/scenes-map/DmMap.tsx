@@ -261,7 +261,7 @@ export function DmMapToolRail() {
   return (
     <ToolRail
       pingHint="Click to ping, Shift+click to pull everyone's view, right-drag for the laser"
-      selectHint="Click, Ctrl/Shift+click or Ctrl/Shift+drag to select; drag tokens, pan the map"
+      selectHint="Click, Ctrl/Shift+click or Ctrl/Shift+drag to select; drag or arrow keys to move tokens; drag elsewhere to pan the map"
       signalsOff={viewed !== null && active?.id !== viewed.id}
       selectOnly={targeting}
       basePanels={{ ruler: DiagonalRulePanel }}
