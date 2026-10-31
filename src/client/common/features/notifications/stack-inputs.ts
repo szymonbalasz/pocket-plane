@@ -27,6 +27,8 @@ import { windowId } from "../play-shell/manager";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
 import { PUSHED_BODY_CLEAR, pushedByPlan, type StackWindow } from "./keep-out";
 import { HISTORY_KIND } from "./logic";
+import { quietBump } from "./quiet-bump";
+import { REFOLD_QUIET_MS } from "./toasts";
 
 export interface StackInputs {
   /** FR-NOTE-32: the open, non-minimised `cbt.initiative` window's rendered rect, else null. */
@@ -269,23 +271,36 @@ function measureBody(id: string, log: boolean): BodyMeasure | null {
   };
 }
 
-/** Bumps (once a frame) when a window body's DOM changes while `on`: content grew or shrank. */
+/**
+ * Bumps (once a frame) when a window body's DOM changes while `on`: content grew or shrank, a tab
+ * switched. FR-NOTE-86: and once when a scroll inside a window body held still for
+ * `REFOLD_QUIET_MS` (FR-NOTE-77's stillness), so what lies under the stack is read again with no
+ * move while it scrolls; a DOM change during that scroll waits for the same bump.
+ */
 function useBodyChanges(on: boolean): number {
   const [n, setN] = useState(0);
   useEffect(() => {
     if (!on || typeof document === "undefined" || typeof MutationObserver === "undefined") return;
     let raf = 0;
+    const bump = () => setN((x) => x + 1);
+    const scrolling = quietBump(REFOLD_QUIET_MS, bump);
     const mo = new MutationObserver((list) => {
       if (raf || !list.some((m) => (m.target as Element).closest?.(BODY_SELECTOR))) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        setN((x) => x + 1);
+        if (!scrolling.busy()) bump();
       });
     });
     mo.observe(document.body, { childList: true, subtree: true });
+    const onScroll = (e: Event) => {
+      if ((e.target as Element | null)?.closest?.(BODY_SELECTOR)) scrolling.poke();
+    };
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
     return () => {
       mo.disconnect();
       cancelAnimationFrame(raf);
+      scrolling.stop();
+      document.removeEventListener("scroll", onScroll, { capture: true });
     };
   }, [on]);
   return n;

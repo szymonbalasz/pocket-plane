@@ -126,6 +126,37 @@ describe("FR-NOTE-83 a player's stack keeps off the sheet's row buttons", () => 
     expect(one.covers).toBeLessThan(three.covers);
   });
 
+  test("FR-NOTE-86 walkthrough step F (Actions, `charx-content` scrolled to the bottom): the 74-px card held at 944, 508 sits on Hunter's Mark's Damage and share; read again it is 944, 634, on no button", () => {
+    const damage = { x: 1120, y: 491, w: 70, h: 32 };
+    const share = { x: 1196, y: 491, w: 28, h: 32 };
+    const end = { x: 1135, y: 599, w: 90, h: 32 };
+    const h = 74;
+    const held = { left: 944, top: 508 };
+    expect(hit(box(held, h), damage)).toBe(true);
+    expect(hit(box(held, h), share)).toBe(true);
+    const scrolled: StackWindow = { ...SHEET, controls: [damage, share, end] };
+    const at = playerStackSpot(vp720, h, [INIT, PM, LOG, scrolled]);
+    expect(at).toEqual({ left: 944, top: 634, covers: 0 });
+  });
+
+  test("FR-NOTE-86 the tab switch: what the new tab draws decides, both ways", () => {
+    const h = 74;
+    // Actions at its top: buttons at the card's corner row → it leaves the row.
+    const actions: StackWindow = {
+      ...SHEET,
+      controls: [{ x: 1040, y: 627, w: 150, h: 15 }],
+    };
+    const a = playerStackSpot(vp720, h, [INIT, PM, LOG, actions]);
+    expect(a.covers).toBe(0);
+    expect(hit(box(a, h), { x: 1040, y: 627, w: 150, h: 15 })).toBe(false);
+    // Back on a tab with nothing there, its content ending above the card: the corner again.
+    const short: StackWindow = { ...SHEET, used: 400, controls: [] };
+    expect(playerStackSpot(vp720, h, [INIT, PM, LOG, short])).toEqual({
+      ...playerHome(vp720, h),
+      covers: 0,
+    });
+  });
+
   test("FR-NOTE-83 no controls measured (the window not in the DOM yet): the whole window counts as content, still off its title bar", () => {
     const win: StackWindow = { x: 700, y: 60, w: 560, h: 650 };
     const r = box(playerStackSpot(vp720, CARD_H, [win]), CARD_H);

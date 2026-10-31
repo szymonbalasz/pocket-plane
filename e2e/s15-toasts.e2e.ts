@@ -6,10 +6,11 @@
 // Rules: bun test (`keep-out-player.test.ts`, `keep-out-s15.test.ts`, `popup-place.test.ts`,
 // combat-tracker `popup-placement-s15.test.ts`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { footprintsOf, overlaps } from "./support/canvas";
+import { footprintsOf, overlaps, tokenFootprints } from "./support/canvas";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { rollNow } from "./support/rolls";
 import { pickSelect } from "./support/select";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 interface Box {
@@ -199,9 +200,30 @@ test("FR-NOTE-81 FR-NOTE-82 BL-175 sim-17 v12, b02 DM 1440×900: the damage-card
   while ((await closePopup.count()) > 0) await closePopup.first().click();
   await expect(dm.getByTestId("dicex-popup")).toHaveCount(0);
   await tray.locator('[data-testid="dicex-tray-palette"][data-value="20"]').click();
+  // FR-NOTE-85: the column's spot in every frame from its first; the camera's refit done first.
+  await dm.waitForTimeout(500);
+  await dm.evaluate(() => {
+    const out: string[] = [];
+    (window as unknown as { columnSpots: string[] }).columnSpots = out;
+    const sample = () => {
+      const p = document.querySelector('[data-testid="dicex-popup"]')?.parentElement;
+      if (p) {
+        const r = p.getBoundingClientRect();
+        const at = `${Math.round(r.x)},${Math.round(r.y)}`;
+        if (out[out.length - 1] !== at) out.push(at);
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
   await tray.getByTestId("dicex-tray-roll").click();
   const roll = dm.getByTestId("dicex-popup").first();
   await expect(roll).toBeVisible();
+  await expect(roll).not.toContainText("Rolling", { timeout: 5_000 });
+  const spots = await dm.evaluate(
+    () => (window as unknown as { columnSpots: string[] }).columnSpots,
+  );
+  expect(spots).toHaveLength(1);
   // The tray's move refits the camera; the column follows once the map settled.
   await expect
     .poll(
@@ -213,6 +235,128 @@ test("FR-NOTE-81 FR-NOTE-82 BL-175 sim-17 v12, b02 DM 1440×900: the damage-card
       { timeout: 3_000 },
     )
     .toEqual([]);
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-NOTE-86 walkthrough step F Player 1 at 1280×720, the sheet at 650, 60, 600 × 598: scrolling the Actions tab moves the sticky card once, after the scroll, onto no button; a tab switch re-places it too", async ({
+  browser,
+}) => {
+  const env = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, env.secret);
+  await live(dm);
+  const player = await rolePage(browser);
+  await player.setViewportSize({ width: 1280, height: 720 });
+  await player.goto(env.link("Player 1"));
+  await live(player);
+  await closePresent(player);
+  const sheet = await openWindow(player, "char.sheet");
+  await placeWindow(player, sheet, 650, 60, 600, 598);
+  const requests = await openWindow(dm, "dicex.requests");
+  const fold = requests.getByTestId("dicex-request-fold");
+  if ((await fold.getAttribute("data-state")) !== "open") await fold.click();
+  await pickSelect(requests, "dicex-request-roll", { label: "Insight" });
+  await requests.getByTestId("dicex-request-all").click();
+  await requests.getByTestId("dicex-request-send").click();
+  const stack = player.getByTestId("note-toasts");
+  await expect(stack.getByTestId("note-toast").first()).toBeVisible();
+  while ((await stack.getByTestId("note-toast").count()) > 1) {
+    const n = await stack.getByTestId("note-toast").count();
+    await stack.getByRole("button", { name: "Decline" }).first().click();
+    await expect(stack.getByTestId("note-toast")).toHaveCount(n - 1);
+  }
+  const clearOfButtons = async () => {
+    await settled(player, stack);
+    const at = await box(stack);
+    expect((await drawnControls(sheet)).filter((c) => overlaps(at, c)).map((c) => c.name)).toEqual(
+      [],
+    );
+    return at;
+  };
+
+  // The tab switch, on Mira's sheet (her spell rows scroll).
+  await pickSheet(sheet, { label: "Mira" });
+  await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
+  await clearOfButtons();
+
+  // The scroll, frame by frame: the card holds while it runs, then moves at most once.
+  const trace = await sheet.getByTestId("charx-content").evaluate(async (content) => {
+    // The sheet's scroller: the content itself, or the nearest scrolling box around it.
+    let el: HTMLElement = content as HTMLElement;
+    while (el.scrollHeight <= el.clientHeight + 1 && el.parentElement) el = el.parentElement;
+    const tops: { t: number; at: string }[] = [];
+    const note = document.querySelector('[data-testid="note-toasts"]') as HTMLElement;
+    let on = true;
+    const sample = () => {
+      const r = note.getBoundingClientRect();
+      const at = `${Math.round(r.x)},${Math.round(r.y)}`;
+      if (tops[tops.length - 1]?.at !== at) tops.push({ t: performance.now(), at });
+      if (on) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+    const max = el.scrollHeight - el.clientHeight;
+    for (let i = 1; i <= 12; i++) {
+      el.scrollTop = (max * i) / 12;
+      await new Promise((go) => setTimeout(go, 40));
+    }
+    const end = performance.now();
+    await new Promise((go) => setTimeout(go, 700));
+    on = false;
+    return { tops, end, max };
+  });
+  expect(trace.max, "her Actions tab scrolls").toBeGreaterThan(100);
+  expect(trace.tops.length, JSON.stringify(trace)).toBeLessThanOrEqual(2);
+  if (trace.tops[1]) expect(trace.tops[1].t).toBeGreaterThan(trace.end);
+  await clearOfButtons();
+
+  // Back to Main: re-placed for what it draws.
+  await sheet.locator('[data-testid="charx-tab"][data-value="main"]').click();
+  await clearOfButtons();
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-NOTE-84 walkthrough step E DM 1280×720: the card from Pending sits on no PC, giving up Initiative's gap if it must, never on Initiative", async ({
+  browser,
+}) => {
+  const env = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, env.secret);
+  await live(dm);
+  // At 1280 the PCs' labels are cut past matching: their ids from 1440.
+  await expect
+    .poll(async () => (await footprintsOf(dm, ["Mira", "Brakka", "Thorn"])).length)
+    .toBeGreaterThan(0);
+  const ids = (await footprintsOf(dm, ["Mira", "Brakka", "Thorn"])).map((p) => p.id);
+  await dm.setViewportSize({ width: 1280, height: 720 });
+  await dm.getByTestId("ui-launcher-menu").click();
+  await dm.getByTestId("ui-launcher-reset").click();
+  const player = await rolePage(browser);
+  await player.setViewportSize({ width: 1280, height: 720 });
+  await player.goto(env.link("Player 1"));
+  await live(player);
+  await closePresent(player);
+  const sheet = await openWindow(player, "char.sheet");
+  await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
+  const init = await openWindow(dm, "cbt.initiative");
+  const cards = init.getByTestId("cbt-init-card");
+  const before = await cards.count();
+  await rollNow(sheet.getByTestId("charx-roll-attack").first());
+  await expect(cards).toHaveCount(before + 1);
+  await dm.waitForTimeout(500);
+  await cards.last().click();
+  const popup = dm.getByTestId("cbt-popup");
+  await expect(popup).toBeVisible();
+  await settled(dm, popup);
+  const at = await box(popup);
+  const pcs = (await tokenFootprints(dm)).filter((t) => ids.includes(t.id));
+  expect(pcs.filter((p) => overlaps(at, p)).map((p) => p.id)).toEqual([]);
+  const initBox = await box(init);
+  expect(at.x + at.w).toBeLessThanOrEqual(initBox.x - 4);
+  await popup.getByTestId("cbt-popup-later").click();
   await player.context().close();
   await dm.context().close();
 });

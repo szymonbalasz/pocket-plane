@@ -150,6 +150,16 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 |---|---|---|---|
 | FR-NOTE-83 | A player's stack stays in its corner while that is free (map, or a window's empty body). On a window's drawn content or a modal dialog it moves, nearest the corner: on no window and no PC; else on an empty body; else over a body, off title bars and tool bars, the fewest controls, then primary parts and headings (FR-NOTE-76–78's rules, the row buttons first). Controls under it fold cards into "+N more", one card stays (FR-NOTE-77). A PC alone never moves it off the corner. No compact step: a player has no summary (BL-151) | S15 | `FR-NOTE-83 …` (`keep-out-player.test.ts`), `FR-NOTE-83 runtime …` (`toast-runtime.test.tsx`), e2e `s15-toasts` |
 
+> **Sprint 15, re-test (walkthrough `.verify/20261031-235222-s15-toasts-walk/`), 2026-11-01.** Three findings; DM's rulings via the orchestrator. Client only, 0 B.
+> - **Step E** (DM 1280×720, popup 416, 446 on Thorn 394, 472 by 6 px): ruling: PCs clear first; the card may give up Initiative's 12 px down to 4 px (ADR-0060), never onto Initiative. **Step F** (sticky card held at 944, 508 on a row's buttons after a scroll): a scroll isn't a DOM change, so nothing re-read the controls. **Step B** (first frame 120, 248 h59, then 496, 312 on Party Manager): the column was placed at the "Rolling…" card's height. The final spot stands: no spot clears everything, PC-clear beats window-clear when there's no room (FR-NOTE-82's next tier, ruled).
+> - Rulings on the first round's picks, all accepted: v12's cards may still cover non-PC tokens; with no clear spot a tall stack stays over the PC and a PC never folds a card; a popup spot off targets beats one off PCs; b08's card may land mid-sheet on text, not a button.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-NOTE-84 | The damage-card popup still on a PC gives up Initiative's 12-px gap, down to 4 px, when that clears the PC's footprint and costs no target; never on Initiative (amends FR-CBT-55) | S15 | `FR-NOTE-84 …` (`popup-placement-s15.test.ts`), e2e `s15-toasts` |
+| FR-NOTE-85 | The DM's roll column is placed for the card an own roll becomes (one row, one dice line), so it first shows where it stays; a taller card may still move it once (amends FR-DICEX-55) | S15 | `FR-NOTE-85 …` (`popup-place.test.ts`), e2e `s15-toasts` |
+| FR-NOTE-86 | Both stacks read again what lies under them once a scroll inside a window body held still 250 ms (FR-NOTE-77's stillness): no move while it scrolls, one after. A tab switch re-places through the DOM change (FR-NOTE-75) | S15 | `FR-NOTE-86 …` (`keep-out-player.test.ts`, `quiet-bump.test.ts`), e2e `s15-toasts` |
+
 ## 1. Summary
 
 - **Notification**: a persisted, toast-like message with a history feed. It has a kind, an audience and optionally an action ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md), [decisions #47](../decisions-log.md)). With an action it is a **pending action** until resolved or dismissed (e.g. a damage card's "Apply"). Without one it is info.
