@@ -1839,7 +1839,12 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const w = get(id);
       if (w?.state !== "minimised" || !ctx.available.has(w.kind)) continue;
       setWin(id, { ...w, state: "open" });
-      const spot = ladder(id, { putAway: false, maxL2: true, prev: d.rect, owedZones: true });
+      const spot = ladder(id, {
+        putAway: false,
+        maxL2: true,
+        prev: d.rect,
+        owedZones: trigger.type === "viewport",
+      });
       if (spot) {
         write(id, spot.rect, "grown", { rung: spot.rung });
         memory.set(id, { ...d, at: plainRect(spot.rect) });
