@@ -1,4 +1,4 @@
-# The full suite on every push (AGENTS §9.4): typecheck + lint + build, every `bun test` file
+# The full suite on every push (AGENTS §9.4): typecheck + lint + build, the upgrade check, every `bun test` file
 # (slow set included) in 6 parts, every e2e bundle in 12 parts. Locally we run only targeted
 # tests (`bun run check`); `bun run ci:watch` reports this run's verdict after a push.
 # Docs-only pushes skip it (but specs and the kit page are read by tests, so they don't).
@@ -42,6 +42,20 @@ jobs:
         run: bun run lint --reporter=github
       - name: build
         run: bun run build
+
+  # A populated DB built by the merge base's code (on main: the previous commit's) must boot on
+  # this tree (BL-173). A refusal fails the job with the message that says what to do.
+  upgrade:
+    name: upgrade check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: upgrade a populated DB
+        run: bun run upgrade:check
 
   unit:
     name: unit ${{ matrix.part }}/6
