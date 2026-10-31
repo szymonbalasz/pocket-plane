@@ -109,6 +109,7 @@ import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
 import s14KitE2e from "./s14-kit-e2e";
 import s14ToastsE2e from "./s14-toasts-e2e";
+import s15FrameE2e from "./s15-frame-e2e";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
@@ -395,6 +396,8 @@ export const bundles: readonly Bundle[] = [
   diceLogMenuE2e,
   // Full session simulation after sim-16 (fix/housekeeping-sim)
   sessionSim17,
+  // Sprint 15 frame (fix/s15-frame): its e2e on a server of its own
+  s15FrameE2e,
   // Send to game log (build/log-share)
   logShare,
   // The Luck tab's d20 chart e2e alias of stats-b (build/luck-d20-chart)

@@ -63,3 +63,4 @@ DM decision [#416](../decisions-log.md): items 1–4 of the [priority build list
 | 2026-10-31 | Planned (DM #416) |
 | 2026-10-31 | Started: upgrade guards, toasts, frame and map, linked notes spec, all from `origin/main` @ 69bf60c1 |
 | 2026-10-31 | Upgrade guards merged (#424): CI job `upgrade check` on every push |
+| 2026-10-31 | Frame and map fixes merged (#432). Linked notes gate: the DM reframed the feature (player notes, private and shared; no reveal); spec to be rewritten |

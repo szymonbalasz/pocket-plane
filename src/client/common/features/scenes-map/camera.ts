@@ -1130,6 +1130,60 @@ export const appearanceKeeps = (
   view: Size,
 ) => allClear(cam, tokens, obstacles, visibleArea(view), FIT_PC_MARGIN);
 
+/**
+ * FR-MAP-125: a yield refit that ends with its window (the Dice tray). `before`: what the canvas
+ * showed before the refit (`T`: its camera and fit state); `from`: that camera; `after`: the
+ * camera the refit drew. Client memory, until the window ends or the user takes the camera.
+ */
+export interface YieldMemory<T> {
+  before: T;
+  from: Camera;
+  after: Camera;
+}
+
+const sameCamera = (a: Camera, b: Camera) => a.x === b.x && a.y === b.y && a.scale === b.scale;
+
+/**
+ * FR-MAP-125: the memory after a yield refit from `now` to `next`. A second yield straight after
+ * the first keeps the first one's `before`; after any other refit, `now` is what the player saw.
+ */
+export function rememberYield<T>(
+  mem: YieldMemory<T> | null,
+  now: Camera,
+  state: T,
+  next: Camera,
+): YieldMemory<T> {
+  return mem && sameCamera(mem.after, now)
+    ? { ...mem, after: next }
+    : { before: state, from: now, after: next };
+}
+
+/** FR-MAP-126: what the user does to the camera (and a full fit) ends the memory; refits don't. */
+export const endsYieldMemory = (e: CameraEvent) =>
+  e !== "window" && e !== "appearance" && e !== "reveal";
+
+/**
+ * FR-MAP-125, -126: what the window's end does to the camera. `leave`: no memory, or `moved`.
+ * `restore`: the camera before the refit (a cell ≤ the last full fit's, FR-MAP-94, as it was
+ * already drawn). `refit`: one `window` refit instead, where another refit moved the camera since
+ * (a reveal) or the old camera would put a PC + 4 px under a window opened since.
+ */
+export function yieldBack<T>(
+  mem: YieldMemory<T> | null,
+  cam: Camera,
+  mode: CameraMode,
+  inputs: Pick<FitInputs, "tokens" | "grid" | "room" | "view"> | null,
+): "leave" | "restore" | "refit" {
+  if (!mem || mode !== "fitted") return "leave";
+  if (!sameCamera(mem.after, cam) || !inputs) return "refit";
+  const pcs = inputs.tokens.flatMap((t) => {
+    const b = t.pc ? footprintBox([t], inputs.grid) : null;
+    return b ? [{ ...b, pc: true }] : [];
+  });
+  const area = visibleArea(inputs.view);
+  return allClear(mem.from, pcs, inputs.room.obstacles, area, FIT_PC_MARGIN) ? "restore" : "refit";
+}
+
 /** `data-camera` (FR-MAP-44 (b)): where the last fit put it, or moved by the user since. */
 export type CameraMode = "fitted" | "moved";
 
