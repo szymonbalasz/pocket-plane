@@ -131,7 +131,7 @@ function TriggerRow({
       data-testid="mod-trigger"
       data-record-id={t.id}
       data-state={t.enabled ? "on" : "off"}
-      className="flex items-start gap-2 text-sm"
+      className="flex flex-wrap items-start gap-2 text-sm"
     >
       <Switch
         data-testid="mod-trigger-enabled"
@@ -142,9 +142,10 @@ function TriggerRow({
         disabled={!may || disabled}
         onCheckedChange={setEnabled}
       />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1">
-          <span className="min-w-0 truncate">{t.name}</span>
+      {/* Below 8rem the edit and delete controls take the next line, not the text's width. */}
+      <div className="min-w-0 flex-[1_1_8rem]">
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+          <span className="min-w-0 [overflow-wrap:anywhere]">{t.name}</span>
           {badge && (
             <Tooltip content={triggerSentence(t.rule, cx)}>
               <Badge
@@ -196,7 +197,7 @@ function TriggerRow({
         ))}
       </div>
       {may && (
-        <>
+        <span className="ml-auto flex shrink-0 items-start gap-2">
           <Tip content={`Edit ${t.name}`} off={!live}>
             <Button
               size="icon"
@@ -225,7 +226,7 @@ function TriggerRow({
               <TrashIcon className="size-3.5" />
             </Button>
           </Tip>
-        </>
+        </span>
       )}
     </div>
   );

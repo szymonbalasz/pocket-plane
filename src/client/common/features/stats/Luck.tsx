@@ -2,7 +2,7 @@
 // default the newest, or Campaign) over a Table of the ack's rows in server order: Name, Rolls,
 // d20s, Avg, Nat 20, Nat 1. The DM's ack alone holds the `dm-dice` row (FR-STATS-47). A `pending`
 // campaign answer shows skeleton rows and is asked again in 1 s (`useStatsQuery`). Refreshes on
-// a live roll entry (FR-STATS-17).
+// a live roll entry (FR-STATS-17). Beside the picker, the d20 chart's button (FR-STATS-90).
 import {
   DM_DICE_KEY,
   type DmLuckResult,
@@ -13,12 +13,15 @@ import {
   SessionsResult as SessionsSchema,
   type StatsQueryInput,
 } from "@shared/stats/schemas";
+import { ChartColumnIcon } from "lucide-react";
+import { Button } from "../../components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
 } from "../../components/ui/overlays";
 import {
   Table,
@@ -30,14 +33,16 @@ import {
 } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
-import { avgText, refreshes, sessionLabel } from "./logic";
+import { useOpenWindow } from "../play-shell/ShellContext";
+import { setChartView } from "./dice-chart";
+import { avgText, refreshes, STATS_DICE_INSTANCE, STATS_DICE_KIND, sessionLabel } from "./logic";
 import { useStatsQuery } from "./query";
 import type { QueryState } from "./refresh";
 import { Empty, LoadError, SkeletonRows } from "./states";
-import type { StatsView } from "./view";
+import { type StatsView, viewKey } from "./view";
 
 type LuckResult = DmLuckResult | PlayerLuckResult;
-const CAMPAIGN = "campaign";
+export const CAMPAIGN = "campaign";
 
 export const luckInput = (scope: StatsView["luckScope"]): StatsQueryInput =>
   scope === CAMPAIGN
@@ -56,6 +61,8 @@ export function LuckPanel({
   setView(patch: Partial<StatsView>): void;
 }) {
   const live = useSync((s) => s.state === "live");
+  const you = useSync((s) => s.store.you);
+  const openWindow = useOpenWindow();
   const list = useStatsQuery<SessionsResult>({ scope: "sessions" }, SessionsSchema.parse, (f) =>
     refreshes(f, { tab: "session", pickedFight: null }),
   );
@@ -72,6 +79,10 @@ export function LuckPanel({
       luck={luck.state}
       live={live}
       onPick={(v) => setView({ luckScope: v === CAMPAIGN ? CAMPAIGN : Number(v) })}
+      onChart={() => {
+        setChartView(you ? viewKey(you) : null, { scope: view.luckScope });
+        openWindow(STATS_DICE_KIND, STATS_DICE_INSTANCE, { by: "user" });
+      }}
       retry={() => {
         list.retry();
         luck.retry();
@@ -80,11 +91,66 @@ export function LuckPanel({
   );
 }
 
+/** The value the scope picker shows for an answer. */
+export const luckScopeValue = (r: { scope: string; fromN?: number } | null) =>
+  r ? (r.scope === "campaign" ? CAMPAIGN : r.fromN ? String(r.fromN) : "") : "";
+
+/** One session or Campaign (FR-STATS-40): the Luck tab's picker, and the d20 chart's. */
+export function LuckScopeSelect({
+  prefix,
+  className,
+  value,
+  sessions,
+  live,
+  onPick,
+  now,
+}: {
+  prefix: "stats-luck" | "stats-dice";
+  className: string;
+  value: string;
+  sessions: SessionsResult["sessions"];
+  live: boolean;
+  onPick(value: string): void;
+  now?: Date;
+}) {
+  return (
+    <Select value={value} onValueChange={onPick} disabled={!live}>
+      <SelectTrigger
+        data-testid={`${prefix}-scope`}
+        className={cn("h-8", className)}
+        aria-label="Scope"
+      >
+        <SelectValue placeholder="Newest session" />
+      </SelectTrigger>
+      <SelectContent>
+        {sessions.map((x) => (
+          <SelectItem
+            key={x.fromN}
+            value={String(x.fromN)}
+            data-testid={`${prefix}-scope-option`}
+            data-record-id={String(x.fromN)}
+          >
+            {sessionLabel(x, now)}
+          </SelectItem>
+        ))}
+        <SelectItem
+          value={CAMPAIGN}
+          data-testid={`${prefix}-scope-option`}
+          data-record-id={CAMPAIGN}
+        >
+          Campaign
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function LuckView({
   list,
   luck,
   live,
   onPick,
+  onChart,
   retry,
   now,
 }: {
@@ -92,6 +158,8 @@ export function LuckView({
   luck: Pick<QueryState<unknown, LuckResult>, "status" | "result">;
   live: boolean;
   onPick(value: string): void;
+  /** FR-STATS-90: opens the d20 chart on this scope. */
+  onChart?(): void;
   retry(): void;
   /** "Today" in the picker (tests pin it). */
   now?: Date;
@@ -99,41 +167,36 @@ export function LuckView({
   const r = luck.result?.luck ?? null;
   const sessions = list.result?.sessions ?? [];
   const failed = live && (list.status === "error" || luck.status === "error");
-  const value = r ? (r.scope === "campaign" ? CAMPAIGN : r.fromN ? String(r.fromN) : "") : "";
   return (
     <div
       data-testid="stats-luck"
       data-state={live ? (r?.pending ? "pending" : luck.status) : "offline"}
       className="flex min-h-0 flex-1 flex-col gap-2"
     >
-      <Select value={value} onValueChange={onPick} disabled={!live}>
-        <SelectTrigger
-          data-testid="stats-luck-scope"
-          className="h-8 w-full min-w-0"
-          aria-label="Scope"
-        >
-          <SelectValue placeholder="Newest session" />
-        </SelectTrigger>
-        <SelectContent>
-          {sessions.map((x) => (
-            <SelectItem
-              key={x.fromN}
-              value={String(x.fromN)}
-              data-testid="stats-luck-scope-option"
-              data-record-id={String(x.fromN)}
+      <div className="flex items-center gap-2">
+        <LuckScopeSelect
+          prefix="stats-luck"
+          className="w-full min-w-0 flex-1"
+          value={luckScopeValue(r)}
+          sessions={sessions}
+          live={live}
+          onPick={onPick}
+          now={now}
+        />
+        {onChart ? (
+          <Tooltip content="How often each d20 face came up">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8"
+              data-testid="stats-luck-chart"
+              onClick={onChart}
             >
-              {sessionLabel(x, now)}
-            </SelectItem>
-          ))}
-          <SelectItem
-            value={CAMPAIGN}
-            data-testid="stats-luck-scope-option"
-            data-record-id={CAMPAIGN}
-          >
-            Campaign
-          </SelectItem>
-        </SelectContent>
-      </Select>
+              <ChartColumnIcon className="size-3.5" /> Chart
+            </Button>
+          </Tooltip>
+        ) : null}
+      </div>
       {failed ? <LoadError retry={retry} /> : null}
       {!r || r.pending ? (
         failed ? null : (

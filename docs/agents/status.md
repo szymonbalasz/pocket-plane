@@ -8,12 +8,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Track | Branch | Agent | Worktree | State |
 |---|---|---|---|---|
-| Upgrade guards | `fix/upgrade-guards` | `build-upgrade-guards` | `fix-upgrade-guards` (slot 2) | building |
+| Upgrade guards | `fix/upgrade-guards` | — | — | **merged** (#424) |
 | Play fixes: toasts | `fix/s15-toasts` | `build-s15-toasts` | `fix-s15-toasts` (slot 4) | building |
-| Play fixes: frame and map | `fix/s15-frame` | `build-s15-frame` | `fix-s15-frame` (slot 6) | building |
-| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | writing; then a review; then the DM's gate |
+| Play fixes: frame and map | `fix/s15-frame` | `build-s15-frame`, `test-s15-frame` | `fix-s15-frame` (slot 6) | built; walkthrough running on port 4163, evidence `.verify/20261031-231755-s15-frame-walk/` |
+| Linked notes spec | `spec/linked-notes` | `spec-linked-notes`, `review-linked-notes` | `spec-linked-notes` | written (`in-review`); review running, report `.verify/review-report.md`; then revisions, then the DM's gate |
 | Window position memory | `fix/window-memory` | — | — | waits for the frame merge |
-| Linked notes build | split by the spec | — | — | waits for the DM's gate and the upgrade guards |
+| Linked notes build | split by the spec | — | — | upgrade guards are in; waits for the DM's gate |
+
+**Memory (2026-10-31):** Claude Code stopped this session's background wait for low memory: 10.7 of 63.7 GB free, 13 agents working across the pocket-plane sessions (3 of them this session's). No new agents from this session until the DM says to carry on. Agents keep running and write their reports into their worktrees, so a new orchestrator turn picks up from those files.
 
 **Landing:** from the detached worktree `s15-integrate`: `git fetch`, `git checkout --detach origin/main`, `git merge --no-ff <branch>`, `git push origin HEAD:main`, `ci:watch` in the background. Status and decisions-log edits go the same way; the main checkout is only fast-forwarded.
 

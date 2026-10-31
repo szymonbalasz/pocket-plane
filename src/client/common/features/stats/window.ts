@@ -3,7 +3,9 @@
 // *(Sprint 8)* FR-STATS-66 (BL-66): useful 400 × 360, checked by content in `useful-size.e2e.ts`.
 import { TrophyIcon } from "lucide-react";
 import { defineWindow } from "../play-shell/registry";
-import { STATS_WINDOW_KIND } from "./logic";
+import { DiceChartWindow } from "./DiceChart";
+import { resetChartViews } from "./dice-chart";
+import { STATS_DICE_KIND, STATS_WINDOW_KIND } from "./logic";
 import { StatsRuntime } from "./runtime";
 import { StatsWindow } from "./StatsWindow";
 import { statsViews } from "./view";
@@ -23,4 +25,19 @@ export const statsWindow = defineWindow({
   // FR-STATS-85, FR-SHELL-200: a user open lands on Campaign; a feature open sets its own view.
   onClose: () => statsViews().reset(),
   component: StatsWindow,
+});
+
+/** FR-STATS-90: `stats.dice`, the Luck tab's chart; no launcher, a reload closes it (FR-SHELL-201). */
+export const statsDiceWindow = defineWindow({
+  kind: STATS_DICE_KIND,
+  title: "d20 rolls",
+  popout: true,
+  clients: ["dm", "player"],
+  defaultSize: { w: 440, h: 400 },
+  minSize: { w: 320, h: 280 },
+  usefulSize: { w: 400, h: 340 },
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  defaultOpen: false,
+  onClose: resetChartViews,
+  component: DiceChartWindow,
 });

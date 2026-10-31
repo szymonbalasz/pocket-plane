@@ -24,6 +24,7 @@
     "fixtures:load": "bun scripts/fixtures.ts load",
     "fixtures:reset-load": "bun scripts/fixtures.ts reset-load",
     "state:digest": "bun scripts/state-digest.ts",
+    "upgrade:check": "bun scripts/upgrade-check.ts",
     "mcp": "bun src/mcp/index.ts",
     "mcp:play": "bun src/mcp/index.ts --play",
     "mcp:call": "bun scripts/mcp-call.ts"
