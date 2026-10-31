@@ -20,8 +20,8 @@ export class IngestRejected extends Error {
 }
 
 export const unsupported = () => new IngestRejected(415, "Unsupported file type");
-export const tooLarge = () => new IngestRejected(413, "File over 25 MB");
-export const tooManyPixels = () => new IngestRejected(422, "Image over 50 megapixels");
+export const tooLarge = () => new IngestRejected(413, "File over 100 MB");
+export const tooManyPixels = () => new IngestRejected(422, "Image over 100 megapixels");
 export const corrupt = (detail = "Image is corrupt or unreadable") =>
   new IngestRejected(422, detail);
 

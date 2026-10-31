@@ -154,6 +154,7 @@ import tableToolsPausedE2e from "./table-tools-paused-e2e";
 import themeGilt from "./theme-gilt";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
+import tokenMirrors from "./token-mirrors";
 import tplMenu from "./tpl-menu";
 import trayAttacks from "./tray-attacks";
 import usesNegative from "./uses-negative";
@@ -370,6 +371,8 @@ export const bundles: readonly Bundle[] = [
   visualKit,
   // Spell FX core (fix/vfx-core): Cast, hit cues and auras walkthrough + spell-fx e2e
   spellFx,
+  // Token mirrors (build/token-mirrors)
+  tokenMirrors,
   // Agent / MCP API (build/agent-core): read tools, plan_check, mcp:call walkthroughs
   agentApi,
   // Rest buttons (fix/rest-buttons): char.rest e2e

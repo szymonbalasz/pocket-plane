@@ -55,7 +55,7 @@ describe("scenes-map fixtures (MAP §13)", () => {
       active: false,
       folderId: null,
       mapLocked: true,
-      mapWidth: 4096,
+      mapWidth: 6000,
       gridCellSize: 50,
       gridOffsetX: 25,
       gridOffsetY: 10,
