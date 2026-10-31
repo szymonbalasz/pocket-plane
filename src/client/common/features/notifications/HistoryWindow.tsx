@@ -13,7 +13,7 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
-import { colorHex } from "../campaign-management/colors";
+import { colorText } from "../campaign-management/colors";
 import { useColorKeyOf } from "../dice-roll-log/name-color";
 import { useWindowShown } from "../play-shell/ShellWindow";
 import { isTestMode } from "../play-shell/test-windows";
@@ -77,7 +77,7 @@ function StateBadge({ n, label }: { n: NotificationRecord; label: string }) {
         data-testid="note-history-closed-by"
         data-color={color ?? undefined}
         className="font-semibold"
-        style={color ? { color: colorHex(color) } : undefined}
+        style={color ? { color: colorText(color) } : undefined}
       >
         {closer.role === "player" ? nameOf(closer.playerId) : "DM"}
       </span>

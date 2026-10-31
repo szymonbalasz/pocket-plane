@@ -36,7 +36,7 @@ import {
   MORE_BADGE_ID,
   namePill,
 } from "../label";
-import { CASING_COLOR, CASING_NAME } from "../mark-colors";
+import { CASING_NAME, casingOf } from "../mark-colors";
 import type { TokenBadge } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
 import { useLayerToggles } from "../tool-store";
@@ -128,7 +128,7 @@ function Pill({
 function IconChip({ p, b, tokenId }: { p: BadgePill; b: TokenBadge; tokenId: string }) {
   const { colors } = useCanvas();
   const fill = b.color
-    ? CASING_COLOR
+    ? casingOf(b.color)
     : b.tone === "neutral"
       ? colors.muted
       : toneColor(colors, b.tone);
@@ -266,7 +266,7 @@ function TokenLabel({ t, cut, full }: { t: TokenView; cut: boolean; full: boolea
             font={row.font}
             fill={
               b.color
-                ? CASING_COLOR
+                ? casingOf(b.color)
                 : b.tone === "neutral"
                   ? colors.muted
                   : toneColor(colors, b.tone)

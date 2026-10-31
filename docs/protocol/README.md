@@ -2670,7 +2670,7 @@ From [campaign-management](../specs/campaign-management.md#9-api--events) FR-CAM
 
 | Intent | Who | Validation (in the command's transaction, in order) | Result | Source |
 |---|---|---|---|---|
-| `camp.setColor {playerId: Id \| null, color}` *(changed)* | DM, player | zod: `color` = `^#[0-9a-fA-F]{6}$`, stored lowercase (palette names and `#rgb` → `invalid` "Invalid input"); permissions and `not_found` as [§91](#91-sprint-5-player-colours-core-k0); `colorProblem` → `invalid` "Too dark to read on the map" \| "Too grey" \| "Too close to the danger red"; same as the current colour → `ack`, no write, no event; distance < 9 from the DM colour (player targets only) or another player's → `conflict` "Taken by ‹name›" (distance 0) \| "Too close to ‹name›'s colour" (+ " for colour-blind players" when normal vision alone is ≥ 9); the closest holder is named | `{}` | FR-CAMP-31–33 |
+| `camp.setColor {playerId: Id \| null, color}` *(changed)* | DM, player | zod: `color` = `^#[0-9a-fA-F]{6}$`, stored lowercase (palette names and `#rgb` → `invalid` "Invalid input"); permissions and `not_found` as [§91](#91-sprint-5-player-colours-core-k0); `colorProblem` → `invalid` "Too dark to see" \| "Too grey" \| "Too close to the danger red"; same as the current colour → `ack`, no write, no event; distance < 9 from the DM colour (player targets only) or another player's → `conflict` "Taken by ‹name›" (distance 0) \| "Too close to ‹name›'s colour" (+ " for colour-blind players" when normal vision alone is ≥ 9); the closest holder is named | `{}` | FR-CAMP-31–33 |
 
 **Record types** (unchanged visibility: every connection of the campaign)
 

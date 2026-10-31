@@ -13,6 +13,7 @@ import {
   colorHex,
   colorKeyOf,
   colorOf,
+  colorText,
   playerColorVar,
   ROLE_ACCENT_FALLBACK,
   useColorOf,
@@ -150,6 +151,15 @@ describe("FR-CAMP-36 colorOf hex", () => {
     expect(colorOf(H, p("nobody"), none)).toBe(ROLE_ACCENT_FALLBACK.player);
     expect(colorOf(store([], "teal"), dm, none)).toBe(ROLE_ACCENT_FALLBACK.dm);
     expect(colorOf(H, { role: "system" }, themed)).toBeNull();
+  });
+
+  test("FR-CAMP-36 colorOf hex: colorText leaves a colour that reads alone (hex, key, theme token); a dark one gets its lighter shade", () => {
+    const none = () => "";
+    const themed = (name: string) => `var(${name})`;
+    expect(colorText("#b388ff", none)).toBe("#b388ff");
+    expect(colorText("blue", none)).toBe(PLAYER_COLORS.blue);
+    expect(colorText("blue", themed)).toBe("var(--player-blue)");
+    expect(colorText("#8b0000", none)).not.toBe("#8b0000");
   });
 
   test("FR-CAMP-36 colorOf hex: colorKeyOf names palette colours (data-color), else the hex; colorHex takes a hex or a key", () => {
