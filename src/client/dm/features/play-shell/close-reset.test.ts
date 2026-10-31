@@ -1,15 +1,14 @@
 // FR-SHELL-200: the DM-only window types' `onClose` (the shared ones:
-// `@ui/features/play-shell/close-reset.test.ts`), as registered.
+// `@ui/features/play-shell/close-reset.test.ts`). The defs, not `dmWindows`: the full registry
+// pulls in the DM session, which needs a DOM at import.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { You } from "@shared/protocol/frames";
-import { ENCOUNTERS_KIND } from "@ui/features/combat-tracker/window";
-import { dmWindows } from "../../windows";
+import { encountersWindow } from "../combat-tracker/encounters-window";
 import { openEncounterKey } from "../combat-tracker/open-encounter";
-import { STATBLOCK_KIND } from "../entities/statblock/logic";
 import { useStatBlockTarget } from "../entities/statblock/store";
+import { statBlockWindow } from "../entities/statblock/window";
 
 const you = { campaignId: "c1", role: "dm", playerId: null } as You;
-const onClose = (kind: string) => dmWindows.get(kind)?.onClose?.(you);
 
 describe("FR-SHELL-200 close resets what the DM window shows", () => {
   const g = globalThis as { window?: unknown };
@@ -31,13 +30,13 @@ describe("FR-SHELL-200 close resets what the DM window shows", () => {
 
   test("FR-SHELL-200 Stat block: no creature", () => {
     useStatBlockTarget.getState().show({ definitionId: "d1" } as never);
-    onClose(STATBLOCK_KIND);
+    statBlockWindow.onClose?.(you);
     expect(useStatBlockTarget.getState().target).toBeNull();
   });
 
   test("FR-SHELL-200 Encounters: back to the list after a reopen or reload", () => {
     data.set(openEncounterKey("c1"), "enc-1");
-    onClose(ENCOUNTERS_KIND);
+    encountersWindow.onClose?.(you);
     expect(data.has(openEncounterKey("c1"))).toBe(false);
   });
 });
