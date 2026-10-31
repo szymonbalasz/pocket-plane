@@ -1,5 +1,5 @@
 // FR-CMP-76: entries popped out of the Compendium, one `cmp.entry` window each. What each instance
-// shows lives here, in client memory, as the window itself does (FR-SHELL-200: never stored, so a
+// shows lives here, in client memory, as the window itself does (FR-SHELL-201: never stored, so a
 // reload closes them). The same entry popped out again is the same window.
 import { createStore, useStore } from "zustand";
 import type { WindowProps } from "../play-shell/registry";

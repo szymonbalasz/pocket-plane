@@ -1,4 +1,4 @@
-// FR-CMP-76 popped-out entries, FR-SHELL-200 pop-out window types: one window per entry, never
+// FR-CMP-76 popped-out entries, FR-SHELL-201 pop-out window types: one window per entry, never
 // stored, a close removes it, never minimised for another window.
 import { afterEach, describe, expect, test } from "bun:test";
 import { Layout, MAX_WINDOWS } from "@shared/play-shell/layout";
@@ -58,15 +58,15 @@ describe("FR-CMP-76 which window shows which entry", () => {
   });
 });
 
-describe("FR-SHELL-200 pop-out window types", () => {
-  test("FR-SHELL-200 several windows of one kind open side by side, each at its own spot", () => {
+describe("FR-SHELL-201 pop-out window types", () => {
+  test("FR-SHELL-201 several windows of one kind open side by side, each at its own spot", () => {
     const ws = open(open(open([], "entry-1"), "entry-2"), "entry-3");
     expect(instances(ws)).toEqual(["entry-1", "entry-2", "entry-3"]);
     const spots = new Set(ws.map((w) => `${w.x},${w.y}`));
     expect(spots.size).toBe(3);
   });
 
-  test("FR-SHELL-200 opening an open pop-out again brings it to front, no second window", () => {
+  test("FR-SHELL-201 opening an open pop-out again brings it to front, no second window", () => {
     const ws = open(open([], "entry-1"), "entry-2");
     const again = open(ws, "entry-1");
     expect(instances(again)).toEqual(["entry-1", "entry-2"]);
@@ -74,19 +74,19 @@ describe("FR-SHELL-200 pop-out window types", () => {
     expect(z("entry-1")).toBeGreaterThan(z("entry-2"));
   });
 
-  test("FR-SHELL-200 a close removes the window; the others stay", () => {
+  test("FR-SHELL-201 a close removes the window; the others stay", () => {
     const ws = open(open([], "entry-1"), "entry-2");
     const closed = reduce(ws, { type: "close", kind: CMP_ENTRY_KIND, instance: "entry-1" }, ctx);
     expect(instances(closed)).toEqual(["entry-2"]);
   });
 
-  test("FR-SHELL-200 closing a pop-out that isn't open changes nothing", () => {
+  test("FR-SHELL-201 closing a pop-out that isn't open changes nothing", () => {
     const ws = open([], "entry-1");
     const same = reduce(ws, { type: "close", kind: CMP_ENTRY_KIND, instance: "entry-9" }, ctx);
     expect(same).toBe(ws);
   });
 
-  test("FR-SHELL-200 pop-outs are never stored, so any number leaves the layout valid (MAX_WINDOWS)", () => {
+  test("FR-SHELL-201 pop-outs are never stored, so any number leaves the layout valid (MAX_WINDOWS)", () => {
     let ws: Windows = reduce([], { type: "open", kind: other.kind }, ctx);
     for (let i = 0; i < MAX_WINDOWS + 5; i += 1) ws = open(ws, `entry-${i}`);
     expect(ws.length).toBeGreaterThan(MAX_WINDOWS);
@@ -95,7 +95,7 @@ describe("FR-SHELL-200 pop-out window types", () => {
     expect(Layout.safeParse(stored).success).toBe(true);
   });
 
-  test("FR-SHELL-200 a pop-out is never auto-minimised to make room for another window", () => {
+  test("FR-SHELL-201 a pop-out is never auto-minimised to make room for another window", () => {
     const small = { ...ctx, viewport: { w: 1280, h: 720 } };
     let ws: Windows = reduce(
       [],

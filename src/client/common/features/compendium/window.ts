@@ -3,6 +3,7 @@
 import { BookOpenIcon } from "lucide-react";
 import type { WindowDef } from "../play-shell/registry";
 import { CMP_ENTRY_KIND, CMP_KIND } from "./logic";
+import { resetCmpNav } from "./nav";
 import { POPOUT_TITLE, PopoutTitle } from "./popout";
 
 type Base = Omit<WindowDef, "component" | "clients">;
@@ -18,6 +19,7 @@ export const compendiumWindowBase = {
   minOpenH: 400,
   defaultOpen: false,
   launcher: { icon: BookOpenIcon, label: "Compendium", order: 65 },
+  onClose: resetCmpNav, // FR-SHELL-200: search, tab, filters, the open entry
 } satisfies Base;
 
 /** `cmp.entry`, an entry popped out of the Compendium (FR-CMP-76); no launcher, one per entry. */

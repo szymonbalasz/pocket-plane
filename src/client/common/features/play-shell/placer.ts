@@ -414,7 +414,7 @@ export function autoMinimiseOrder(
     .filter((w) => {
       const d = ctx.registry.get(w.kind);
       if (!d || d.defaultOpen || d.fixedDefault || !isShown(w, ctx.available)) return false;
-      // FR-SHELL-200: a pop-out has no launcher to come back from.
+      // FR-SHELL-201: a pop-out has no launcher to come back from.
       if (d.popout) return false;
       // FR-SHELL-151: only untouched launcher windows are put away.
       if (isRemembered(w)) return false;

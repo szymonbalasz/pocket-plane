@@ -269,7 +269,7 @@ export function ShellWindow({
         <span className="flex-1 truncate">
           {TitleView ? <TitleView kind={win.kind} instance={win.instance} /> : def.title}
         </span>
-        {/* FR-SHELL-37: say what each button does. FR-SHELL-200: a pop-out has no launcher. */}
+        {/* FR-SHELL-37: say what each button does. FR-SHELL-201: a pop-out has no launcher. */}
         {!def.popout && (
           <Tooltip content="Minimise — keep it on the launcher">
             <button

@@ -115,13 +115,13 @@ export interface WindowDef {
    */
   restoreOpen?: false;
   /**
-   * FR-SHELL-200: a pop-out type, one window per instance (a feature opens each with its own
+   * FR-SHELL-201: a pop-out type, one window per instance (a feature opens each with its own
    * `instance` and keeps what it shows). Lives in memory only: never stored, and a close removes
    * it, so they can't fill the stored layout (`MAX_WINDOWS`). With no launcher to bring one back,
    * it has no Minimise button and is never auto-minimised.
    */
   popout?: true;
-  /** FR-SHELL-200: the title bar's text per instance, in place of `title` (e.g. an entry's name). */
+  /** FR-SHELL-201: the title bar's text per instance, in place of `title` (e.g. an entry's name). */
   titleView?: ComponentType<WindowProps>;
   /**
    * FR-SHELL-155: window kinds (removed from the registry) whose stored layout entry this type
@@ -131,6 +131,12 @@ export interface WindowDef {
   absorbs?: readonly string[];
   /** FR-SHELL-155: runs once after this type absorbed `fromKind`'s entry (e.g. picks a tab). */
   onAbsorb?: (fromKind: string, you: You | null) => void;
+  /**
+   * FR-SHELL-200: the window closed (not minimised): put back the state it keeps outside its
+   * components, so the next open starts fresh. Components unmount on their own; this is for
+   * stores and browser memory. Keep work the user would lose and per-browser preferences.
+   */
+  onClose?: (you: You | null) => void;
   /**
    * Always mounted while the kind is available, whatever the window state (e.g. the toast
    * runtime of `note.history`). Renders its own UI, if any; gets no props.

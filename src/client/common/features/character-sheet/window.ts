@@ -1,6 +1,7 @@
 // `char.sheet` window geometry (CHAR §7, protocol §24); each client registers its own def.
 import type { Viewport } from "../play-shell/geometry";
 import type { Size, WindowDef } from "../play-shell/registry";
+import { resetSheetSelection } from "./selection";
 
 export const CHAR_SHEET_KIND = "char.sheet";
 
@@ -18,4 +19,5 @@ export const charSheetWindowBase = {
   // stored sheet at either default takes the current viewport's one.
   previousDefaults: [SHEET_WIDE],
   minSize: { w: 280, h: 320 },
+  onClose: resetSheetSelection, // FR-SHELL-200: the picked creature
 } satisfies Partial<WindowDef>;

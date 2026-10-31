@@ -1,11 +1,11 @@
 // e2e-bundle: compendium
-// Thin flow of popped-out entries (FR-CMP-76, FR-SHELL-200): the DM pops out two entries, each in
+// Thin flow of popped-out entries (FR-CMP-76, FR-SHELL-201): the DM pops out two entries, each in
 // its own window titled with its name, while the Compendium goes back to its list; popping one out
 // again adds no window; a close removes one; a reload closes the rest and keeps the layout valid.
 // A player does the same. Placement, storage rules: bun test (popout.test.tsx).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 const popouts = (page: Page) =>
   page.locator('[data-testid="ui-window"][data-record-id^="cmp.entry:"]');
@@ -41,7 +41,7 @@ test("FR-CMP-76 the DM pops out two entries, each in its own window; again = sam
   await expect(dm.getByTestId("cmp-search")).toBeVisible();
   await popOut(dm, "fire", "Fireball");
   await expect(popouts(dm)).toHaveCount(2);
-  // No launcher to come back from, so no Minimise (FR-SHELL-200).
+  // No launcher to come back from, so no Minimise (FR-SHELL-201).
   await expect(named(dm, "Goblin").getByTestId("ui-window-minimise")).toHaveCount(0);
 
   // The windows sit side by side, not on top of each other.
@@ -51,6 +51,11 @@ test("FR-CMP-76 the DM pops out two entries, each in its own window; again = sam
 
   await popOut(dm, "goblin", "Goblin");
   await expect(popouts(dm)).toHaveCount(2);
+
+  // Closing the Compendium resets it (FR-SHELL-200); its pop-outs stay.
+  await shellWindow(dm, "cmp.compendium").getByTestId("ui-window-close").click();
+  await expect(popouts(dm)).toHaveCount(2);
+  await expect(named(dm, "Goblin").getByTestId("cmp-entry")).toBeVisible();
 
   await named(dm, "Goblin").getByTestId("ui-window-close").click();
   await expect(popouts(dm)).toHaveCount(1);

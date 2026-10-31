@@ -128,9 +128,11 @@ test("FR-CHARX-82 FR-PARTY-50 FR-LOOT-29 player-1: the Owlbear's attack buttons 
   await tab("loot").click();
   await expect(gp).toHaveValue("5");
   await expect(move.getByTestId("loot-move-text")).toHaveValue("for the ferry");
-  // Closing the window drops the draft.
+  // Closing the window drops the draft and the tab (FR-SHELL-200).
   await board.getByTestId("ui-window-close").click();
   const again = await openWindow(p1, "party.board");
+  await expect(tab("loot")).toHaveAttribute("aria-selected", "false");
+  await tab("loot").click();
   await expect(
     again.getByTestId("loot-move").locator('[data-testid="loot-move-coin"][data-value="gp"]'),
   ).toHaveValue("");

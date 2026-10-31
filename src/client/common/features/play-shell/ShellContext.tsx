@@ -329,7 +329,7 @@ export function useResetLayout(): () => void {
 
 /**
  * Feature API (SHELL §9): open a window by kind (and instance: `main`, or a pop-out's,
- * FR-SHELL-200), or bring it to front / restore it. Passes no data; the window reads the synced store itself. `by` (FR-SHELL-08)
+ * FR-SHELL-201), or bring it to front / restore it. Passes no data; the window reads the synced store itself. `by` (FR-SHELL-08)
  * defaults to `"user"` (click-driven: the stored spot); a feature opening a window on its own
  * passes `"feature"` (never over another window, FR-SHELL-41).
  */

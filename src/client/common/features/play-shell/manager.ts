@@ -231,7 +231,7 @@ export function restoreLayout(
 
 /**
  * What gets written: unknown kinds dropped, unavailable ones kept (FR-SHELL-18); pop-outs never
- * (FR-SHELL-200).
+ * (FR-SHELL-201).
  */
 export function serialise(ws: Windows, registry: WindowRegistry): Layout {
   return {
@@ -353,7 +353,7 @@ export function plan(ws: Windows, action: WindowAction, ctx: ManagerContext): Pl
       // A user close / minimise moves nothing (FR-SHELL-95); what this kind displaced may return
       // (its cause ended, FR-SHELL-102).
       const state = action.type === "close" ? "closed" : "minimised";
-      // FR-SHELL-200: a closed pop-out is gone, not kept closed.
+      // FR-SHELL-201: a closed pop-out is gone, not kept closed.
       const cur = find(ws, kind, instance);
       const next =
         cur && def.popout && action.type === "close"

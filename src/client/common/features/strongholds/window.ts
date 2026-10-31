@@ -6,6 +6,7 @@
 // the 1280×720 band of 412), min 340 × 360, `minOpenH` 400.
 import { defineWindow } from "../play-shell/registry";
 import { HOLD_WINDOW_KIND } from "./logic";
+import { holdMemory } from "./memory";
 import { StrongholdWindow } from "./StrongholdWindow";
 
 export const strongholdWindow = defineWindow({
@@ -18,5 +19,6 @@ export const strongholdWindow = defineWindow({
   defaultPosition: { anchor: "top-right" },
   minOpenH: 400,
   defaultOpen: false,
+  onClose: () => holdMemory().reset(), // FR-SHELL-200
   component: StrongholdWindow,
 });

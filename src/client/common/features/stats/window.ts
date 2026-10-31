@@ -6,6 +6,7 @@ import { defineWindow } from "../play-shell/registry";
 import { STATS_WINDOW_KIND } from "./logic";
 import { StatsRuntime } from "./runtime";
 import { StatsWindow } from "./StatsWindow";
+import { statsViews } from "./view";
 
 export const statsWindow = defineWindow({
   kind: STATS_WINDOW_KIND,
@@ -19,5 +20,7 @@ export const statsWindow = defineWindow({
   defaultOpen: false,
   launcher: { icon: TrophyIcon, label: "Stats", order: 59 },
   companion: StatsRuntime,
+  // FR-STATS-85, FR-SHELL-200: a user open lands on Campaign; a feature open sets its own view.
+  onClose: () => statsViews().reset(),
   component: StatsWindow,
 });

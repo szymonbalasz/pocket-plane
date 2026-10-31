@@ -7,6 +7,7 @@ import { DicesIcon } from "lucide-react";
 import { createElement, Suspense } from "react";
 import { lazyChunk } from "../../lib/lazy-chunk";
 import type { WindowDef } from "../play-shell/registry";
+import { diceExtras } from "./store";
 import { DiceExtrasRuntime } from "./ThrowLayer";
 import { DICEX_TRAY_KIND } from "./window-kind";
 
@@ -37,5 +38,11 @@ export const trayWindowBase = {
   defaultOpen: false,
   launcher: { icon: DicesIcon, label: "Dice", order: 45 },
   companion: DiceExtrasRuntime,
+  // FR-DICEX-03, FR-SHELL-200: the staged request, the last result and the mode; a running throw
+  // plays on.
+  onClose: () => {
+    diceExtras.clear();
+    diceExtras.setMode("normal");
+  },
   component: LazyTrayWindow,
 } satisfies Omit<WindowDef, "clients" | "defaultPosition">;

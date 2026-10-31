@@ -29,7 +29,7 @@ afterAll(() => {
   delete g.window;
   delete g.document;
 });
-// The store is per process: an earlier test file's pending roll would add a card here.
+// Another file in this process may leave a roll pending on the shared store ("Rolling…" popup).
 beforeEach(() => diceExtras.failed());
 afterEach(() => {
   diceExtras.failed();
