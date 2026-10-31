@@ -33,7 +33,10 @@
 // an open non-modal popup (the damage-card popup) blocks like Initiative and, when nothing clears
 // it, the stack folds over its fewest controls. *(Sprint 12, X1)* BL-119: then off the other
 // records' headings (every Roll requests card's title line, not only the newest card's).
-// Pure; players keep bottom-right.
+// *(Sprint 15)* FR-NOTE-80 (BL-175): a clear spot is also off the PC tokens: the column spot over
+// the least PC area first, a spot over a PC only when no slide (beside a window, then beside the
+// PC itself) clears it; no such spot → the rules before, and a PC never folds a card.
+// Pure; players: `keep-out-player.ts`.
 
 import { type FirstRow, firstRows } from "../play-shell/content-heights";
 import {
@@ -100,7 +103,7 @@ export type StackWindow = Rect & {
 };
 
 /** FR-NOTE-75: the window's content part (title bar to `used`; unknown → all of it). */
-const contentOf = (w: StackWindow): Rect => ({
+export const contentOf = (w: StackWindow): Rect => ({
   x: w.x,
   y: w.y,
   w: w.w,
@@ -158,7 +161,7 @@ export function dmStackLefts(
   return [...new Set(out)];
 }
 
-const hits = (a: Rect, b: Rect, gap: number) =>
+export const hits = (a: Rect, b: Rect, gap: number) =>
   a.x < b.x + b.w + gap && b.x - gap < a.x + a.w && a.y < b.y + b.h + gap && b.y - gap < a.y + a.h;
 
 /**
@@ -289,6 +292,7 @@ function dmStackSpotOnly(
     avoid.length === 0 &&
     windows.length === 0 &&
     popups.length === 0 &&
+    pcs.length === 0 &&
     fits(base) &&
     offHard(base)
   )
@@ -345,6 +349,12 @@ function dmStackSpotOnly(
         (w.headings ?? []).flatMap((r) => [r.y + r.h + STACK_GAP, r.y - STACK_GAP - stackH]),
       ),
     ]);
+  // FR-NOTE-80: the PC area under a spot, and the tops just off each PC (in the column's range).
+  const overPc = (p: Spot) => coveredArea(at(p), pcs);
+  const pcTops = pcs
+    .flatMap((t) => [t.y + t.h + EDGE_GAP, t.y - EDGE_GAP - stackH])
+    .filter((y) => y >= DM_TOAST_TOP && y <= maxTop)
+    .map(Math.round);
   // Nearest the home row first (ties keep the earlier spot): FR-NOTE-32's spot, then by top.
   const spotsAt = (tops: number[], ls: readonly number[]) => [
     base,
@@ -365,6 +375,7 @@ function dmStackSpotOnly(
       // Pass 1 (content-clear): K12 (kit round 3, DM #363): a spot over no window at all first
       // (FR-NOTE-71's body-clear rank; re-test 3 O2's "empty body is as good as the map" only
       // among the rest), then nearest home, the least token area first; later passes: FR-NOTE-71.
+      // FR-NOTE-80: in pass 1 the least PC area before all that.
       const r = at(p);
       const key =
         pass === 0
@@ -372,7 +383,7 @@ function dmStackSpotOnly(
               primaryUnder(r, windows),
               controlsUnder(r, windows),
               headingsUnder(r, windows),
-              0,
+              overPc(p),
               body ? 1 : 0,
               coveredArea(r, avoid),
             ]
@@ -395,8 +406,12 @@ function dmStackSpotOnly(
   // 1. FR-NOTE-75: in the column, clear of every window's drawn content. K12 (kit round 3, DM
   // #363: toasts off windows where a clear spot exists): a spot over no window wins outright;
   // one over a window's empty body waits for the slide.
-  const content = pick(spotsAt(topsIn(0), lefts), (p) => (clearIn(0, p) ? 0 : null));
-  const clear = content && coveredArea(at(content), windows) === 0 ? content : null;
+  // FR-NOTE-80: a spot over a PC isn't clear; it waits for the slides.
+  const content = pick(spotsAt([...topsIn(0), ...pcTops], lefts), (p) =>
+    clearIn(0, p) ? 0 : null,
+  );
+  const clear =
+    content && coveredArea(at(content), windows) === 0 && overPc(content) === 0 ? content : null;
   // 2. FR-NOTE-77: beside a window, clear of every window, the PCs and the cards' targets.
   const found = besideSpot(vp, width, stackH, windows, initiative, hard, blockers, avoid, pcs);
   const beside = found && fits(found) && lefts.every((l) => l !== found.left) ? found : null;
@@ -407,8 +422,19 @@ function dmStackSpotOnly(
   if (clear ?? beside) return (clear ?? beside) as Spot;
   // 2b. DM #364 (amends #288): no clear spot within the half-width slide → a slide further left,
   // still on no window, PC, card target or keep-out (the rail kept clear).
-  const far = besideSpot(vp, width, stackH, windows, initiative, hard, blockers, avoid, pcs, true);
+  const far = besideSpot(vp, width, stackH, windows, initiative, hard, blockers, avoid, pcs, {
+    farLeft: true,
+  });
   if (far && fits(far) && lefts.every((l) => l !== far.left)) return far;
+  // 2c. FR-NOTE-80: the column's best spot is on a PC → a slide beside the PC itself, on the same
+  // terms (no window, PC, card target or keep-out; the right cap holds).
+  if (content && overPc(content) > 0) {
+    const off = besideSpot(vp, width, stackH, windows, initiative, hard, blockers, avoid, pcs, {
+      farLeft: true,
+      pcEdges: true,
+    });
+    if (off && fits(off)) return off;
+  }
   // 1b. No clear spot: over the empty body below a window's content (pass 1, nearest home).
   if (content) return content;
   // 3. Over a body, in the column: the first rows kept (FR-NOTE-75), then ruling B, then the
@@ -475,18 +501,18 @@ function partsUnder(
  * FR-NOTE-78 (BL-108): how many of the windows' primary parts `r` overlaps: their headings and
  * first records, and a log's newest rows (FR-NOTE-77 re-test 3: what the DM reads first).
  */
-const primaryUnder = (r: Rect, windows: readonly StackWindow[]) =>
+export const primaryUnder = (r: Rect, windows: readonly StackWindow[]) =>
   partsUnder(r, windows, (w) => [w.primary, w.logRows]);
 
 /**
  * FR-NOTE-77: how many of the windows' other key parts `r` overlaps: their controls and
  * (FR-NOTE-78) their other records.
  */
-const controlsUnder = (r: Rect, windows: readonly StackWindow[]) =>
+export const controlsUnder = (r: Rect, windows: readonly StackWindow[]) =>
   partsUnder(r, windows, (w) => [w.controls, w.records]);
 
 /** BL-119: how many of the windows' record headings `r` overlaps (an older card's title line). */
-const headingsUnder = (r: Rect, windows: readonly StackWindow[]) =>
+export const headingsUnder = (r: Rect, windows: readonly StackWindow[]) =>
   partsUnder(r, windows, (w) => [w.headings]);
 
 /** FR-NOTE-77: a spot's distance from home (the home row, centred): sideways + down, px. */
@@ -518,11 +544,18 @@ function besideSpot(
   blockers: readonly Rect[],
   avoid: readonly TokenBox[],
   pcs: readonly Rect[],
-  /** DM #364: no cap left of home (only once no spot within the cap is clear). */
-  farLeft = false,
+  {
+    farLeft = false,
+    pcEdges = false,
+  }: {
+    /** DM #364: no cap left of home (only once no spot within the cap is clear). */
+    farLeft?: boolean;
+    /** FR-NOTE-80: beside the PCs too, not only beside windows. */
+    pcEdges?: boolean;
+  } = {},
 ): Spot | null {
   const home = Math.round((vp.w - width) / 2);
-  const edges = [...windows, ...(initiative ? [initiative] : []), ...hard];
+  const edges = [...windows, ...(initiative ? [initiative] : []), ...hard, ...(pcEdges ? pcs : [])];
   const lefts = [
     ...new Set(
       edges.flatMap((w) => [w.x - EDGE_GAP - width, w.x + w.w + EDGE_GAP]).map(Math.round),

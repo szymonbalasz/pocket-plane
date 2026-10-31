@@ -166,6 +166,29 @@ describe("FR-NOTE-43 never over a tool bar", () => {
     expect(attr(tag, "data-placement")).toBe("bottom-right");
     expect(spot(tag)).toEqual({ left: undefined, top: undefined });
   });
+
+  test("FR-NOTE-83 runtime a player's stack: anchored to its corner while that is free; drawn at its spot when a window's content is there, back in the corner when that goes", () => {
+    stubH = 72;
+    const inputs = (windows: StackInputs["windows"]): StackInputs => ({
+      initiative: null,
+      windows,
+      hard: [],
+      rows: [],
+    });
+    // The real viewport here: 1440×900; a window over the corner, no controls measured.
+    const over = { x: 800, y: 300, w: 600, h: 580 };
+    stubInputs = inputs([over]);
+    const moved = stackTag("player");
+    // Above it, in the corner's column: nearer than left of it.
+    expect(spot(moved)).toEqual({ left: "1104", top: String(300 - 8 - 72) });
+    expect(attr(moved, "style")).toContain("left:1104px");
+    expect(attr(moved, "data-placement")).toBe("bottom-right");
+    stubInputs = inputs([{ ...over, y: 60, h: 400 }]);
+    const home = stackTag("player");
+    expect(spot(home)).toEqual({ left: undefined, top: undefined });
+    expect(attr(home, "style")).toContain("right:16px");
+    expect(attr(home, "style")).toContain("bottom:20px");
+  });
 });
 
 describe("FR-NOTE-51 stack returns home (BL-59)", () => {

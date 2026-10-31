@@ -676,7 +676,12 @@ for (const [width, height] of [
     // went to the far bottom centre, 500+ px away). Not "within one popup height": the nearest free
     // spot (#200) may be diagonal, beside one target and below another (BL-34: 261 px at 259 tall).
     for (const t of await monsters()) expect(overlaps(placed, t)).toBe(false);
-    expect(overlaps(placed, origin(card.box))).toBe(true);
+    // FR-NOTE-81 (2026-10-31): the free spot beside the target may be on a PC (Mira at 356, 448 under
+    // 384, 220 at this camera); the nearest off her too then, not overlapping the toast's spot.
+    const from = origin(card.box);
+    expect(Math.hypot(placed.x - from.x, placed.y - from.y)).toBeLessThan(500);
+    const pcs = (await tokenBoxes(dm)).filter((t) => t.name === "Mira" || t.name === "Thorn");
+    for (const t of pcs) expect(overlaps(placed, t)).toBe(false);
     await popup.getByTestId("cbt-popup-dismiss").click();
     await expect(popup).toHaveCount(0);
 

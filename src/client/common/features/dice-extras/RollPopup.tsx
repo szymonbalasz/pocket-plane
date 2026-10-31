@@ -20,6 +20,7 @@ import { EyeOffIcon, SettingsIcon, XIcon } from "lucide-react";
 import {
   type RefObject,
   Suspense,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -35,11 +36,13 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Tip } from "../../components/ui/tip";
 import { lazyChunk } from "../../lib/lazy-chunk";
 import { cn } from "../../lib/utils";
+import { SyncContext } from "../../sync/store";
 import { colorHex } from "../campaign-management/colors";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { focusLogEntry } from "../dice-roll-log/focus";
 import { RollerName, rollerColorKey, useColorKeyOf } from "../dice-roll-log/name-color";
-import { SHOWN_STACK_ID as NOTE_STACK_ID } from "../notifications/ToastRuntime";
+import { pcScreenBoxes, pcTokenIds } from "../notifications/pc-boxes";
+import { SHOWN_STACK_ID as NOTE_STACK_ID, useMapSettled } from "../notifications/ToastRuntime";
 import { firstRows } from "../play-shell/content-heights";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
@@ -58,6 +61,7 @@ import { dice3d, whenChunk } from "./lazy3d";
 import {
   CELL_LINES,
   cellTag,
+  columnPlanH,
   dmColumnTop,
   dmPopupAt,
   dmPopupClear,
@@ -792,7 +796,27 @@ export function RollPopupStack({
   // BL-118: from the toast stack's resting report, so the column moves only when a popup arrives
   // or leaves or that stack settles elsewhere, never on a popup's own rolling → rest re-render.
   const start = dmColumnTop(reports.get(NOTE_STACK_ID)?.h ?? 0);
-  const at = dmPopupAt(vp, start, { w: g.w, h: box.h }, clear, others, heads);
+  // FR-NOTE-82 (BL-175): off the PC tokens, read when a popup arrives or leaves and once the map
+  // settled (a window that moved refits the camera); never on a popup's own rolling → rest
+  // re-render (BL-118). Footprints, so a map redraw at the same camera moves nothing.
+  const sync = useContext(SyncContext);
+  const arrivals = `${popups.map((p) => p.id).join(",")}:${pending}`;
+  const settled = useMapSettled(dm && (popups.length > 0 || pending));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `arrivals`, `settled` re-read the boxes
+  const pcs = useMemo(() => {
+    if (!dm) return [];
+    const store = sync?.getState().store;
+    return pcScreenBoxes(pcTokenIds(store), store);
+  }, [dm, sync, arrivals, settled]);
+  // FR-NOTE-82 (BL-118): a showing column holds its spot while that stays clear.
+  const held = useRef<{ left: number; top: number } | null>(null);
+  // FR-NOTE-85: placed for the card an own roll becomes, so it first shows where it will stay.
+  const size = { w: g.w, h: columnPlanH(box.h, pending, g) };
+  const at = dmPopupAt(vp, start, size, clear, others, heads, pcs, held.current);
+  const showingColumn = popups.length > 0 || pending;
+  useLayoutEffect(() => {
+    held.current = showingColumn && box.h > 0 ? at : null;
+  });
   // FR-DICEX-47 short screens: only the popups that fit the region (newest first; the oldest
   // drops), never past the viewport's bottom (DM) or over the top bar (players).
   useLayoutEffect(() => {
