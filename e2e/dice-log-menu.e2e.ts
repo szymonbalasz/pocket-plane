@@ -86,6 +86,18 @@ test("FR-DICE-99 FR-DICE-103 FR-DICE-109 the DM hides a player's roll: gone from
   const dmDetails = shellWindow(dm, "dice.details");
   await expect(dmDetails.getByTestId("dice-details-audience")).toHaveText("DM only");
   expect(await dm.evaluate(() => String(window.getSelection()))).toBe("");
+  // Nor focus on the row, so no ring (FR-DICE-106).
+  expect(
+    await dm.evaluate(() => document.activeElement?.closest("[data-slot=log-row]") ?? null),
+  ).toBeNull();
+  // Keyboard focus still shows it.
+  await dm.keyboard.press("Tab");
+  await dmRow.getByTestId("dice-log-entry-text").focus();
+  expect(
+    await dmRow
+      .getByTestId("dice-log-entry-text")
+      .evaluate((el) => el === document.activeElement && el.matches(":focus-visible")),
+  ).toBe(true);
 
   await item(await menuOf(dmRow), "reveal").click();
   await expect(line(p1Log, PERCEPTION)).toHaveCount(1);
@@ -137,4 +149,12 @@ test("FR-DICE-105 a player's Inspiration reroll from the menu shows the confirm 
   // The struck line's menu jumps to the new one.
   await item(await menuOf(row), "new-roll").click();
   await expect(line(p1Log, "Perception (reroll, was 7)")).toHaveAttribute("data-focused", "true");
+});
+
+test("FR-DICE-103 a global definition's line opens its stat block; a name on two definitions has no item", async ({
+  browser,
+}) => {
+  const { dm, dmLog } = await setup(browser);
+  await item(await menuOf(line(dmLog, "Goblin 2 — Initiative").first()), "sheet").click();
+  await expect(shellWindow(dm, "ent.statblock")).toBeVisible();
 });

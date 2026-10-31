@@ -106,6 +106,7 @@ import { type EntryAction, entryActions } from "./entry-actions";
 import { EntryMenuItems, sendEntryHidden } from "./entry-menu";
 import { focusLogEntry, scrollToEntry, useLogFocus } from "./focus";
 import {
+  type ActorCreature,
   actorGroups,
   actorItemValue,
   actorLabel,
@@ -388,9 +389,11 @@ function Entry({
   focused,
   actions,
   onGuarded,
+  openCreature,
 }: {
   e: GameLogEntryView;
   isDm: boolean;
+  openCreature: ((creature: ActorCreature) => void) | undefined;
   /** FR-DICE-100: a reveal the server refused as guarded: ask the DM. */
   onGuarded: (entryId: string) => void;
   color: string | null;
@@ -420,6 +423,7 @@ function Entry({
   const pendingAction = useRef<string | null>(null);
   const [actionRequest, setActionRequest] = useState<string | null>(null);
   const rowEl = (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: only drops a mouse click's focus; nothing for a keyboard to do
     <li
       ref={li}
       data-testid="dice-log-entry"
@@ -439,6 +443,14 @@ function Entry({
       }}
       onDoubleClick={(ev) => {
         if (!onRowControl(ev)) openRollDetails(e.id);
+      }}
+      // FR-DICE-106: a mouse click leaves no focus on the row's text (its ring would stay, or come
+      // back with the browser window); a keyboard's focus never gets here (`detail` 0).
+      onClick={(ev) => {
+        const focused = document.activeElement;
+        if (ev.detail > 0 && !onRowControl(ev) && focused instanceof HTMLElement) {
+          if (ev.currentTarget.contains(focused)) focused.blur();
+        }
       }}
       // FR-KIT-40: one 40-px line, `medallion · what · time · boxes · chips · actions`.
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
@@ -615,6 +627,7 @@ function Entry({
             pendingAction.current = id;
           }}
           onGuarded={onGuarded}
+          openCreature={openCreature}
         />
       </ContextMenuContent>
     </ContextMenu>
@@ -669,10 +682,12 @@ function EntryList({
   entries,
   isDm,
   actions,
+  openCreature,
 }: {
   entries: GameLogEntryView[];
   isDm: boolean;
   actions: readonly EntryAction[];
+  openCreature: ((creature: ActorCreature) => void) | undefined;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -788,6 +803,7 @@ function EntryList({
               focused={focusedId === e.id}
               actions={actions}
               onGuarded={setGuarded}
+              openCreature={openCreature}
             />
           ))}
         </ul>
@@ -1205,14 +1221,17 @@ export function useRollerLooks(): (e: GameLogEntryView) => DiceLook {
 
 /**
  * The `dice.log` window body. `dmTools`: the DM's settings gear (FR-DICE-22). `actions`: the
- * entry-action registry (FR-DICE-68; tests pass their own).
+ * entry-action registry (FR-DICE-68; tests pass their own). `openCreature`: the DM's sheet or stat
+ * block opener for the row menu (FR-DICE-103).
  */
 export function GameLog({
   dmTools,
   actions = entryActions,
+  openCreature,
 }: {
   dmTools?: ReactNode;
   actions?: readonly EntryAction[];
+  openCreature?: (creature: ActorCreature) => void;
 }) {
   const records = useRecords<GameLogEntryView>(GAME_LOG_ENTRY_TYPE);
   const everLive = useSync((s) => s.everLive);
@@ -1242,7 +1261,7 @@ export function GameLog({
           No rolls yet
         </p>
       ) : (
-        <EntryList entries={entries} isDm={isDm} actions={actions} />
+        <EntryList entries={entries} isDm={isDm} actions={actions} openCreature={openCreature} />
       )}
       <RollBar dmTools={isDm ? dmTools : undefined} />
     </section>

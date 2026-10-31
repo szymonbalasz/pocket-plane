@@ -56,9 +56,9 @@ export const diceLogWindowBase = {
 export const diceDetailsWindowBase = {
   kind: DICE_DETAILS_KIND,
   title: "Roll details",
-  defaultSize: (vp: Viewport) => (vp.h >= 800 ? { w: 420, h: 520 } : { w: 420, h: 412 }),
+  defaultSize: { w: 420, h: 300 },
   minSize: { w: 320, h: 240 },
-  usefulSize: { w: 400, h: 360 },
+  usefulSize: { w: 400, h: 280 },
   defaultPosition: { anchor: "top-left", dx: 56 },
   defaultOpen: false,
   restoreOpen: false,

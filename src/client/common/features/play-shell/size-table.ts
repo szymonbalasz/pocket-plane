@@ -100,12 +100,12 @@ const shared: Record<string, SizeRow> = {
     min: s(340, 320),
     criterion: "header + the first 4 fight lines",
   },
-  // FR-DICE-106: Roll details, no launcher; short viewports open it band-high.
+  // FR-DICE-106: Roll details, no launcher; one roll fills it, long content scrolls.
   "dice.details": {
-    default: four(s(420, 412), s(420, 520), s(420, 520), s(420, 520)),
-    useful: all(400, 360),
+    default: all(420, 300),
+    useful: all(400, 280),
     min: s(320, 240),
-    criterion: "a roll's dice and total, or the empty state",
+    criterion: "header, a one-roll equation and the footer, or the empty state",
   },
 };
 

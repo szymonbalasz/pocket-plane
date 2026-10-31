@@ -103,7 +103,7 @@
   },
   {
     "at": "open @1600×900 dice.details",
-    "rect": "540,484,420×404",
+    "rect": "540,608,420×280",
     "placed": "auto",
     "parked": ""
   },
@@ -211,8 +211,8 @@
   },
   {
     "at": "reopen @1600×900 dice.details",
-    "rect": "540,484,420×404",
-    "placed": "reopened",
+    "rect": "540,608,420×280",
+    "placed": "stored",
     "parked": ""
   },
   {
@@ -319,7 +319,7 @@
   },
   {
     "at": "reopen 1440×900 @1440×900 dice.details",
-    "rect": "540,484,420×404",
+    "rect": "540,608,420×280",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
@@ -427,9 +427,9 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 dice.details",
-    "rect": "365,60,420×520",
+    "rect": "848,452,420×300",
     "placed": "reopened",
-    "parked": "ent.statblock"
+    "parked": ""
   },
   {
     "at": "reopen 1280×720 @1280×720 camp.players",
@@ -535,7 +535,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 dice.details",
-    "rect": "404,60,420×412",
+    "rect": "404,196,420×300",
     "placed": "reopened",
     "parked": "ent.statblock"
   },
@@ -655,7 +655,7 @@
   },
   {
     "at": "open @1440×900 dice.details",
-    "rect": "540,484,420×404",
+    "rect": "540,608,420×280",
     "placed": "auto",
     "parked": "cmp.rules"
   },
@@ -763,7 +763,7 @@
   },
   {
     "at": "reopen @1440×900 dice.details",
-    "rect": "540,484,420×404",
+    "rect": "540,608,420×280",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
@@ -871,9 +871,9 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 dice.details",
-    "rect": "365,60,420×520",
+    "rect": "848,452,420×300",
     "placed": "reopened",
-    "parked": "ent.statblock"
+    "parked": ""
   },
   {
     "at": "reopen 1280×720 @1280×720 camp.players",
@@ -979,7 +979,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 dice.details",
-    "rect": "404,60,420×412",
+    "rect": "404,196,420×300",
     "placed": "reopened",
     "parked": "ent.statblock"
   },
@@ -1099,9 +1099,9 @@
   },
   {
     "at": "open @1280×800 dice.details",
-    "rect": "365,60,420×520",
+    "rect": "848,452,420×300",
     "placed": "auto",
-    "parked": "ent.statblock"
+    "parked": ""
   },
   {
     "at": "reopen @1280×800 camp.players",
@@ -1207,9 +1207,9 @@
   },
   {
     "at": "reopen @1280×800 dice.details",
-    "rect": "365,60,420×520",
-    "placed": "reopened",
-    "parked": "ent.statblock"
+    "rect": "848,452,420×300",
+    "placed": "stored",
+    "parked": ""
   },
   {
     "at": "reopen 1280×720 @1280×720 camp.players",
@@ -1315,7 +1315,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 dice.details",
-    "rect": "404,60,420×412",
+    "rect": "404,196,420×300",
     "placed": "reopened",
     "parked": "ent.statblock"
   },
@@ -1435,7 +1435,7 @@
   },
   {
     "at": "open @1280×720 dice.details",
-    "rect": "404,60,420×412",
+    "rect": "404,196,420×300",
     "placed": "auto",
     "parked": "ent.statblock"
   },
@@ -1543,7 +1543,7 @@
   },
   {
     "at": "reopen @1280×720 dice.details",
-    "rect": "404,60,420×412",
+    "rect": "404,196,420×300",
     "placed": "reopened",
     "parked": "ent.statblock"
   },

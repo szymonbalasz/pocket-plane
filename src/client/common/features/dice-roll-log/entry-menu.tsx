@@ -3,7 +3,12 @@
 // of a log pay for nothing else. Registry actions never run here: `onAction` asks the row's own
 // hover button (FR-DICE-105), which owns the confirm and the physical form.
 
-import { COMBATANT_TYPE, type CombatantRecord } from "@shared/combat-tracker/schemas";
+import {
+  COMBATANT_TYPE,
+  type CombatantRecord,
+  ENCOUNTER_TYPE,
+  type EncounterRecord,
+} from "@shared/combat-tracker/schemas";
 import { labelAfterActor } from "@shared/dice-roll-log/actor-label";
 import { baseExpression } from "@shared/dice-roll-log/grammar";
 import { formatEntry } from "@shared/dice-roll-log/line";
@@ -17,7 +22,7 @@ import {
   seenByPlayers,
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
-import { TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
+import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
 import {
   CopyIcon,
   DicesIcon,
@@ -33,32 +38,37 @@ import { toast } from "sonner";
 import { ContextMenuItem, ContextMenuSeparator } from "../../components/ui/context-menu";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
-import { openSheetFor } from "../character-sheet/selection";
-import { CHAR_SHEET_KIND } from "../character-sheet/window";
 import { stageTray, type TrayRequest } from "../dice-extras/store";
-import { useOpenWindow } from "../play-shell/ShellContext";
 import { openRollDetails } from "./details";
 import { actionsFor, type EntryAction } from "./entry-actions";
 import { focusLogEntry } from "./focus";
-import { type ActorCreature, actorCreature } from "./logic";
+import { type ActorCreature, type ActorOption, actorCreature, actorOptions } from "./logic";
 
 /**
  * FR-DICE-104: "Copy to dice tray": a `roll` line of exactly one roll, as the roll bar stages it:
  * the expression as asked (the stored one has adv / dis baked in, FR-DICE-04, and `mode` would
- * apply it twice), mode, category, the label as the line reads it (BL-162). Else null.
+ * apply it twice), mode, category, the label as the line reads it (BL-162), and the actor when its
+ * name is exactly one of this viewer's "roll as" options (`actors`), so a companion's or NPC's
+ * line re-rolls as them. Else the default actor. Not a one-roll `roll` line → null.
  */
-export function trayRequestOf(e: GameLogEntryView): TrayRequest | null {
+export function trayRequestOf(
+  e: GameLogEntryView,
+  actors: readonly ActorOption[] = [],
+): TrayRequest | null {
   if (e.kind !== ROLL_KIND) return null;
   const items = RollEntryPayload.safeParse(e.payload);
   const item = items.success && items.data.length === 1 ? items.data[0] : undefined;
   if (!item) return null;
   const label = item.label ? labelAfterActor(item.label, e.actorName) : "";
+  const named = actors.filter((a) => a.label === e.actorName);
+  const actor = named.length === 1 ? named[0]?.ref : undefined;
   return {
     kind: "free",
     expression: baseExpression(item.expression, item.mode),
     mode: item.mode,
     category: e.category,
     ...(label ? { label } : {}),
+    ...(actor ? { actor } : {}),
   };
 }
 
@@ -75,7 +85,7 @@ export interface EntryMenuItem {
 /**
  * FR-DICE-103: the menu of one line for one viewer, in order. `actions`: the registry's available
  * ones (`actionsFor`). `creature`: the DM's one match of the actor's name, else null. Anything that
- * sends waits for `live`; what copies or shows doesn't.
+ * sends, and the tray (its code may not be loaded yet), waits for `live`; the rest doesn't.
  */
 export function entryMenuItems(o: {
   entry: GameLogEntryView;
@@ -94,7 +104,9 @@ export function entryMenuItems(o: {
     disabled: false,
   });
   const items = [view("details", "Roll details…", InfoIcon)];
-  if (landed && trayRequestOf(e)) items.push(view("tray", "Copy to dice tray", DicesIcon));
+  if (landed && trayRequestOf(e)) {
+    items.push({ ...view("tray", "Copy to dice tray", DicesIcon), disabled: !live });
+  }
   if (landed) items.push(view("copy", "Copy text", CopyIcon));
   if (isDm) {
     const seen = seenByPlayers(e);
@@ -113,7 +125,7 @@ export function entryMenuItems(o: {
     items.push({ ...view("new-roll", "Show new roll", ScrollTextIcon), group: 2 });
   }
   if (isDm && o.creature) {
-    const label = o.creature.kind === "character" ? "Open sheet" : "Open NPC sheet";
+    const label = o.creature.kind === "character" ? "Open sheet" : "Stat block";
     items.push({ ...view("sheet", label, UserIcon), group: 2 });
   }
   return items;
@@ -157,11 +169,14 @@ export function EntryMenuItems({
   actions,
   onAction,
   onGuarded,
+  openCreature,
 }: {
   e: GameLogEntryView;
   isDm: boolean;
   landed: boolean;
   actions: readonly EntryAction[];
+  /** FR-DICE-103: the DM's window opens a sheet or stat block (the opener lives in its bundle). */
+  openCreature: ((creature: ActorCreature) => void) | undefined;
   /** FR-DICE-105: run this registry action through the row's own button, once the menu closed. */
   onAction: (actionId: string) => void;
   onGuarded: (entryId: string) => void;
@@ -169,7 +184,6 @@ export function EntryMenuItems({
   const live = useSync((s) => s.state === "live");
   const store = useSync((s) => s.store);
   const connection = useSync((s) => s.connection);
-  const open = useOpenWindow();
   const entities = useRecords<EntityRecord>(ENTITY_TYPE);
   const combatants = useRecords<CombatantRecord>(COMBATANT_TYPE);
   const tokens = useRecords<TokenView>(TOKEN_TYPE);
@@ -177,14 +191,24 @@ export function EntryMenuItems({
     () => (isDm ? actorCreature(e.actorName, { entities, combatants, tokens }) : null),
     [isDm, e.actorName, entities, combatants, tokens],
   );
+  const scenes = useRecords<SceneView>(SCENE_TYPE);
+  const encounters = useRecords<EncounterRecord>(ENCOUNTER_TYPE);
   const shown = useMemo(() => actionsFor(actions, store, e), [actions, store, e]);
-  const items = entryMenuItems({ entry: e, isDm, live, landed, actions: shown, creature });
+  const items = entryMenuItems({
+    entry: e,
+    isDm,
+    live,
+    landed,
+    actions: shown,
+    creature: openCreature ? creature : null,
+  });
   const run = (value: string) => {
     switch (value) {
       case "details":
         return openRollDetails(e.id);
       case "tray": {
-        const request = trayRequestOf(e);
+        const actors = actorOptions(store.you, entities, scenes, tokens, encounters, combatants);
+        const request = trayRequestOf(e, actors);
         return request ? stageTray(request) : undefined;
       }
       case "copy":
@@ -195,9 +219,7 @@ export function EntryMenuItems({
       case "new-roll":
         return e.supersededBy ? focusLogEntry(e.supersededBy) : undefined;
       case "sheet":
-        if (!creature) return;
-        openSheetFor(creature.id, creature.kind);
-        return open(CHAR_SHEET_KIND);
+        return creature ? openCreature?.(creature) : undefined;
       default:
         return onAction(value);
     }

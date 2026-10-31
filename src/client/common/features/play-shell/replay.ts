@@ -104,14 +104,7 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
     {
       name: "P3",
       viewer: "player-2",
-      kinds: [
-        "char.sheet",
-        "cbt.initiative",
-        "dice.log",
-        "stats.board",
-        "party.board",
-        "dice.details",
-      ], // PM2; FR-DICE-106
+      kinds: ["char.sheet", "cbt.initiative", "dice.log", "stats.board", "party.board"], // PM2
     },
   ],
 };
