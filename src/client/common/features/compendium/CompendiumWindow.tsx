@@ -13,8 +13,22 @@ import {
   type DefinitionDragData,
   ImportedEntityRecord,
 } from "@shared/entities/schemas";
-import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, FilterIcon } from "lucide-react";
-import { type DragEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import {
+  ArrowLeftIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  FilterIcon,
+  SquareArrowOutUpRightIcon,
+} from "lucide-react";
+import {
+  type DragEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { toast } from "sonner";
 import type { Api } from "../../api";
 import { Button } from "../../components/ui/button";
@@ -32,6 +46,7 @@ import { SearchInput } from "../../components/ui/search-input";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
+import { useOpenWindow } from "../play-shell/ShellContext";
 import { CreditsLink } from "./credits";
 import { useDefinitions } from "./definitions";
 import {
@@ -45,6 +60,7 @@ import {
 import {
   activeFilterCount,
   badgeLabel,
+  CMP_ENTRY_KIND,
   type CmpTab,
   emptyText,
   FILTER_FIELDS,
@@ -59,7 +75,6 @@ import {
 } from "./logic";
 import {
   backToList,
-  type CmpView,
   openDefinition,
   openEntry,
   setFilters,
@@ -68,6 +83,7 @@ import {
   toggleGroup,
   useCmpNav,
 } from "./nav";
+import { type PopoutTarget, popoutInstance, setPopoutName, usePopoutTarget } from "./popout";
 import { eagerApi } from "./search";
 import { Attribution, DragHandle, EntryView, StatBlock } from "./views";
 
@@ -452,15 +468,25 @@ function ResultsList({ api, viewer }: { api: Api; viewer: Role }) {
   );
 }
 
+/** FR-CMP-76: tells a popped-out window the name it shows, once it is known. */
+function useReportName(name: string | null | undefined, onName?: (name: string) => void) {
+  useEffect(() => {
+    if (name) onName?.(name);
+  }, [name, onName]);
+}
+
 function EntryReadView({
   read,
   viewer,
   actions,
+  onName,
 }: {
   read: EntryRead;
   viewer: Role;
   actions?: EntryActions;
+  onName?: (name: string) => void;
 }) {
+  useReportName(read.state === "ready" ? read.data.entry.name : null, onName);
   if (read.state === "loading") {
     return (
       <div className="space-y-2" data-testid="cmp-entry-loading">
@@ -484,14 +510,23 @@ function EntryById({
   id,
   viewer,
   actions,
+  onName,
 }: {
   api: Api;
   id: string;
   viewer: Role;
   actions?: EntryActions;
+  onName?: (name: string) => void;
 }) {
   const nonce = useCmpNav((s) => s.entryNonce);
-  return <EntryReadView read={useEntry(api, id, nonce)} viewer={viewer} actions={actions} />;
+  return (
+    <EntryReadView
+      read={useEntry(api, id, nonce)}
+      viewer={viewer}
+      actions={actions}
+      {...(onName && { onName })}
+    />
+  );
 }
 
 /**
@@ -503,17 +538,20 @@ function DefinitionView({
   definitionId,
   viewer,
   actions,
+  onName,
 }: {
   api: Api;
   definitionId: string;
   viewer: Role;
   actions?: EntryActions;
+  onName?: (name: string) => void;
 }) {
   const defs = useDefinitions(useMemo(() => [definitionId], [definitionId]));
   const raw = defs.byId.get(definitionId);
   const def = raw ? ImportedEntityRecord.safeParse(raw) : null;
   const name = def?.success ? def.data.name : null;
   const found = useDefinitionEntry(api, definitionId, name);
+  useReportName(name, onName);
   if (defs.state === "error") {
     return (
       <p className="text-sm text-muted-foreground" data-testid="cmp-entry-error">
@@ -563,6 +601,57 @@ function DefinitionView({
   );
 }
 
+function EntryTarget({
+  api,
+  view,
+  viewer,
+  actions,
+  onName,
+}: {
+  api: Api;
+  view: PopoutTarget;
+  viewer: Role;
+  actions?: EntryActions;
+  onName?: (name: string) => void;
+}) {
+  const named = onName && { onName };
+  return view.mode === "entry" ? (
+    <EntryById api={api} id={view.entryId} viewer={viewer} actions={actions} {...named} />
+  ) : (
+    <DefinitionView
+      api={api}
+      definitionId={view.definitionId}
+      viewer={viewer}
+      actions={actions}
+      {...named}
+    />
+  );
+}
+
+/**
+ * FR-CMP-76: the entry moves to a window of its own, and this one goes back to the list, so the
+ * next entry is one click away.
+ */
+function PopOutButton({ view }: { view: PopoutTarget }) {
+  const openWindow = useOpenWindow();
+  return (
+    <Tip content="Open in its own window">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2"
+        data-testid="cmp-popout"
+        onClick={() => {
+          openWindow(CMP_ENTRY_KIND, popoutInstance(view), { by: "user" });
+          backToList();
+        }}
+      >
+        <SquareArrowOutUpRightIcon className="size-3.5" /> Pop out
+      </Button>
+    </Tip>
+  );
+}
+
 function EntryPane({
   api,
   view,
@@ -570,13 +659,13 @@ function EntryPane({
   actions,
 }: {
   api: Api;
-  view: Exclude<CmpView, { mode: "list" }>;
+  view: PopoutTarget;
   viewer: Role;
   actions?: EntryActions;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center border-b px-1 py-1">
+      <div className="flex items-center justify-between border-b px-1 py-1">
         <Button
           variant="ghost"
           size="sm"
@@ -586,19 +675,33 @@ function EntryPane({
         >
           <ArrowLeftIcon className="size-4" /> Back
         </Button>
+        <PopOutButton view={view} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {view.mode === "entry" ? (
-          <EntryById api={api} id={view.entryId} viewer={viewer} actions={actions} />
-        ) : (
-          <DefinitionView
-            api={api}
-            definitionId={view.definitionId}
-            viewer={viewer}
-            actions={actions}
-          />
-        )}
+        <EntryTarget api={api} view={view} viewer={viewer} actions={actions} />
       </div>
+    </div>
+  );
+}
+
+/** `cmp.entry` body (FR-CMP-76): one popped-out entry, as the Compendium shows it. */
+export function CompendiumEntryBody({
+  api,
+  viewer,
+  instance,
+  entryActions,
+}: {
+  api: Api;
+  viewer: Role;
+  instance: string;
+  entryActions?: EntryActions;
+}) {
+  const target = usePopoutTarget(instance);
+  const onName = useCallback((name: string) => setPopoutName(instance, name), [instance]);
+  if (!target) return null;
+  return (
+    <div data-testid="cmp-popout-window" data-record-id={instance} data-view={target.mode}>
+      <EntryTarget api={api} view={target} viewer={viewer} actions={entryActions} onName={onName} />
     </div>
   );
 }
