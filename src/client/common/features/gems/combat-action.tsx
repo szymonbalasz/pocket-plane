@@ -153,7 +153,7 @@ function CombatGemPicker({ card, close }: { card: NotificationRecord; close(): v
       {rows.map(({ part, total, texts, entered, values }) => (
         <div key={String(part.part)} className="flex flex-wrap items-center gap-1">
           {multi && part.type && (
-            <span className="w-14 truncate text-xs text-muted-foreground">{part.type}</span>
+            <span className="min-w-14 text-xs text-muted-foreground">{part.type}</span>
           )}
           {total && !(entered && "values" in entered) ? (
             <>
