@@ -21,6 +21,7 @@ import * as sceneTools from "./scene-tools";
 import * as scenesMap from "./scenes-map";
 import * as spellFx from "./spell-fx";
 import * as strongholds from "./strongholds";
+import * as tokenMirrors from "./token-mirrors";
 import { type DomainEventDef, isDomainEventDef } from "./types";
 
 export type { DomainEventDef } from "./types";
@@ -57,6 +58,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   // reminders + strongholds (fix/rs-core).
   ...Object.values<unknown>(reminders).filter(isDomainEventDef),
   ...Object.values<unknown>(strongholds).filter(isDomainEventDef),
+  // token-mirrors (build/token-mirrors).
+  ...Object.values<unknown>(tokenMirrors).filter(isDomainEventDef),
   // spell-fx (fix/vfx-core).
   ...Object.values<unknown>(spellFx).filter(isDomainEventDef),
   // overview scenes (fix/ovw-core).

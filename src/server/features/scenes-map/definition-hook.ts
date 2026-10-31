@@ -15,6 +15,7 @@ import { token } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import type { HookEnv } from "../entities/definition-hooks";
+import { syncMirrors } from "../token-mirrors/sync";
 import { characterIdOf } from "./character-copy";
 import { readToken, toTokenRecord } from "./rows";
 import { runTokenChangedHooks } from "./token-hooks";
@@ -81,6 +82,7 @@ export function refreshTokenCopies(
       changes.push(
         ...rederiveDependants(env, { type: TOKEN_TYPE, id: t.id, before: t, after: next }),
       );
+    changes.push(...syncMirrors(env, t, next));
     if (tokenHiddenForPlayers(t) !== tokenHiddenForPlayers(next)) {
       hookChanges.push(...runTokenChangedHooks(env, t, next));
     }

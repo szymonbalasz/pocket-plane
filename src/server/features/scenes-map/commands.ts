@@ -74,6 +74,7 @@ import { requireAsset } from "../assets-pipeline/commands";
 import { importedArtOfDefinition } from "../compendium/imported-art-lookup";
 import { resolveDefinition } from "../entities/commands";
 import { getOverview } from "../overview-scenes/rows";
+import { copyMirrors } from "../token-mirrors/copy";
 import { characterIdOf } from "./character-copy";
 import { entriesIn, nextPosition, placeEntries } from "./list-order";
 import { tokenMoveGuards } from "./move-guards";
@@ -297,8 +298,10 @@ export const duplicateScene = defineCommand({
       sceneChange(null, copy),
       ...lifecycleHooks.duplicated({ tx, ctx, actor }, src, copy),
     ];
+    const tokenIds = new Map<string, string>();
     for (const t of tokens) {
       const tid = ctx.ids.next();
+      tokenIds.set(t.id, tid);
       const { seq: _s, ...fields } = t;
       tx.insert(token)
         .values({
@@ -315,6 +318,7 @@ export const duplicateScene = defineCommand({
         .run();
       changes.push(tokenChange(null, readToken(tx, tid)));
     }
+    changes.push(...copyMirrors({ tx, ctx }, src.id, id, tokenIds));
     // FR-FOG-35 (#216): the copy re-derives once its tokens are copied; rows fold into creates.
     for (const d of rederiveDependants({ tx, ctx, actor }, sceneChange(null, copy))) {
       const c = changes.find((x) => x.type === d.type && x.id === d.id);

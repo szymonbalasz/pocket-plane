@@ -3,12 +3,12 @@ import { z } from "zod";
 import { DroppedTag } from "./tags";
 
 /** FR-ASSET-02 (OQ-ASSET-06, proposed): request body limit. */
-export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 /** FR-ASSET-02: pixel limit, read from the header before decoding. */
-export const MAX_PIXELS = 50_000_000;
+export const MAX_PIXELS = 100_000_000;
 /** FR-ASSET-05 (OQ-ASSET-03): long-edge limits of the derivatives. */
 export const THUMB_EDGE = 512;
-export const DISPLAY_EDGE = 4096;
+export const DISPLAY_EDGE = 8192;
 /** FR-ASSET-08: name length. */
 export const MAX_NAME_LENGTH = 80;
 

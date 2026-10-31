@@ -13,7 +13,7 @@ export const ATTACH_TYPES: readonly string[] = [
 ];
 
 export const UNSUPPORTED = "Unsupported file type";
-export const TOO_LARGE = "File over 25 MB";
+export const TOO_LARGE = "File over 100 MB";
 
 export function precheck(file: { type: string; size: number }): string | null {
   if (!ATTACH_TYPES.includes(file.type)) return UNSUPPORTED;

@@ -138,6 +138,29 @@ describe("a teleport in combat (FR-MAP-123)", () => {
     expect(moved()).toBe(start + 5);
     t.close();
   });
+
+  test("FR-MAP-123 leaves no trail: it clears the walked one, and the next step starts afresh", async () => {
+    const t = await table();
+    const m = t.token("Mira");
+    const trail = () =>
+      (t.dm.store.records.token?.[m.id] as TokenRecord | undefined)?.trail?.cells ?? null;
+    const walked = { col: m.col + 1, row: m.row };
+    const landing = { col: m.col + 6, row: m.row };
+    const next = { col: m.col + 7, row: m.row };
+    await ok(t.dm, I.moveToken, { tokenId: m.id, ...walked });
+    await barrier(t.dm);
+    expect(trail()?.at(-1)).toEqual([walked.col, walked.row]);
+    await ok(t.dm, I.teleportToken, { tokenId: m.id, ...landing });
+    await barrier(t.dm);
+    expect(trail()).toBeNull();
+    await ok(t.dm, I.moveToken, { tokenId: m.id, ...next });
+    await barrier(t.dm);
+    expect(trail()).toEqual([
+      [landing.col, landing.row],
+      [next.col, next.row],
+    ]);
+    t.close();
+  });
 });
 
 describe("vfx.poof routing (FR-MAP-122)", () => {

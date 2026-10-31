@@ -24,14 +24,14 @@ describe("picker upload outcomes (FR-ASSET-17)", () => {
   });
 
   test("FR-ASSET-17 413 / 415 / 422 / other → inline error naming the cause", () => {
-    expect(uploadErrorMessage(413, null)).toBe("File over 25 MB");
+    expect(uploadErrorMessage(413, null)).toBe("File over 100 MB");
     expect(uploadErrorMessage(415, { code: "invalid", message: "x" })).toBe(
       "Unsupported file type",
     );
-    expect(uploadErrorMessage(422, { code: "invalid", message: "Image over 50 megapixels" })).toBe(
-      "Image over 50 megapixels",
+    expect(uploadErrorMessage(422, { code: "invalid", message: "Image over 100 megapixels" })).toBe(
+      "Image over 100 megapixels",
     );
-    expect(uploadErrorMessage(422, null)).toBe("Image over 50 megapixels");
+    expect(uploadErrorMessage(422, null)).toBe("Image over 100 megapixels");
     expect(uploadErrorMessage(500, null)).toBe("Upload failed, try again");
     expect(uploadErrorMessage(409, null)).toBe("Upload failed, try again");
     expect(outcomeOf(401, null)).toEqual({ kind: "unauthorized" });

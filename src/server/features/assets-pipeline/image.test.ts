@@ -3,6 +3,7 @@ import { deflateSync } from "node:zlib";
 import {
   AssetName,
   type AssetRecord,
+  DISPLAY_EDGE,
   nameFromFilename,
   pickerOrder,
 } from "@shared/assets-pipeline/schemas";
@@ -131,9 +132,9 @@ describe("SVG size rules (FR-ASSET-02)", () => {
   });
 
   test("FR-ASSET-02 SVG megapixels come from the attributes, before rasterising", async () => {
-    const r = await rejects(processImage(svg('width="10000" height="6000"')));
+    const r = await rejects(processImage(svg('width="20000" height="6000"')));
     expect(r.status).toBe(422);
-    expect(r.message).toBe("Image over 50 megapixels");
+    expect(r.message).toBe("Image over 100 megapixels");
   });
 
   test("FR-ASSET-02 SVG is rasterised at intrinsic size and stored as PNG", async () => {
@@ -163,12 +164,13 @@ describe("size maths and derivatives (FR-ASSET-05)", () => {
   test("FR-ASSET-05 fitWithin never upscales and keeps aspect", () => {
     expect(fitWithin(300, 200, 512)).toEqual({ width: 300, height: 200 });
     expect(fitWithin(6000, 4000, 4096)).toEqual({ width: 4096, height: 2731 });
+    expect(fitWithin(12000, 8000, DISPLAY_EDGE)).toEqual({ width: 8192, height: 5461 });
     expect(fitWithin(6000, 4000, 512)).toEqual({ width: 512, height: 341 });
     expect(fitWithin(980, 1400, 512)).toEqual({ width: 358, height: 512 });
     expect(fitWithin(10000, 1, 512)).toEqual({ width: 512, height: 1 });
   });
 
-  test("FR-ASSET-05 thumb ≤ 512 and display ≤ 4096 WebP; small images not upscaled", async () => {
+  test("FR-ASSET-05 thumb ≤ 512 and display ≤ 8192 WebP; small images not upscaled", async () => {
     const big = await processImage(await png(1400, 980));
     expect(sniffFormat(big.thumb.data)).toBe("webp");
     expect(sniffFormat(big.display.data)).toBe("webp");
@@ -216,10 +218,10 @@ describe("size maths and derivatives (FR-ASSET-05)", () => {
 });
 
 describe("limits (FR-ASSET-02)", () => {
-  test("FR-ASSET-02 > 50 MP from the header is 422 before pixel decode", async () => {
-    const r = await rejects(processImage(pngHeader(10_000, 6_000)));
+  test("FR-ASSET-02 > 100 MP from the header is 422 before pixel decode", async () => {
+    const r = await rejects(processImage(pngHeader(20_000, 6_000)));
     expect(r.status).toBe(422);
-    expect(r.message).toBe("Image over 50 megapixels");
+    expect(r.message).toBe("Image over 100 megapixels");
   });
 
   test("FR-ASSET-02 corrupt image is 422", async () => {

@@ -128,6 +128,7 @@ describe("FR-SCN-51 contextMenu hook", () => {
     expect(canvasLayers.filter((l) => l.contextMenu).map((l) => l.id)).toEqual([
       "scn-templates",
       "vfx-under",
+      "mirrors",
     ]);
   });
 });

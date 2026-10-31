@@ -43,6 +43,9 @@ import { toneColor } from "./tone";
 
 const INSET = TOKEN_INSET;
 
+/** What the art needs (a token, or a mirror's copy of one, FR-MIR-08). */
+type BodyToken = Pick<TokenView, "shape" | "creatureType" | "name">;
+
 /** Backdrop per shape: a disc (round) or a rounded square inset like the outline. */
 function Backdrop({
   kind,
@@ -70,7 +73,7 @@ function Backdrop({
 }
 
 /** FR-ENT-28: the type's glyph (white, ≈ 65 % of the footprint) on its colour per shape. */
-function CreatureArt({ t, side, type }: { t: TokenView; side: number; type: CreatureType }) {
+function CreatureArt({ t, side, type }: { t: BodyToken; side: number; type: CreatureType }) {
   const { colors } = useCanvas();
   const glyph = CREATURE_ART[type];
   const box = glyphRect(side);
@@ -97,12 +100,12 @@ function CreatureArt({ t, side, type }: { t: TokenView; side: number; type: Crea
 }
 
 /** Token art per shape (FR-MAP-35); creature-type art or initials when there is no image (yet). */
-function TokenBody({
+export function TokenBody({
   t,
   side,
   image,
 }: {
-  t: TokenView;
+  t: BodyToken;
   side: number;
   image: HTMLImageElement | null;
 }) {

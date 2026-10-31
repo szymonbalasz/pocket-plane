@@ -1,5 +1,5 @@
 // Canvas layer registry core (FR-MAP-29, FR-SCN-02/03): an ordered list, map 0 < grid 10 <
-// scn-props 20 < scn-structure 26 < fog 30 < scn-templates 35 < vfx-under 38 < tokens 40 < vfx-over
+// scn-props 20 < scn-structure 26 < fog 30 < scn-templates 35 < vfx-under 38 < mirrors 39 < tokens 40 < vfx-over
 // 43 < labels 45 < scn-template-labels 47 < scn-edit 48 < pointers 50. Later features add layers at their slots without touching scene or token code.
 // Sprint 4 (BL-07): every entry is a Konva Group (named by its id) inside one of four Konva layers
 // (`map-layer-<base|fog|objects|top>`), picked by its `layer` key. DOM-free so it runs under
@@ -18,6 +18,8 @@ export const LAYER_ORDER = {
   scnTemplates: 35,
   /** spell-fx under pass: auras below tokens (FR-VFX-13). */
   vfxUnder: 38,
+  /** Token mirrors, under the tokens they copy (FR-MIR-15). */
+  mirrors: 39,
   tokens: 40,
   /** spell-fx over pass: auras and hit looks above tokens, below labels (FR-VFX-13). */
   vfxOver: 43,
