@@ -477,7 +477,7 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 | 11 | B: Copy text on a line, paste | The row's full line on one line |
 | 12 | B: Perception → Inspiration: reroll in the menu | Menu closes, "Spend Inspiration? ✓ ✗" on the row; ✓ rolls; with Physical dice on, ✓ opens the form on the row |
 | 13 | A: hide the new line of step 12 | Both lines of the chain go for B and C; the `gem.spend` line stays until A hides it on its own |
-| 14 | A: right-click "Goblin 2", "Scarface", "Fire Elemental 3" (global definitions); a line by a name reaching two definitions (Goblin, Wolf); a character's line | Stat block opens that creature; absent; Open sheet |
+| 14 | A: right-click "Goblin 2", "Scarface", "Fire Elemental 3" (global definitions); "Wolf", "Goblin" (the campaign holds two definitions of each, but the tokens and combatants of that name use one); a character's line | Stat block opens that creature; the same, the one its tokens use; Open sheet. A name whose tokens or combatants reach two definitions has no item (unit `FR-DICE-103 actor lookup`) |
 | 15 | A: drop the connection, right-click a row | Hide, actions and Copy to dice tray disabled; details and Copy text work |
 | 16 | A: Roll details on "Mira attacks Goblin 2" with a DM-set to-hit; A reveals it, B opens it | A: 15, `Set by DM`, `Rolled 13`, no sum. B: 15 alone, no die, no "+ 4", no word about the DM setting it |
 | 17 | A, B: Copy to dice tray on a companion's / NPC's line, then Roll | The new line is by that actor; a line whose name isn't in the viewer's list rolls as the default |
