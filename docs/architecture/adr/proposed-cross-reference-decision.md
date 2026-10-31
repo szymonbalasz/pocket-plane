@@ -12,8 +12,8 @@
 
 | Option | Pros | Cons |
 |---|---|---|
-| A. Explicit relations table | Queryable, typed | No links inside prose; rigid while writing |
-| B. Inline references only | Natural writing | Backlinks need an index anyway; untyped |
+| A. Explicit relations table | Queryable, typed | No links inside prose, which is what the sprint asks for: recorded from ADR-0011, not on the gate |
+| B. Inline references only, backlinks by scanning bodies | Natural writing; no table | Every backlink, flip and dead-link check scans bodies; typed relations need a table later |
 | **C. Both: inline links indexed as untyped mentions (`note_link`); typed relations added later as a nullable `relType`** | One query surface; backlinks trivial; graph possible later | Index kept in step (one transaction with the save); **only the mention half is built now** |
 
 ## 2. Link target (OQ-NOTES-02)
@@ -55,15 +55,17 @@ Player 1 may see Duke Varen; Player 2 may not. Burnt Ledger was deleted. Elite G
 | A | Tightest: only DM-typed plain prose ever shows | Prose stutters; aliases do nothing for players |
 | C | No sign anything is hidden | Broken sentences |
 
-**Mechanism, any option:** the player-visible text is compiled once at save and never depends on another note's state. A link reaches a player as a span over that text only if they may see its target. No span = no ID, no title, no marker. So the frame holds no more than the screen.
+**Mechanism, any option:** the player-visible text is compiled once at save and never depends on another note's state. A link reaches a player as a span over that text only if they may see its target. No span = no ID, no title, no marker. Compile also strips Markdown link targets and refuses malformed `[[` tokens, so the frame holds no more than the screen.
+
+**Also:** a player's frames for a hide and a delete are byte-identical apart from `seq`, so a deleted note can't be told from a hidden one over the wire either.
 
 ## 5. Other link targets (OQ-NOTES-05)
 
 | Option | Pros | Cons |
 |---|---|---|
-| **Yes: compendium entries, characters and creatures by ID, shown only if the reader may read the target** (compendium: `entryVisibleTo`; character: name, per ADR-0024; creature: never to players) | "See Fireball" just works; no copies | Each kind's rule to keep and test |
-| Notes only for now | Smallest | The DM's most common outside link is missing |
-| Compendium through a campaign clone only | One target kind | Needless copies of read-only entries |
+| **Yes: compendium entries, characters and creatures by ID, shown only if the reader may read the target** (compendium: `entryVisibleTo`; character: name, per ADR-0024; creature: never to players) | "See Fireball" and "see Elite Goblin" just work; no copies | Each kind's rule to keep and test; a new compendium entry hook and an entity-delete hook so a change reaches open notes live |
+| Notes + compendium only | One new hook, public names | No links to the DM's own creatures or the party |
+| Notes only for now | Smallest | The most common outside link is missing |
 
 ## Consequences (if the picks hold)
 

@@ -13,7 +13,7 @@ The server compares `schema.ts` with the live DB at every start. Would an FTS5 t
 |---|---|
 | Empty FTS5 table beside an unchanged schema | 6 tables seen (`note_fts` + 5 shadow). 6 `DROP TABLE`; `hasDataLoss = true`, because shadow tables hold rows even with no documents |
 | Populated | Same, more warnings |
-| FTS5 + a new table in `schema.ts` | drizzle-kit asks whether it's a rename → `Interactive prompts require a TTY` (the crash BL-172 covers) |
+| FTS5 + a new table in `schema.ts` | drizzle-kit asks whether it's a rename → `Interactive prompts require a TTY`. Since the upgrade guards merged (#424), `renameQuestions` refuses first, with a clear message: it lists every `table` row in `sqlite_master`, so the FTS5 tables count as old tables (read in `push.ts`, not re-probed) |
 | External-content FTS5 with a trigger | 5 `DROP TABLE`, `hasDataLoss = true` |
 | The drops applied anyway | Fails: `no such table: note_fts_data` (dropping the virtual table already removed it) |
 | FTS5 in an `ATTACH`ed file | Push sees nothing: 0 statements, no loss; queries work |
@@ -25,7 +25,8 @@ The server compares `schema.ts` with the live DB at every start. Would an FTS5 t
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. No virtual tables in the main DB while push runs; search with the shared matcher in server memory** | No schema risk; same results as compendium and pickers; incremental per note; no corpus statistics | Cold start on first search (235 ms at 2,000 × 2,000 chars); no stemming beyond the plural rule |
+| **A. No virtual tables in the main DB while push runs; search with the shared matcher in server memory** | No schema risk; same results as compendium and pickers; incremental per note, filled per viewer's visible set, so a player can't time hidden notes; no corpus statistics | First-search fill (DM: 235 ms at 2,000 × 2,000 chars); no stemming beyond the plural rule |
+| A2. Same rule, with a plain `note_word` table instead of memory | No cold start; survives push (ordinary table); filter by join | Roughly 600,000 rows at the cap (an estimate); each save rewrites its rows; backups and digest grow; `searchTier`'s tiers to redo in SQL |
 | B. FTS5 in an attached sidecar file | Real FTS; survives push | A second DB file for backup, reset, digest, Windows locks; a different matcher; BM25 ranking could reflect hidden notes unless filtered per viewer |
 | C. Teach `push.ts` to ignore virtual tables and shadows | FTS5 in one file | Shared-core change on the path every real upgrade takes; the rename prompt returns with each later table; the guard must parse `sqlite_master` |
 
