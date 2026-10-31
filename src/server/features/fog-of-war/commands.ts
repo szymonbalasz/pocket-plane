@@ -89,6 +89,7 @@ import type { Logger } from "../../log";
 import { campaignOf, getScene, getToken, readToken } from "../scenes-map/rows";
 import { runTokenChangedHooks } from "../scenes-map/token-hooks";
 import { deriveSceneObject, tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
+import { syncMirrors } from "../token-mirrors/sync";
 import { readFogRow } from "./hooks";
 import { markScenesStale, mergeChanges, rederiveScene } from "./rederive";
 import { dmFogRecord, readFogRecord, type ServerFogRecord, sceneExploredRecords } from "./rows";
@@ -608,6 +609,8 @@ export function fogCommands(log: Logger) {
         tokenHiddenForPlayers(before) !== tokenHiddenForPlayers(after)
           ? runTokenChangedHooks(env, before, after)
           : [];
+      // FR-MIR-09: an Invisible token's mirrors stop showing (no-op if the hooks above did it).
+      hookChanges.push(...syncMirrors(env, before, after));
       env.emit({
         type: TokenInvisibleSet.type,
         campaignId: cid,

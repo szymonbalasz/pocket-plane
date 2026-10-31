@@ -32,8 +32,9 @@ import {
   SCENE_PROP_TYPE,
   SCENE_STRUCTURE_TYPE,
 } from "@shared/scene-tools/schemas";
-import { footprint } from "@shared/scenes-map/geometry";
+import { footprint, overlapsMap } from "@shared/scenes-map/geometry";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { TOKEN_MIRROR_TYPE } from "@shared/token-mirrors/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   aoeTemplate,
@@ -43,6 +44,7 @@ import {
   sceneFog,
   sceneStructure,
   token,
+  tokenMirror,
 } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import {
@@ -56,6 +58,7 @@ import {
 import { readScene, readToken, sceneTokens } from "../scenes-map/rows";
 import { runTokenChangedHooks } from "../scenes-map/token-hooks";
 import { type SceneHookEnv, tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
+import { readMirror, sceneMirrors } from "../token-mirrors/rows";
 import {
   campaignPlayers,
   darknessSeenBy,
@@ -143,6 +146,47 @@ function rederiveProps(env: SceneHookEnv, st: SceneStatic, now: string, o: Reder
       .where(eq(prop.id, p.id))
       .run();
     changes.push({ type: SCENE_PROP_TYPE, id: p.id, before: p, after: readProp(env.tx, p.id) });
+  }
+  return changes;
+}
+
+/**
+ * FR-MIR-06, -09: a mirror is a fog subject at its own cells, whatever its token's copies say; a
+ * map change can also take it off the map.
+ */
+function rederiveMirrors(env: SceneHookEnv, st: SceneStatic, now: string, o: RederiveOptions) {
+  const rows = sceneMirrors(env.tx, st.sceneId);
+  if (rows.length === 0) return [];
+  const s = readScene(env.tx, st.sceneId);
+  const sources = new Map(sceneTokens(env.tx, st.sceneId).map((t) => [t.id, t]));
+  const changes: RecordChange[] = [];
+  for (const m of rows) {
+    const n = footprint(m.size);
+    const c = subjectCopies(st, {
+      type: TOKEN_MIRROR_TYPE,
+      sceneId: st.sceneId,
+      cells: { col: m.col, row: m.row, w: n, h: n },
+    });
+    const src = sources.get(m.tokenId);
+    const suppressed =
+      src === undefined ||
+      src.hidden ||
+      src.invisible === true ||
+      !overlapsMap(s, m.col, m.row, m.size);
+    const foggedFlip = c.fogged !== m.fogged;
+    if (!foggedFlip && suppressed === m.suppressed && sameSeenBy(m.seenBy, c.seenBy)) continue;
+    const set = o.migration ? {} : { updatedAt: now };
+    env.tx
+      .update(tokenMirror)
+      .set({ fogged: c.fogged, seenBy: c.seenBy, suppressed, ...set })
+      .where(eq(tokenMirror.id, m.id))
+      .run();
+    changes.push({
+      type: TOKEN_MIRROR_TYPE,
+      id: m.id,
+      before: m,
+      after: readMirror(env.tx, m.id),
+    });
   }
   return changes;
 }
@@ -416,6 +460,7 @@ export function rederiveScene(
     ...memory,
     ...tokens.changes,
     ...rederiveProps(env, st, now, o),
+    ...rederiveMirrors(env, st, now, o),
     ...rederiveTemplates(env, st, now, o),
     ...rederiveDoors(env, st, now, o),
     ...tokens.hookChanges,

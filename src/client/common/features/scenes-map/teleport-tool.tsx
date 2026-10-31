@@ -3,8 +3,10 @@
 // on the pressed cell, as a drop) and goes back to the tool in use before. Its own cell or off the
 // map: keeps picking. Esc, Cancel, leaving `live` or another scene drop the pick. Space and the
 // middle mouse still pan (FR-SCN-06). Which token sits on the cell doesn't matter: the DM decides.
+// The same pick places a token's mirror (`mirror`, FR-MIR-01): `mir.create` instead of the jump.
 import { overlapsMap } from "@shared/scenes-map/geometry";
 import { MAP_INTENTS, type TokenRecord, type TokenView } from "@shared/scenes-map/schemas";
+import { MIR_INTENTS } from "@shared/token-mirrors/schemas";
 import { WandSparklesIcon } from "lucide-react";
 import { create } from "zustand";
 import { Button } from "../../components/ui/button";
@@ -23,23 +25,29 @@ interface TeleportPick {
   returnTo: string;
   /** The cell under the pointer (the target footprint's top-left), if a valid one. */
   hover: { col: number; row: number } | null;
+  /** FR-MIR-01: the click places a mirror of the token instead of moving it. */
+  mirror: boolean;
 }
 
-const IDLE: TeleportPick = { token: null, returnTo: "select", hover: null };
+const IDLE: TeleportPick = { token: null, returnTo: "select", hover: null, mirror: false };
 
 export const useTeleportPick = create<TeleportPick>(() => IDLE);
 
 /** The token menu entry: starts picking a cell for `token`. */
-export function startTeleport(token: PickToken): void {
+export function startTeleport(token: PickToken, mirror = false): void {
   const { tool, setTool } = useMapTool.getState();
   const { returnTo } = useTeleportPick.getState();
   useTeleportPick.setState({
     token,
     returnTo: tool === TELEPORT_TOOL_ID ? returnTo : tool,
     hover: null,
+    mirror,
   });
   setTool(TELEPORT_TOOL_ID);
 }
+
+/** The token menu's Mirror entry (FR-MIR-01). */
+export const startMirrorPick = (token: PickToken): void => startTeleport(token, true);
 
 /** Ends the pick and returns to the previous tool. */
 export function endTeleport(): void {
@@ -62,14 +70,20 @@ export function teleportTarget(
 
 function TeleportPanel() {
   const name = useTeleportPick((s) => s.token?.name);
+  const mirror = useTeleportPick((s) => s.mirror);
   if (name === undefined) return null;
   return (
-    <div data-testid="map-teleport-panel" className="flex items-center gap-2 text-sm">
-      <span className="max-w-64 truncate">Teleport {name}: click a cell</span>
+    <div
+      data-testid={mirror ? "mir-pick-panel" : "map-teleport-panel"}
+      className="flex items-center gap-2 text-sm"
+    >
+      <span className="max-w-64 truncate">
+        {mirror ? "Mirror" : "Teleport"} {name}: click a cell
+      </span>
       <Button
         size="sm"
         variant="ghost"
-        data-testid="map-teleport-cancel"
+        data-testid={mirror ? "mir-pick-cancel" : "map-teleport-cancel"}
         onClick={() => endTeleport()}
       >
         Cancel
@@ -88,12 +102,13 @@ export const teleportTool: CanvasToolDef = {
   panel: TeleportPanel,
   pointer: {
     down(e) {
-      const { token } = useTeleportPick.getState();
+      const { token, mirror } = useTeleportPick.getState();
       if (!token) return endTeleport();
       const to = teleportTarget(token, e);
       if (!to) return;
       endTeleport();
-      e.intent(MAP_INTENTS.teleportToken, { tokenId: token.id, ...to }).catch(toastReject);
+      const name = mirror ? MIR_INTENTS.create : MAP_INTENTS.teleportToken;
+      e.intent(name, { tokenId: token.id, ...to }).catch(toastReject);
     },
     move(e) {
       const { token, hover } = useTeleportPick.getState();

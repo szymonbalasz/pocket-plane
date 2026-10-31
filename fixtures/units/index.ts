@@ -157,6 +157,7 @@ import holdGreystoneStores from "./strongholds/hold-greystone-stores";
 import holdTowerMove from "./strongholds/hold-tower-move";
 import holdTowerSecret from "./strongholds/hold-tower-secret";
 import themeRound3 from "./theme-system/theme-round-3";
+import mirGoblin from "./token-mirrors/mir-goblin";
 
 export const units: readonly Fixture[] = [
   campaign,
@@ -329,6 +330,8 @@ export const units: readonly Fixture[] = [
   kitGroups,
   // Spell FX core (fix/vfx-core): the fight, Mira's and Thorn's FX spell rows, Mira's fire card
   vfxFight,
+  // Token mirrors (build/token-mirrors)
+  mirGoblin,
   sgRow,
   moilRow,
   fireCard,

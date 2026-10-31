@@ -140,6 +140,7 @@ DM picks #351 (ADR-0069), #355–#356 (Gilt & Stone default, Simple Dark; kit pa
 | Spec | Prefix | Status | Owner |
 |---|---|---|---|
 | [Overview scenes](overview-scenes.md) | OVW | complete (#398), [ADR-0075](../architecture/adr/0075-overview-scenes.md) | spec-overview-scenes |
+| [Token mirrors](token-mirrors.md) | MIR | complete, [ADR-0077](../architecture/adr/0077-token-mirrors.md) | build-token-mirrors |
 
 ## Send to game log (2026-10-31)
 

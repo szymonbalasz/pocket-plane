@@ -17,6 +17,7 @@ import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
 import { cbtxTokenHook } from "../combat-extras/rule-hooks";
 import { combatantTokenHook } from "../combat-tracker/hooks";
+import { mirrorTokenHook } from "../token-mirrors/sync";
 
 export type TokenHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor"> & {
   /** FR-MAP-123: this move is a teleport, not walked (combat adds no `movedFt`). */
@@ -39,6 +40,7 @@ export interface TokenHookRegistration {
 export const tokenChangedHooks: readonly TokenHookRegistration[] = [
   { name: "combat-tracker.combatant-copies", hook: combatantTokenHook }, // combat-tracker (FR-CBT-09)
   { name: "combat-extras.hidden-copy", hook: cbtxTokenHook }, // combat-extras (FR-CBTX-13)
+  { name: "token-mirrors.follow", hook: mirrorTokenHook }, // token-mirrors (FR-MIR-08 – -11)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */

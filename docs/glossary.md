@@ -76,6 +76,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Scene folder** | DM-only grouping of scenes in the scene list, nesting up to 5 levels. Never sent to players. | — |
 | **Grid calibration** | Setting cell size/offset so the grid aligns with the map image. | — |
 | **Token** | A movable piece on a scene: an instance of a creature definition, optionally bound to a combatant. | Combatant |
+| **Mirror** | A display-only copy of a token at another place on the same map, for battles on several floors. Has a mode: Hidden, Visible, Transparent or Shadow. No sight, no combat, can't be targeted. | Token, Miniature |
 | **Token owner** | The one player (or none) who may move a token. Defaults from the character's owner; the DM reassigns it (decisions #124). A companion's token follows its owner ([ADR-0056](architecture/adr/0056-companion-visibility.md)). | Character's owner |
 | **Reveal refit** | A player's map re-frames once when tokens they see for the first time land under a window or off-screen, unless they moved the camera; a pan cancels it, a drag defers it ([scenes-map](specs/scenes-map.md) FR-MAP-82). | Fit |
 | **Hidden token** | Token visible only to the DM (shown translucent to DM) until revealed with the hide/reveal button. MVP. | — |
