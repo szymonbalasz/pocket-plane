@@ -3,7 +3,7 @@
 // the visual-only reactions, and draws the two passes on the `objects` layer's 2D context. It
 // reads token positions through `FxView` each frame (own drag, others' previews, shown cells), so
 // a drag never re-renders React. Cues play on arrival only (FR-VFX-22). DOM-free.
-import { type HitCue, type HitLookKey, hitLooks as pickLooks } from "@shared/spell-fx/cue";
+import { type HitCue, hitLooks as pickLooks } from "@shared/spell-fx/cue";
 import type { AuraSpec } from "./anchors";
 import {
   type AuraFrame,
@@ -15,7 +15,7 @@ import {
   STILL_T,
 } from "./aura-types";
 import { type HitLook, type HitLookFrame, hitLooks } from "./hit-looks";
-import { lookParticles } from "./looks";
+import { lookParticles, POOF, POOF_KEY } from "./looks";
 import type { FxLevel } from "./prefs";
 import { seededRandom } from "./prng";
 import { rendererOf } from "./renderers";
@@ -62,8 +62,11 @@ export interface PlayingLook {
   /** `<cueId>:<look>`. */
   key: string;
   cueId: string;
-  look: HitLookKey;
+  look: HitLook["key"];
+  /** The token the look follows; `""` for a poof, which stays at `at`. */
   tokenId: string;
+  /** FR-MAP-122: a fixed spot instead of a token. */
+  at?: DrawnBox;
   scale: number;
   angle: number;
   start: number;
@@ -91,6 +94,8 @@ export class FxEngine {
   private readonly wakers = new Set<() => void>();
   /** The last cue played, for walkthroughs (`vfx-over` attr `lastHit`). */
   lastHit: string | null = null;
+  /** The last poof played, for walkthroughs (`vfx-over` attr `lastPoof`). */
+  lastPoof: string | null = null;
 
   constructor(private readonly clock: () => number = () => performance.now() / 1000) {
     this.now = clock();
@@ -200,6 +205,33 @@ export class FxEngine {
     return true;
   }
 
+  /**
+   * FR-MAP-122: a teleport's smoke, one puff per box (map px). The token has already jumped, so the
+   * puffs stay where they started. Off → dropped. True if played.
+   */
+  playPoof(cueId: string, boxes: readonly DrawnBox[]): boolean {
+    if (this.level === "off" || boxes.length === 0) return false;
+    const now = this.clock();
+    boxes.forEach((at, i) => {
+      this.looks.push({
+        key: `${cueId}:${POOF_KEY}:${i}`,
+        cueId,
+        look: POOF_KEY,
+        tokenId: "",
+        at,
+        // Reach 0.78 × the footprint, FR-VFX-18's bound: a cloud a little wider than the token.
+        scale: 1.56,
+        angle: 0,
+        start: now,
+        def: POOF,
+      });
+    });
+    this.lastPoof = cueId;
+    this.enforceBudget();
+    this.changed();
+    return true;
+  }
+
   /** FR-VFX-15: the aura `key` strikes the token `targetTokenId` (the caller picked it). */
   strike(key: string, targetTokenId: string): void {
     if (this.level === "off") return;
@@ -245,7 +277,7 @@ export class FxEngine {
   /** Something moves: an aura at Full / Reduced, a look, a reaction (FR-VFX-26, VFX §12). */
   animating(onScreen: (b: DrawnBox) => boolean = () => true): boolean {
     if (this.level === "off") return false;
-    if (this.looks.some((l) => this.visible(l.tokenId, onScreen))) return true;
+    if (this.looks.some((l) => this.lookVisible(l, onScreen))) return true;
     const level = this.drawLevel();
     for (const a of this.auras.values()) {
       if (!this.visible(a.spec.tokenId, onScreen, a.spec.radiusFt)) continue;
@@ -296,7 +328,7 @@ export class FxEngine {
       a.inst.over(ctx, f, reactions);
     }
     for (const l of this.looks) {
-      const box = this.view.position(l.tokenId);
+      const box = l.at ?? this.view.position(l.tokenId);
       if (!box) continue;
       const f: HitLookFrame = {
         x: box.x + box.size / 2,
@@ -339,6 +371,12 @@ export class FxEngine {
 
   private drawLevel(): DrawLevel | null {
     return this.level === "off" ? null : this.level;
+  }
+
+  private lookVisible(l: PlayingLook, onScreen: (b: DrawnBox) => boolean): boolean {
+    if (!l.at) return this.visible(l.tokenId, onScreen);
+    const pad = l.at.size * 0.3;
+    return onScreen({ x: l.at.x - pad, y: l.at.y - pad, size: l.at.size + pad * 2 });
   }
 
   private visible(

@@ -46,6 +46,7 @@ import {
   SetLockedInput,
   SetSceneMapInput,
   SetTokenHiddenInput,
+  TeleportTokenInput,
   TOKEN_TYPE,
   TOKENS_PER_CAMPAIGN_MAX,
   TOKENS_PER_SCENE_MAX,
@@ -716,34 +717,70 @@ export function moveTokenCommand(hooks: TokenHooks) {
     authorize({ tokenId }, { tx, actor }) {
       authorizeTokenMove(tx, actor, tokenId);
     },
-    execute({ tokenId, col, row }, env): void {
-      const { tx, ctx, actor, emit } = env;
-      const cid = campaignOf(actor);
-      const before = getToken(tx, cid, tokenId);
-      const s = findScene(tx, cid, before.sceneId) as SceneRecord;
-      assertOnMap(s, col, row, before.size);
-      // ADR-0040: guards (may refuse) → derive → one write → token-changed hooks.
-      tokenMoveGuards.run(
-        { read: tx, actor },
-        before,
-        { col: before.col, row: before.row },
-        { col, row },
-      );
-      const copies = tokenCopies(tx, { ...before, col, row });
-      tx.update(token)
-        .set({ col, row, ...copies, updatedAt: ctx.clock.iso() })
-        .where(eq(token.id, tokenId))
-        .run();
-      const after = readToken(tx, tokenId);
-      const dependants = rederiveDependants({ tx, ctx, actor }, tokenChange(before, after));
-      const hookChanges = hooks.run({ tx, ctx, actor }, before, after);
-      emit({
-        type: TokenMoved.type,
-        campaignId: cid,
-        payload: { tokenId, sceneId: before.sceneId, col, row },
-        changes: [tokenChange(before, readToken(tx, tokenId)), ...dependants, ...hookChanges],
-      });
+    execute(input, env): void {
+      applyMove(input, env, hooks);
     },
+  });
+}
+
+/**
+ * FR-MAP-121 / -122: the DM moves a token to any other cell on its map, walls and distance aside.
+ * The same move (guards, derive, hooks, one `TokenMoved`); `teleportCue` sets off the smoke.
+ */
+export function teleportTokenCommand(hooks: TokenHooks) {
+  return defineCommand({
+    name: MAP_INTENTS.teleportToken,
+    input: TeleportTokenInput,
+    roles: ["dm"],
+    execute(input, env): void {
+      const before = getToken(env.tx, campaignOf(env.actor), input.tokenId);
+      if (before.col === input.col && before.row === input.row) {
+        throw invalid("Pick another cell", [{ path: ["col"], message: "Same cell" }]);
+      }
+      applyMove(input, env, hooks, env.ctx.ids.next());
+    },
+  });
+}
+
+/** A token move, in the FR-MAP-21 / -38 order above. `teleportCue`: FR-MAP-122 only. */
+function applyMove(
+  { tokenId, col, row }: MoveTokenInput,
+  env: CommandEnv,
+  hooks: TokenHooks,
+  teleportCue?: string,
+): void {
+  const { tx, ctx, actor, emit } = env;
+  const cid = campaignOf(actor);
+  const before = getToken(tx, cid, tokenId);
+  const s = findScene(tx, cid, before.sceneId) as SceneRecord;
+  assertOnMap(s, col, row, before.size);
+  // ADR-0040: guards (may refuse) → derive → one write → token-changed hooks.
+  tokenMoveGuards.run(
+    { read: tx, actor },
+    before,
+    { col: before.col, row: before.row },
+    { col, row },
+  );
+  const copies = tokenCopies(tx, { ...before, col, row });
+  tx.update(token)
+    .set({ col, row, ...copies, updatedAt: ctx.clock.iso() })
+    .where(eq(token.id, tokenId))
+    .run();
+  const after = readToken(tx, tokenId);
+  const dependants = rederiveDependants({ tx, ctx, actor }, tokenChange(before, after));
+  const hookEnv = { tx, ctx, actor, ...(teleportCue ? { teleport: true } : {}) };
+  const hookChanges = hooks.run(hookEnv, before, after);
+  emit({
+    type: TokenMoved.type,
+    campaignId: cid,
+    payload: {
+      tokenId,
+      sceneId: before.sceneId,
+      col,
+      row,
+      ...(teleportCue ? { teleportCue } : {}),
+    },
+    changes: [tokenChange(before, readToken(tx, tokenId)), ...dependants, ...hookChanges],
   });
 }
 

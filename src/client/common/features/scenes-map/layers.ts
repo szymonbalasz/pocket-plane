@@ -25,6 +25,8 @@ export const LAYER_ORDER = {
   labels: 45,
   /** Drawing previews and handles; mounted only while a drawing tool is active. */
   scnEdit: 48,
+  /** FR-MAP-121: Teleport's target footprint, while the DM picks a cell. */
+  teleportPick: 49,
   pointers: 50,
 } as const;
 

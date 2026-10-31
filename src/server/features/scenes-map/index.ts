@@ -25,6 +25,7 @@ import {
   setLocked,
   setSceneMap,
   setTokenHiddenCommand,
+  teleportTokenCommand,
   updateTokenCommand,
 } from "./commands";
 import { dragAudience } from "./drag";
@@ -57,6 +58,7 @@ export const scenesMap: Feature = {
       setLocked,
       placeToken,
       moveTokenCommand(hooks),
+      teleportTokenCommand(hooks),
       updateTokenCommand(hooks),
       setTokenHiddenCommand(hooks),
       duplicateToken,

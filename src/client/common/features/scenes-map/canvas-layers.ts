@@ -16,6 +16,7 @@ import { GridLayer } from "./layers/GridLayer";
 import { LabelsLayer } from "./layers/LabelsLayer";
 import { MapLayer } from "./layers/MapLayer";
 import { PointersLayer } from "./layers/PointersLayer";
+import { TeleportPickLayer } from "./layers/TeleportPickLayer";
 import { TokensLayer } from "./layers/TokensLayer";
 
 export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
@@ -56,6 +57,14 @@ export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
     order: LAYER_ORDER.scnEdit,
     layer: "top",
     component: ScnEditLayer,
+    clients: ["dm"],
+  },
+  // scenes-map (FR-MAP-121): Teleport's target footprint while the DM picks a cell.
+  {
+    id: "teleport-pick",
+    order: LAYER_ORDER.teleportPick,
+    layer: "top",
+    component: TeleportPickLayer,
     clients: ["dm"],
   },
   // fog-of-war (FR-FOG-20/21): translucent for the DM (+ Fog tool draft), opaque for players.

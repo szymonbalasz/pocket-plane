@@ -26,7 +26,7 @@ import { useLayerToggles } from "../scenes-map/tool-store";
 import { aurasOf } from "./anchors";
 import { openCellsMenu, useCellsMenuIsland } from "./CellsMenu";
 import { pruneCells, useFxCells } from "./cells-store";
-import { useHitCues } from "./cues";
+import { useHitCues, usePoofCues } from "./cues";
 import { type DrawnBox, type FxEngine, type FxView, fxEngine } from "./engine";
 import { createFxLoop } from "./loop";
 import { useVfxLevel, vfxPrefs } from "./prefs";
@@ -211,6 +211,15 @@ export function VfxOverLayer() {
     if (engine.playCue(cue)) groupRef.current?.setAttr("lastHit", engine.lastHit);
   });
 
+  // FR-MAP-122: a teleport's smoke, on arrival only; this scene's cells, at both ends.
+  usePoofCues((cue) => {
+    if (typeof document !== "undefined" && document.hidden) return;
+    if (cue.sceneId !== c.scene.id) return;
+    const size = cue.side * c.grid.gridCellSize;
+    const boxes = cue.cells.map((cell) => ({ ...cellToPx(c.grid, cell.col, cell.row), size }));
+    if (engine.playPoof(cue.id, boxes)) groupRef.current?.setAttr("lastPoof", engine.lastPoof);
+  });
+
   // FR-VFX-15: the shown turn (FR-MAP-108: DM `turnCombatantId`, players `playerTurnCombatantId`).
   const turnId = useSync((s) => {
     const enc = startedIn(s.store);
@@ -253,9 +262,13 @@ export function VfxOverLayer() {
           cover={a.cover}
         />
       ))}
-      {snap.looks.map((l) => (
-        <Group key={l.key} name="vfx-hit" id={l.cueId} look={l.look} tokenId={l.tokenId} />
-      ))}
+      {snap.looks.map((l) =>
+        l.at ? (
+          <Group key={l.key} name="vfx-poof" id={l.cueId} x={l.at.x} y={l.at.y} size={l.at.size} />
+        ) : (
+          <Group key={l.key} name="vfx-hit" id={l.cueId} look={l.look} tokenId={l.tokenId} />
+        ),
+      )}
       <Shape
         ref={shapeRef}
         name="vfx-over-shape"
