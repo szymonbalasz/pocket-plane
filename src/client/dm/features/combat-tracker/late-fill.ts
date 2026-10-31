@@ -41,6 +41,13 @@ export function ruledRows(
     .map(({ targetId, multiplier }) => ({ targetId, multiplier }));
 }
 
+/**
+ * FR-CBT-178 (#423): Clear on the damage line: a card with a to-hit that holds damage or a total
+ * the DM typed. A damage-only card can't wait for a roll (Dismiss ends it).
+ */
+export const clearShown = (card: Pick<DamageCardPayload, "toHit" | "damage">, typed: boolean) =>
+  card.toHit !== null && (card.damage !== null || typed);
+
 // ---------- fields that fill (FR-CBT-90) ----------
 
 /**

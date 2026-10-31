@@ -142,6 +142,17 @@ export const RollUsed = defineEvent({
   undoable: false,
 });
 
+/**
+ * `cbt.clearDamage` (FR-CBT-178, #423): the card's upsert (one frame, no toast), to the DM and the
+ * card's audience. Not undoable; the roll lines stay in the log.
+ */
+export const DamageCleared = defineEvent({
+  type: "DamageCleared",
+  payload: z.object({ cardId: Id, encounterId: Id, rollIds: z.array(Id).min(1) }).strict(),
+  logged: true,
+  undoable: false,
+});
+
 /** `cbt.rollAbility`: one `game-log-entry` (players iff public; hidden combatant never) (FR-CBT-44). */
 export const CombatantRolled = defineEvent({
   type: "CombatantRolled",

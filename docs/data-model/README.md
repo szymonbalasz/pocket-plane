@@ -2886,3 +2886,11 @@ From [log-share](../specs/log-share.md#8-data-model) (#415). **No new table, col
 - **Fold (FR-SHARE-08):** the window's shares keep ≤ 64,000 chars of text, newest first; an older one gets `text: ""`, `folded: true` in the same transaction.
 - **Fixtures:** `share-mira-rows` (Mira: Fireball, Hedge Whisper, Moonblade Shard); bundle `log-share`.
 - **Snapshot size** (CON-44, `FR-SHARE-08 CON-44`): 100 shares of the longest text: at most +109,235 B per viewer on `log-share`, about 45 KB of it the rows themselves. 0 B while no share exists.
+
+## 152. Clear damage (build/cbt-clear-damage)
+
+No new table or column.
+
+| Field | Change | Rule | FR |
+|---|---|---|---|
+| `notification.payload` (kind `damage-card`) | + optional `damageCleared: true` | Set by `cbt.clearDamage` with `damage: null` (`unusedRolls`, `diceMaxed` removed); removed when new damage attaches | FR-CBT-178 |

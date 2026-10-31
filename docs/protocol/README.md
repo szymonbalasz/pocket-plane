@@ -4464,3 +4464,15 @@ From [scenes-map](../specs/scenes-map.md) FR-MAP-121–123 (#418). **Built by `b
 - **Server signal `vfx.poof`** (server-originated, transient: no event of its own, DB row, log, snapshot or `seq`): `signal {name: "vfx.poof", data: PoofCue, from: {role: "dm"}}`, `PoofCue = {id, sceneId, side, cells: [{col, row}]}` (1–2 cells, top-left of each footprint). Per connection after commit: the DM gets both ends; a player the ends where `records.view` shows them the token (the record before the move for the cell left, after it for the cell reached); neither → no signal.
 - **Canvas tool** `teleport`: DM, `offRail` (a new optional `CanvasToolDef` field: `toolsFor` leaves it off the rail).
 - **Test IDs:** `map-token-menu-teleport`, `map-teleport-panel`, `map-teleport-cancel`; canvas `map-teleport-target` (attrs `col`, `row`), `vfx-poof` (id = cue id; `x`, `y`, `size`), `vfx-over-pass` attr `lastPoof` = cue id.
+
+## 193. Clear damage (build/cbt-clear-damage)
+
+From [combat-tracker](../specs/combat-tracker.md#68-sprint-15-attacks-through-the-tray) FR-CBT-178 (#423). **Built by `build/cbt-clear-damage`.** No new record type.
+
+| Item | Shape | Rule | FR |
+|---|---|---|---|
+| `cbt.clearDamage` *(new, DM only)* | `{cardId, damageRollId}` → `{cardId}` | Pending card with a to-hit and damage; ended encounter, not pending, no damage, another `damageRollId` → `conflict`; damage-only → `invalid`; player → refused; nothing written | FR-CBT-178 |
+| Event `DamageCleared` *(new, logged, not undoable)* | `{cardId, encounterId, rollIds}` | Changes: the card upsert (one frame, no toast), to the DM and the card's audience | FR-CBT-178 |
+| `cbt.rollDamage`, `cbt.useRoll` | unchanged | Attach to a cleared card before a newer to-hit-only card; attaching removes `damageCleared` | FR-CBT-178 |
+
+- **Test ID:** `cbt-popup-damage-clear`.

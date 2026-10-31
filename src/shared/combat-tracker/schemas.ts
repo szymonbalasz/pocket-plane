@@ -81,6 +81,8 @@ export const CBT_INTENTS = {
   dismiss: "cbt.dismiss",
   /** FR-CBT-173 (sprint 15, #385): the DM builds or completes a card from a logged roll. */
   useRoll: "cbt.useRoll",
+  /** FR-CBT-178 (#423): the DM takes a card's damage off so a new roll can fill it. */
+  clearDamage: "cbt.clearDamage",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -544,6 +546,11 @@ export const DamageCardPayload = z
      * clears it with the moved damage, FR-CBT-127). A gems trace (OQ-GEM-21 B). Absent = never.
      */
     diceMaxed: z.literal(true).optional(),
+    /**
+     * FR-CBT-178 (#423): the DM cleared this card's damage (`cbt.clearDamage`); the next damage
+     * roll of the attacker fills this card first. Gone once new damage attaches. Absent = never.
+     */
+    damageCleared: z.literal(true).optional(),
   })
   .refine((p) => p.toHit !== null || p.damage !== null, {
     path: ["damage"],
@@ -595,6 +602,19 @@ export const samePartRollIds = (sent: PartRollIds, p: DamageCardPayload): boolea
  */
 export const critChanged = (p: DamageCardPayload): boolean =>
   p.toHit !== null && p.damage === null && (p.unusedRolls?.length ?? 0) > 0;
+
+/** FR-CBT-178 (#423): the card waits for a new roll because the DM cleared its damage. */
+export const damageClearedWaiting = (p: DamageCardPayload): boolean =>
+  p.damageCleared === true && p.damage === null;
+
+/** FR-CBT-178: what the owner's card view says while `damageClearedWaiting`. */
+export const DAMAGE_CLEARED_TEXT = "The DM cleared the damage — roll damage again";
+
+/** FR-CBT-178: a card about to take new damage no longer counts as cleared. */
+export function withoutDamageCleared(p: DamageCardPayload): DamageCardPayload {
+  const { damageCleared: _cleared, ...rest } = p;
+  return rest;
+}
 
 /** FR-CBT-128: a card damage part: `"base"` or an extra part's index (card order). */
 export const CardPartRef = z.union([
@@ -835,6 +855,15 @@ export const RollDamageResult = z.object({
   unused: z.literal(true).optional(),
 });
 export type RollDamageResult = z.infer<typeof RollDamageResult>;
+
+/**
+ * `cbt.clearDamage` (FR-CBT-178, DM only): `damageRollId` = the damage the popup shows; another
+ * one on the card → `conflict`, nothing written.
+ */
+export const ClearDamageInput = z.strictObject({ cardId: Id, damageRollId: Id });
+export type ClearDamageInput = z.input<typeof ClearDamageInput>;
+export const ClearDamageResult = z.object({ cardId: z.string() });
+export type ClearDamageResult = z.infer<typeof ClearDamageResult>;
 
 /** FR-CBT-173 (#385): what a logged roll is used as. */
 export const USE_ROLL_AS = ["attack", "damage"] as const;

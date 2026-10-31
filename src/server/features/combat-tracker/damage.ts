@@ -6,6 +6,7 @@
 // card owner's second roll on a completed pending card makes no card (`unusedRolls`).
 // Sprint 15 (FR-CBT-170, -171, #385): the tray's staged parts (`parts`) in place of the row's;
 // `rowless` = no sheet row; the pending match also takes a rowless side.
+// FR-CBT-178 (#423): a card the DM cleared takes the attacker's next roll first.
 import {
   type CharacterRollSpec,
   characterRolls,
@@ -25,6 +26,7 @@ import {
   RollDamageInput,
   type RollDamageResult,
   UNUSED_ROLLS_MAX,
+  withoutDamageCleared,
 } from "@shared/combat-tracker/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import { ROLL_ROW_MAX } from "@shared/effect-modifiers/schemas";
@@ -101,6 +103,7 @@ export type PendingCard = { card: NotificationRecord; p: DamageCardPayload };
  * FR-CBT-71: the attacker's latest pending to-hit-only card of this row in the encounter
  * (`toHit`), and FR-CBT-92: the latest pending card of this row whatever its shape (`latest`).
  * FR-CBT-171: `ref` null = a rowless roll (any row matches; a rowless card matches any row).
+ * FR-CBT-178: a card whose damage the DM cleared comes before a newer to-hit-only card.
  */
 export function pendingCards(
   env: CommandEnv,
@@ -121,6 +124,7 @@ export function pendingCards(
     .orderBy(desc(notification.seq))
     .all();
   let latest: PendingCard | null = null;
+  let toHit: PendingCard | null = null;
   for (const r of rows) {
     const parsed = DamageCardPayload.safeParse(r.payload);
     if (!parsed.success) continue;
@@ -128,9 +132,12 @@ export function pendingCards(
     if (p.encounterId !== enc.id || p.attackerId !== attackerId || !rowMatches(p, ref)) continue;
     const found = { card: toNotificationRecord(r), p };
     latest ??= found;
-    if (p.damage === null && p.toHit !== null) return { toHit: found, latest };
+    if (p.damage === null && p.toHit !== null) {
+      if (p.damageCleared) return { toHit: found, latest };
+      toHit ??= found;
+    }
   }
-  return { toHit: null, latest };
+  return { toHit, latest };
 }
 
 /**
@@ -226,7 +233,11 @@ export const rollDamageCommand = defineCommand({
     const payload: DamageCardPayload = withCardOffers(
       env,
       pending
-        ? { ...pending.p, damage: card, ...(stagedType ? { damageType: stagedType } : {}) }
+        ? {
+            ...withoutDamageCleared(pending.p),
+            damage: card,
+            ...(stagedType ? { damageType: stagedType } : {}),
+          }
         : {
             encounterId: enc.id,
             attackerId: c.id,
