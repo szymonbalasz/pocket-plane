@@ -110,8 +110,9 @@ const selectTool: OverviewToolDef = {
   clients: ["dm", "player"],
   order: 0,
   hint: {
-    dm: "Click, Ctrl/Shift+click or Ctrl/Shift+drag to select; drag items, pan the map",
-    player: "Drag your miniature to move it; drag anywhere else to pan the map",
+    dm: "Click, Ctrl/Shift+click or Ctrl/Shift+drag to select; drag or arrow keys to move items; drag elsewhere to pan the map",
+    player:
+      "Drag your miniature or use the arrow keys to move it; drag anywhere else to pan the map",
   },
   pans: true,
   pointer: selectPointer,
