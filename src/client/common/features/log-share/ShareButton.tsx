@@ -1,7 +1,7 @@
 // "Send to game log" (FR-SHARE-01, -02, -11): names an entry or a sheet row; the server builds the
 // text. `labelled`: the compendium's outline Button; else the sheet's small icon Button. `confirm`:
 // the DM's homebrew players can't open yet (FR-SHARE-11): sending shows its text to everyone, so
-// ask first. Test ID `share-send`, `data-value` = `compendium` or the sheet list, `data-record-id`.
+// ask first. Test ID `share-send`, `data-source` = `compendium` or the sheet list, `data-record-id`.
 import { SHARE_TO_LOG, type ShareToLogIntent } from "@shared/log-share/schemas";
 import { SendIcon } from "lucide-react";
 import { useState } from "react";
@@ -46,7 +46,7 @@ export function ShareButton({
   };
   const props = {
     "data-testid": "share-send",
-    "data-value": sourceValue(source),
+    "data-source": sourceValue(source),
     "data-record-id": idOf(source),
     disabled,
     onClick,

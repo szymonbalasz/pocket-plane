@@ -4449,4 +4449,4 @@ From [log-share](../specs/log-share.md) FR-SHARE-01–11 (#415). **Built by `bui
 | `LogEntryShared` | SHARE | `share.toLog` | `{entryId, from, title}` | The new `game-log-entry` upsert, stamped public; an upsert per older share folded (FR-SHARE-08) | no (the DM's Hide takes it back) | FR-SHARE-05 |
 
 - **Log kind** `share.entry`, payload `{title, line, text, cut?, folded?}`, no `dmPayload`, category `other`; registered in `src/shared/dice-roll-log/kinds.ts`.
-- **Test IDs:** `share-send` (`data-value` = `compendium` or the list, `data-record-id`), `share-confirm-dialog`, `share-confirm-send`, `share-confirm-cancel`, `share-entry-body`, `share-entry-line`, `share-entry-folded`, `share-entry-cut`.
+- **Test IDs:** `share-send` (`data-source` = `compendium` or the list, `data-record-id`), `share-confirm-dialog`, `share-confirm-send`, `share-confirm-cancel`, `share-entry-body`, `share-entry-line`, `share-entry-folded`, `share-entry-cut`.

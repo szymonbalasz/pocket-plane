@@ -175,7 +175,7 @@ describe("FR-SHARE-01 the Send to game log button", () => {
     const source = { from: "compendium", entryId: "e9" } as const;
     const html = render(<ShareButton source={source} labelled />);
     expect(html).toContain('data-testid="share-send"');
-    expect(html).toContain('data-value="compendium"');
+    expect(html).toContain('data-source="compendium"');
     expect(html).toContain('data-record-id="e9"');
     expect(html).toContain("Send to game log");
     expect(html).not.toMatch(/\sdisabled=/);
@@ -188,7 +188,7 @@ describe("FR-SHARE-01 the Send to game log button", () => {
     const html = render(
       <ShareButton source={{ from: "sheet", creatureId: "c", list: "spells", rowId: "r7" }} />,
     );
-    expect(html).toContain('data-value="spells"');
+    expect(html).toContain('data-source="spells"');
     expect(html).toContain('data-record-id="r7"');
     expect(html).toContain('aria-label="Send to game log"');
   });
