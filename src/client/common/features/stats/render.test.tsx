@@ -44,7 +44,7 @@ function wrap(you: You, node: ReactNode) {
           ...emptyStore(),
           you,
           records: {
-            player: { p1: { id: "p1", color: "#e11d48" }, p2: { id: "p2", color: "#2563eb" } },
+            player: { p1: { id: "p1", color: "#e08ab8" }, p2: { id: "p2", color: "#5b8ff0" } },
           },
         },
         lazy: { generation: 1 },
@@ -354,8 +354,8 @@ describe("FR-STATS-19 session cards", () => {
     expect(html).toContain(">30 damage<");
     expect(html).toContain("Thorn → Goblin 1, 30, Fight 2 · Tue 20 Oct");
     expect(html).toContain("Mira + Owlbear");
-    expect(html).toMatch(/data-record-id="thorn"[^>]*style="color:#2563eb"/);
-    expect(html).toMatch(/data-record-id="mira"[^>]*style="color:#e11d48"/);
+    expect(html).toMatch(/data-record-id="thorn"[^>]*style="color:#5b8ff0"/);
+    expect(html).toMatch(/data-record-id="mira"[^>]*style="color:#e08ab8"/);
     expect(count(html, "stats-award-winner")).toBe(2);
     expect(html.split(">—<").length - 1).toBe(7);
     expect(html).toContain('data-testid="stats-session-picker"');

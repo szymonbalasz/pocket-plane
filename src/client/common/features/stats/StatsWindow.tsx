@@ -44,7 +44,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
-import { type ColorPerson, useColorOf } from "../campaign-management/colors";
+import { type ColorPerson, useTextColorOf } from "../campaign-management/colors";
 import { useRecapOpener } from "../session-recap/open";
 import { CampaignPanel } from "./Campaign";
 import { Highlights } from "./Highlights";
@@ -459,7 +459,7 @@ export function SessionView({
 }
 
 function AwardCard({ award: a }: { award: Award }) {
-  const colorOf = useColorOf();
+  const colorOf = useTextColorOf();
   const role = useSync((s) => (s.store.you?.role === "dm" ? "dm" : "player"));
   const detail = awardDetailText(a);
   return (

@@ -14,10 +14,15 @@ import {
   defaultColor,
   deltaE,
   HexColorInput,
+  hasColorClash,
+  MIN_CONTRAST,
   normalizeColor,
   type PaletteKey,
   PLAYER_COLOR_KEYS,
   PLAYER_COLORS,
+  personDistance,
+  readableColor,
+  surfaceContrast,
 } from "./colors";
 
 /** CAMP §7: on the app background, the window surface, the canvas casing. */
@@ -93,10 +98,11 @@ describe("FR-CAMP-30 colour value", () => {
 describe("FR-CAMP-31 colour validity", () => {
   test("FR-CAMP-31 colour validity: every palette colour passes; too-dark, too-grey, too-red examples, danger (a) in colour-blind views", () => {
     for (const k of PLAYER_COLOR_KEYS) expect({ k, p: colorProblem(P[k]) }).toEqual({ k, p: null });
-    // #3d6ec9: 3.65 : 1 on the window surface.
-    expect(contrastRatio("#3d6ec9", "#171717")).toBeCloseTo(3.65, 2);
-    expect(colorProblem("#3d6ec9")).toBe("too-dark");
-    expect(colorProblem("#5a4630")).toBe("too-dark");
+    // Navy: 1.17 : 1 on the window surface.
+    expect(contrastRatio("#00008b", "#171717")).toBeCloseTo(1.17, 2);
+    expect(colorProblem("#00008b")).toBe("too-dark");
+    expect(colorProblem("#660000")).toBe("too-dark");
+    expect(colorProblem("#5a4630")).toBe("too-grey");
     expect([r1(chroma("#9e9e9e")), colorProblem("#9e9e9e")]).toEqual([0, "too-grey"]);
     expect([r1(deltaE("#f05555", ACCENT_DANGER)), colorProblem("#f05555")]).toEqual([
       3.5,
@@ -121,9 +127,9 @@ describe("FR-CAMP-31 colour validity", () => {
     ]);
   });
 
-  test("FR-CAMP-31 colour validity: boundaries, adjacent hex either side: 4.49 / 4.50 : 1, C* 24.9 / 25.0, normal ΔE 14.9 / 15.0, worst ΔE 4.9 / 5.0 from #ef4444 and from --destructive", () => {
+  test("FR-CAMP-31 colour validity: boundaries, adjacent hex either side: 1.59 / 1.61 : 1, C* 24.9 / 25.0, normal ΔE 14.9 / 15.0, worst ΔE 4.9 / 5.0 from #ef4444 and from --destructive", () => {
     const cases: [string, string, (h: string) => number, number, ColorProblem][] = [
-      ["#507dd8", "#507ed9", (h) => contrastRatio(h, "#171717"), 4.5, "too-dark"],
+      ["#7d0000", "#7e0000", (h) => contrastRatio(h, "#171717"), 1.6, "too-dark"],
       ["#71b0ce", "#71b0cf", chroma, 25, "too-grey"],
       ["#f4447d", "#f4447e", (h) => deltaE(h, ACCENT_DANGER), 15, "too-red"],
       ["#d08530", "#d0852f", (h) => colorDistance(h, ACCENT_DANGER), 5, "too-red"],
@@ -144,10 +150,34 @@ describe("FR-CAMP-31 colour validity", () => {
     }
   });
 
-  test("FR-CAMP-31 colour validity: about 17 % of the HSV grid passes", () => {
+  test("FR-CAMP-31 colour validity: deep saturated colours pass (dark red, maroon, pure blue, purple, forest green); a bright red stays too close to danger", () => {
+    for (const hex of ["#8b0000", "#800000", "#b00000", "#0000ff", "#800080", "#006400"]) {
+      expect({ hex, p: colorProblem(hex) }).toEqual({ hex, p: null });
+    }
+    expect(colorProblem("#ff0000")).toBe("too-red");
+  });
+
+  test("FR-CAMP-31 text shade: a colour that reads stays itself; a darker one keeps its hue and reaches 4.5 : 1 on every window; not a hex → unchanged", () => {
+    for (const k of PLAYER_COLOR_KEYS) expect(readableColor(P[k])).toBe(P[k]);
+    expect(readableColor(LAVENDER)).toBe(LAVENDER);
+    for (const hex of ["#8b0000", "#0000ff", "#800080", "#006400", "#3d6ec9"]) {
+      const shade = readableColor(hex);
+      expect(shade).not.toBe(hex);
+      expect(surfaceContrast(shade)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+      expect(readableColor(shade)).toBe(shade);
+      // As little lift as reaches the contrast: one lightness step under it fails.
+      expect(surfaceContrast(shade)).toBeLessThan(MIN_CONTRAST + 0.2);
+    }
+    // #8b0000 stays a pure red, #0000ff a blue (no green sneaks in).
+    expect(readableColor("#8b0000")).toMatch(/^#ff0[0-9a-f]0[0-9a-f]$/);
+    expect(readableColor("#0000ff").slice(-2)).toBe("ff");
+    for (const css of ["var(--x)", "red", "#ABCDEF"]) expect(readableColor(css)).toBe(css);
+  });
+
+  test("FR-CAMP-31 colour validity: about 35 % of the HSV grid passes", () => {
     const pass = GRID.filter((h) => colorProblem(h) === null).length / GRID.length;
-    expect(pass).toBeGreaterThan(0.16);
-    expect(pass).toBeLessThan(0.19);
+    expect(pass).toBeGreaterThan(0.34);
+    expect(pass).toBeLessThan(0.37);
   });
 });
 
@@ -197,6 +227,40 @@ describe("FR-CAMP-32 distance rule", () => {
     const near = { by: "p3", name: "Player 3", color: "#b389ff" };
     expect(colorClash("#b388fe", [p2, near])?.by).toBe("p2");
     expect(colorClash("#b389fe", [p2, near])?.by).toBe("p3");
+  });
+
+  test("FR-CAMP-32 distance rule: dark colours are also measured by their names' shade: #8b0000 clashes with Vermillion for colour-blind players; two dark reds with one shade are too close, never Taken", () => {
+    const deep = "#8b0000";
+    expect(colorDistance(deep, P.vermillion)).toBeGreaterThan(9);
+    expect(personDistance(deep, P.vermillion)).toBeLessThan(9);
+    expect(colorClash(deep, [{ by: "p1", name: "Player 1", color: P.vermillion }])).toEqual({
+      reason: "too-close",
+      by: "p1",
+      message: "Too close to Player 1's colour for colour-blind players",
+    });
+    expect(colorDistance("#800000", "#c00000")).toBeGreaterThan(9);
+    expect(colorDistance(readableColor("#800000"), readableColor("#c00000"))).toBeLessThan(1);
+    expect(colorClash("#800000", [{ by: "p1", name: "Player 1", color: "#c00000" }])).toEqual({
+      reason: "too-close",
+      by: "p1",
+      message: "Too close to Player 1's colour",
+    });
+    // The picker's yes / no agrees with the full check, over the whole grid and a crowd.
+    const crowd = [P.vermillion, deep, LAVENDER, P.jade].map((color, i) => ({
+      by: `p${i}`,
+      name: `P${i}`,
+      color,
+    }));
+    for (const h of GRID.filter((_, i) => i % 37 === 0)) {
+      expect({ h, clash: hasColorClash(h, crowd) }).toEqual({
+        h,
+        clash: colorClash(h, crowd) !== null,
+      });
+    }
+    // Colours that read: the same number as ever.
+    expect(personDistance(P.sky, P.rose)).toBe(colorDistance(P.sky, P.rose));
+    // A dark holder doesn't leave its shade free: Rose is far from a dark red, Vermillion isn't.
+    expect(defaultColor([P.amber, P.jade, P.sky, P.rose, P.yellow, P.blue, deep])).toBe(P.bronze);
   });
 
   test("FR-CAMP-32 distance rule: a greedy pack over the grid (palette first) yields ≥ 18 colours at ≥ 9", () => {

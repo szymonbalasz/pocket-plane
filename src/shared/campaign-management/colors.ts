@@ -84,7 +84,10 @@ export const WINDOW_SURFACES = { default: "#171717", gilt: "#101414" } as const;
 export const WINDOW_SURFACE = WINDOW_SURFACES.default;
 /** The danger reds the app draws: `accent.danger` / `hp.down`, the canvas `--destructive`. */
 export const DANGER_REDS = ["#ef4444", "#ff6467"] as const;
+/** Text on a window: a colour under this is drawn in its `readableColor` shade there. */
 export const MIN_CONTRAST = 4.5;
+/** A colour must stay visible as a dot or a fill on a window (FR-CAMP-31 (a)). */
+export const MIN_FILL_CONTRAST = 1.6;
 export const MIN_CHROMA = 25;
 /** ΔE2000 from `accent.danger` in normal vision. */
 export const MIN_DANGER_NORMAL = 15;
@@ -94,7 +97,7 @@ export const MIN_DANGER_WORST = 5;
 export type ColorProblem = "too-dark" | "too-grey" | "too-red";
 
 export const COLOR_PROBLEM_MESSAGE: Readonly<Record<ColorProblem, string>> = {
-  "too-dark": "Too dark to read on the map",
+  "too-dark": "Too dark to see",
   "too-grey": "Too grey",
   "too-red": "Too close to the danger red",
 };
@@ -106,13 +109,13 @@ export function chroma(hex: string): number {
 }
 
 /**
- * FR-CAMP-31: null when the colour reads on the map and stays a person colour; else the first
- * rule it breaks: (a) contrast ≥ 4.5 : 1 on every theme's window surface (FR-THEME-18); (b)
- * C* ≥ 25; (c) ΔE ≥ 15 from `#ef4444` in normal vision and ≥ 5 from each danger red in the worst
- * of the three views.
+ * FR-CAMP-31: null when the colour stays visible and a person colour; else the first rule it
+ * breaks: (a) contrast ≥ 1.6 : 1 on every theme's window surface (FR-THEME-18); (b) C* ≥ 25;
+ * (c) ΔE ≥ 15 from `#ef4444` in normal vision and ≥ 5 from each danger red in the worst of the
+ * three views. Text keeps its 4.5 : 1 through `readableColor`, map marks through a light casing.
  */
 export function colorProblem(hex: string): ColorProblem | null {
-  if (surfaceContrast(hex) < MIN_CONTRAST) return "too-dark";
+  if (surfaceContrast(hex) < MIN_FILL_CONTRAST) return "too-dark";
   if (chroma(hex) < MIN_CHROMA) return "too-grey";
   if (deltaE(hex, DANGER_REDS[0]) < MIN_DANGER_NORMAL) return "too-red";
   if (DANGER_REDS.some((red) => colorDistance(hex, red) < MIN_DANGER_WORST)) return "too-red";
@@ -122,6 +125,32 @@ export function colorProblem(hex: string): ColorProblem | null {
 /** FR-THEME-18: the lowest contrast of `hex` over the window surfaces of all themes. */
 export function surfaceContrast(hex: string): number {
   return Math.min(...Object.values(WINDOW_SURFACES).map((s) => contrastRatio(hex, s)));
+}
+
+const shades = new Map<string, string>();
+const MAX_SHADES = 20_000;
+
+/**
+ * FR-CAMP-31: the shade of a colour for text on a window. A colour with 4.5 : 1 on every window
+ * surface is itself; a darker one keeps its hue and saturation and takes the lowest HSL lightness
+ * that reaches 4.5 : 1. Not a hex → returned unchanged. Remembered per colour: the picker's square
+ * asks for thousands of them on a hue change.
+ */
+export function readableColor(color: string): string {
+  if (!isHexColor(color) || surfaceContrast(color) >= MIN_CONTRAST) return color;
+  const known = shades.get(color);
+  if (known) return known;
+  const [h, s, l] = rgbToHsl(hexToRgb(color));
+  let [lo, hi] = [l, 1];
+  for (let i = 0; i < 8; i++) {
+    const mid = (lo + hi) / 2;
+    if (surfaceContrast(hslToHex(h, s, mid)) >= MIN_CONTRAST) hi = mid;
+    else lo = mid;
+  }
+  const shade = hslToHex(h, s, hi);
+  if (shades.size >= MAX_SHADES) shades.clear();
+  shades.set(color, shade);
+  return shade;
 }
 
 // ---- FR-CAMP-32 distance between people ----
@@ -135,6 +164,16 @@ export const DISTANCE_VISIONS = ["normal", "deuteranopia", "protanopia"] as cons
 export function colorDistance(a: string, b: string): number {
   return Math.min(...DISTANCE_VISIONS.map((v) => deltaE(a, b, v)));
 }
+
+/** The smaller of `measure` on the colours and on their text shades (`readableColor`). */
+function inBothShades(a: string, b: string, measure: (x: string, y: string) => number): number {
+  const d = measure(a, b);
+  const [ta, tb] = [readableColor(a), readableColor(b)];
+  return ta === a && tb === b ? d : Math.min(d, measure(ta, tb));
+}
+
+/** FR-CAMP-32: how far apart two people's colours are, as marks and as names in text. */
+export const personDistance = (a: string, b: string): number => inBothShades(a, b, colorDistance);
 
 /** Someone else's colour in the campaign: a player (`by` = id) or the DM (`by` = `dm`). */
 export interface ColorHolder {
@@ -160,14 +199,33 @@ export function colorClash(hex: string, others: readonly ColorHolder[]): ColorCl
   for (const h of others) {
     const other = normalizeColor(h.color);
     if (!other) continue;
-    const d = other === own ? 0 : colorDistance(own, other);
+    const d = other === own ? 0 : personDistance(own, other);
     if (d < MIN_PERSON_DISTANCE && (!best || d < best.d)) best = { h, hex: other, d };
   }
   if (!best) return null;
-  const { h, d } = best;
-  if (d === 0) return { reason: "taken", by: h.by, message: `Taken by ${h.name}` };
-  const cb = deltaE(own, best.hex) >= MIN_PERSON_DISTANCE ? " for colour-blind players" : "";
+  const { h } = best;
+  if (best.hex === own) return { reason: "taken", by: h.by, message: `Taken by ${h.name}` };
+  const normal = inBothShades(own, best.hex, deltaE);
+  const cb = normal >= MIN_PERSON_DISTANCE ? " for colour-blind players" : "";
   return { reason: "too-close", by: h.by, message: `Too close to ${h.name}'s colour${cb}` };
+}
+
+/**
+ * `colorClash(...) !== null`, stopping at the first holder under 9: the picker's square asks this
+ * of thousands of colours and needs no message for them.
+ */
+export function hasColorClash(hex: string, others: readonly ColorHolder[]): boolean {
+  const own = hex.toLowerCase();
+  const near = (a: string, b: string) =>
+    DISTANCE_VISIONS.some((v) => deltaE(a, b, v) < MIN_PERSON_DISTANCE);
+  const held = others.map((h) => normalizeColor(h.color)).filter((c): c is string => c !== null);
+  if (held.some((c) => c === own || near(own, c))) return true;
+  // The colours themselves are clear: only now is the shades' search worth it.
+  const ownShade = readableColor(own);
+  return held.some((c) => {
+    const shade = readableColor(c);
+    return (ownShade !== own || shade !== c) && near(ownShade, shade);
+  });
 }
 
 /**
@@ -181,7 +239,7 @@ export function defaultColor(taken: readonly string[]): string {
   let best = { hex: PLAYER_COLORS[PLAYER_COLOR_KEYS[0]], d: -1 };
   for (const k of PLAYER_COLOR_KEYS) {
     const hex = PLAYER_COLORS[k];
-    const d = Math.min(Infinity, ...held.map((c) => (c === hex ? 0 : colorDistance(hex, c))));
+    const d = Math.min(Infinity, ...held.map((c) => (c === hex ? 0 : personDistance(hex, c))));
     if (d >= MIN_PERSON_DISTANCE) return hex;
     if (d > best.d) best = { hex, d };
   }
@@ -197,6 +255,31 @@ export function hexToRgb(hex: string): Rgb {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   if (!m) throw new Error(`Not a #rrggbb colour: ${hex}`);
   return [m[1], m[2], m[3]].map((h) => Number.parseInt(h as string, 16) / 255) as unknown as Rgb;
+}
+
+/** sRGB channels 0–1 → HSL, each 0–1. */
+function rgbToHsl([r, g, b]: Rgb): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const c = max - min;
+  const l = (max + min) / 2;
+  if (c === 0) return [0, 0, l];
+  const s = c / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? ((g - b) / c + 6) % 6 : max === g ? (b - r) / c + 2 : (r - g) / c + 4;
+  return [h / 6, s, l];
+}
+
+/** HSL, each 0–1 → lowercase `#rrggbb`. */
+function hslToHex(h: number, s: number, l: number): string {
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12;
+    const c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(c * 255)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
 }
 
 const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -318,8 +401,21 @@ export function ciede2000([L1, a1, b1]: Lab, [L2, a2, b2]: Lab): number {
 
 /** ΔE2000 between two hex colours as seen under `vision`. */
 export function deltaE(a: string, b: string, vision: Vision = "normal"): number {
-  const lab = (hex: string) => linearToLab(simulate(linearRgb(hexToRgb(hex)), vision));
-  return ciede2000(lab(a), lab(b));
+  return ciede2000(labOf(a, vision), labOf(b, vision));
+}
+
+const labs = new Map<string, Lab>();
+const MAX_LABS = 60_000;
+
+/** A colour's Lab under `vision`, remembered: the picker's square measures thousands of pairs. */
+function labOf(hex: string, vision: Vision): Lab {
+  const key = vision + hex;
+  const known = labs.get(key);
+  if (known) return known;
+  const lab = linearToLab(simulate(linearRgb(hexToRgb(hex)), vision));
+  if (labs.size >= MAX_LABS) labs.clear();
+  labs.set(key, lab);
+  return lab;
 }
 
 /** The closest pair of palette keys under `vision` (CAMP §7's colour-blind check). */

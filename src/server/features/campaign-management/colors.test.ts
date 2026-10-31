@@ -375,7 +375,7 @@ describe("FR-CAMP-25 / -33 camp.setColor", () => {
     const n = t.events.length;
     const own = (color: string) => outcome(() => t.run({ playerId: t.seed.p1.id, color }, p1));
     expect(own("vermillion")).toBe("invalid: Invalid input");
-    expect(own("#3d6ec9")).toBe("invalid: Too dark to read on the map");
+    expect(own("#00008b")).toBe("invalid: Too dark to see");
     expect(own("#9e9e9e")).toBe("invalid: Too grey");
     expect(own("#f05555")).toBe("invalid: Too close to the danger red");
     expect(own("#cc793d")).toBe("invalid: Too close to the danger red");
@@ -392,8 +392,8 @@ describe("FR-CAMP-25 / -33 camp.setColor", () => {
     );
     expect(t.run({ playerId: null, color: "#e8a10a" })).toEqual({}); // a near-Amber: only the DM had it
     // An invalid colour is invalid even as a "same colour" resend (validity first).
-    expect(outcome(() => t.run({ playerId: null, color: "#3d6ec9" }))).toBe(
-      "invalid: Too dark to read on the map",
+    expect(outcome(() => t.run({ playerId: null, color: "#00008b" }))).toBe(
+      "invalid: Too dark to see",
     );
   });
 

@@ -24,7 +24,7 @@ import { withoutDmOnly } from "../../scene-tools/layer-switches";
 import { useCanvas } from "../canvas-context";
 import { decorateToken, type MergedDecoration } from "../decorations";
 import { CROSS_OPACITY, crossGeometry } from "../label";
-import { CASING_COLOR, CASING_EXTRA_PX, CASING_NAME } from "../mark-colors";
+import { CASING_EXTRA_PX, CASING_NAME, casingOf } from "../mark-colors";
 import { artBackdropOf, containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape";
 import {
   barGeometry,
@@ -244,7 +244,7 @@ export const TurnRingMark = memo(function TurnRingMark(p: {
         // FR-MAP-72: the dark casing first, without the glow.
         ctx.save();
         ctx.setAttr("shadowColor", "rgba(0,0,0,0)");
-        ctx.setAttr("strokeStyle", CASING_COLOR);
+        ctx.setAttr("strokeStyle", casingOf(p.color));
         ctx.setAttr("lineWidth", g.casingWidth);
         ctx.setLineDash(g.dash ?? []);
         path(ctx);
@@ -465,7 +465,7 @@ function TokenCueMark({ t, side, cue }: { t: TokenView; side: number; cue: Token
         x={g.ring.x}
         y={g.ring.y}
         radius={g.ring.radius}
-        stroke={CASING_COLOR}
+        stroke={casingOf(accent)}
         strokeWidth={g.ring.strokeWidth + CASING_EXTRA_PX / cam.scale}
       />
       <Circle

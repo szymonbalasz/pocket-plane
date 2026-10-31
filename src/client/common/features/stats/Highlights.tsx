@@ -8,7 +8,7 @@ import type { DmHighlights, PlayerHighlights } from "@shared/stats/schemas";
 import { ChevronDownIcon, EyeOffIcon } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../components/ui/menus";
 import { cn } from "../../lib/utils";
-import { type ColorPerson, useColorOf } from "../campaign-management/colors";
+import { type ColorPerson, useTextColorOf } from "../campaign-management/colors";
 import { HIGHLIGHT_TITLE, type HighlightItem, highlightDetailText, highlightItems } from "./logic";
 
 const Hidden = () => (
@@ -20,7 +20,7 @@ const Hidden = () => (
 );
 
 function Winners({ item }: { item: Extract<HighlightItem, { kind: "stat" }> }) {
-  const colorOf = useColorOf();
+  const colorOf = useTextColorOf();
   return (
     <>
       {item.stat.winners.map((w, i) => {

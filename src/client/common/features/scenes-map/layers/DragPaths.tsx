@@ -29,7 +29,7 @@ import {
   trailCellsAttr,
   trailSegments,
 } from "../drag-path";
-import { CASING_COLOR, CASING_EXTRA_PX, CASING_NAME, casingWidth } from "../mark-colors";
+import { CASING_EXTRA_PX, CASING_NAME, casingOf, casingWidth } from "../mark-colors";
 
 /** Path tint (FR-MAP-52) and trail opacity (FR-MAP-54, -67). */
 const TINT = 0.25;
@@ -91,7 +91,7 @@ function PathMarks({
             name={CASING_NAME}
             id={id}
             points={clear.flatMap(centre)}
-            stroke={CASING_COLOR}
+            stroke={casingOf(color)}
             strokeWidth={casingWidth(2, cam.scale)}
           />
           <Line points={clear.flatMap(centre)} stroke={color} strokeWidth={width} />
@@ -118,7 +118,7 @@ function PathMarks({
                 x={x}
                 y={y}
                 radius={dot + CASING_EXTRA_PX / cam.scale / 2}
-                fill={CASING_COLOR}
+                fill={casingOf(color)}
               />
             )}
             <Circle x={x} y={y} radius={dot} fill={past ? colors.destructive : color} />

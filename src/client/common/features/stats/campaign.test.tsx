@@ -31,7 +31,7 @@ function wrap(you: You, node: ReactNode) {
           ...emptyStore(),
           you,
           records: {
-            player: { p1: { id: "p1", color: "#e11d48" }, p2: { id: "p2", color: "#2563eb" } },
+            player: { p1: { id: "p1", color: "#e08ab8" }, p2: { id: "p2", color: "#5b8ff0" } },
           },
         },
         lazy: { generation: 1 },
@@ -194,7 +194,7 @@ describe("FR-STATS-82 party table", () => {
     expect(cells(html, "nat20")).toEqual([0, 2]);
     expect(cells(html, "nat1")).toEqual([1, 0]);
     expect(cells(html, "fights")).toEqual([2, 2]);
-    expect(html).toContain("color:#e11d48");
+    expect(html).toContain("color:#e08ab8");
     expect(attr(html, "stats-campaign-scroll", "class")).toContain("overflow-x-auto");
   });
 

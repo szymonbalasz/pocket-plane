@@ -48,7 +48,7 @@ import {
 } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
-import { type ColorPerson, useColorOf } from "../campaign-management/colors";
+import { type ColorPerson, useTextColorOf } from "../campaign-management/colors";
 import { awardDetailText, awardValueText, sessionLabel, winnerText } from "../stats/logic";
 import { useStatsQuery } from "../stats/query";
 import { viewKey } from "../stats/view";
@@ -470,7 +470,7 @@ export function RecapSections({
 }
 
 function PartyTable({ rows }: { rows: NonNullable<Recap["party"]> }) {
-  const colorOf = useColorOf();
+  const colorOf = useTextColorOf();
   return (
     <Table className="text-xs">
       <TableHeader>
@@ -549,7 +549,7 @@ function LootTable({ loot }: { loot: NonNullable<Recap["loot"]> }) {
 
 /** Stats' award card, as the Session tab shows it (FR-RECAP-16). */
 function AwardCard({ award: a }: { award: Award }) {
-  const colorOf = useColorOf();
+  const colorOf = useTextColorOf();
   const role = useSync((s) => (s.store.you?.role === "dm" ? "dm" : "player"));
   const detail = awardDetailText(a);
   return (
