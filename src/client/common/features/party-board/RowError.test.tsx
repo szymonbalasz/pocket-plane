@@ -14,7 +14,7 @@ describe("full text: Party Manager row errors", () => {
     const html = renderToStaticMarkup(<RowError>{LONG}</RowError>);
     expect(html).toContain(`>${LONG}</span>`);
     expect(html).toContain('role="alert"');
-    expect(html).toContain("w-full basis-full break-words");
+    expect(html).toContain("w-full basis-full [overflow-wrap:anywhere]");
     expect(html).not.toContain("truncate");
     expect(html).not.toContain("max-w-");
     expect(html).not.toContain("title=");

@@ -360,7 +360,7 @@ describe("TT2 roll requests (client)", () => {
     expect(both).toMatch(/data-testid="dicex-request-fold" data-state="closed"/);
     expect(both).not.toContain('data-testid="dicex-request-roll"');
     // Full text: the request's label and DC wrap, never cut.
-    expect(both).toContain('<p class="break-words text-sm font-medium">');
+    expect(both).toContain('<p class="[overflow-wrap:anywhere] text-sm font-medium">');
     expect(
       [...both.matchAll(/data-testid="dicex-request-card" data-record-id="([^"]+)"/g)].map(
         (m) => m[1],

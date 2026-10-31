@@ -506,12 +506,14 @@ function GivePanel({
                 disabled={!live}
                 onClick={() => setChosen(sourceKey(s))}
                 className={cn(
-                  "flex w-full items-baseline gap-2 rounded px-1.5 py-1 text-left text-xs hover:bg-accent disabled:opacity-50",
+                  "flex w-full flex-wrap items-baseline gap-x-2 rounded px-1.5 py-1 text-left text-xs hover:bg-accent disabled:opacity-50",
                   chosen === sourceKey(s) && "bg-accent",
                 )}
               >
-                <span className="text-muted-foreground">{s.character.name}:</span>
-                <span className="min-w-0 flex-1 break-words">{s.row.name}</span>
+                <span className="min-w-0 [overflow-wrap:anywhere] text-muted-foreground">
+                  {s.character.name}:
+                </span>
+                <span className="min-w-0 flex-auto [overflow-wrap:anywhere]">{s.row.name}</span>
                 <span className="tabular-nums text-muted-foreground">×{s.row.qty}</span>
               </button>
             </li>
@@ -618,7 +620,7 @@ export function InventoryTab({
             data-dm-only={isDm && holder !== null ? String(i.dmOnly === true) : undefined}
             className="flex flex-col px-1"
           >
-            <div className="flex items-baseline gap-2 py-1.5 text-sm">
+            <div className="flex flex-wrap items-baseline gap-x-2 py-1.5 text-sm">
               {i.dmOnly && (
                 <EyeOffIcon
                   className="size-3.5 shrink-0 self-center text-muted-foreground"
@@ -626,54 +628,61 @@ export function InventoryTab({
                   data-testid="party-item-dm-only"
                 />
               )}
-              <span data-testid="party-item-name" className="min-w-0 flex-1 break-words">
+              <span
+                data-testid="party-item-name"
+                className="min-w-0 flex-auto [overflow-wrap:anywhere]"
+              >
                 {i.name}
               </span>
               <span data-testid="party-item-count" className="tabular-nums text-muted-foreground">
                 ×{i.qty}
               </span>
-              {movable && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-xs"
-                  data-testid="party-item-take"
-                  disabled={!live}
-                  onClick={() => setOpen({ kind: "take", itemId: i.id })}
-                >
-                  {isDm || intoStores ? "Move…" : "Take"}
-                </Button>
-              )}
-              {isDm && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-2 text-xs"
-                    data-testid="party-item-edit"
-                    disabled={!live}
-                    onClick={() => setOpen({ kind: "edit", itemId: i.id })}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-2 text-xs"
-                    data-testid="party-item-remove"
-                    disabled={!live}
-                    onClick={() => setOpen({ kind: "remove", itemId: i.id })}
-                  >
-                    Remove
-                  </Button>
-                </>
+              {(movable || isDm) && (
+                <span className="ml-auto flex shrink-0 items-baseline gap-2">
+                  {movable && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-xs"
+                      data-testid="party-item-take"
+                      disabled={!live}
+                      onClick={() => setOpen({ kind: "take", itemId: i.id })}
+                    >
+                      {isDm || intoStores ? "Move…" : "Take"}
+                    </Button>
+                  )}
+                  {isDm && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs"
+                        data-testid="party-item-edit"
+                        disabled={!live}
+                        onClick={() => setOpen({ kind: "edit", itemId: i.id })}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs"
+                        data-testid="party-item-remove"
+                        disabled={!live}
+                        onClick={() => setOpen({ kind: "remove", itemId: i.id })}
+                      >
+                        Remove
+                      </Button>
+                    </>
+                  )}
+                </span>
               )}
             </div>
             {i.notes && (
               <p
                 data-testid="party-item-notes"
                 data-record-id={i.id}
-                className="pb-1.5 text-xs break-words whitespace-pre-wrap text-muted-foreground"
+                className="pb-1.5 text-xs [overflow-wrap:anywhere] whitespace-pre-wrap text-muted-foreground"
               >
                 {i.notes}
               </p>

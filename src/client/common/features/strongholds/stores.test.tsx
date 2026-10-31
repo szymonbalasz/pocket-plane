@@ -317,7 +317,7 @@ describe("Stores items (FR-LOOT-36, -37, FR-PARTY-77)", () => {
   test("FR-PARTY-77 full text: an item's long name wraps and its notes show whole on their own line", () => {
     const html = render(<StoresTab parts={greyParts(true)} />, DM);
     const name = /<span data-testid="party-item-name"[^>]*>/.exec(html)?.[0] ?? "";
-    expect(name).toContain("break-words");
+    expect(name).toContain("[overflow-wrap:anywhere]");
     expect(name).not.toContain("truncate");
     const notes = /<p data-testid="party-item-notes"[^>]*>([^<]*)<\/p>/.exec(html);
     expect(notes?.[1]).toBe("Silvered, kept in the vault.");

@@ -68,8 +68,8 @@ export function HandoutRow({
       >
         <Thumb h={h} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex items-center gap-1.5">
-            <span className="min-w-0 break-words text-sm font-medium">{h.title}</span>
+          <span className="flex flex-wrap items-center gap-x-1.5">
+            <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">{h.title}</span>
             {mark}
           </span>
           <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">

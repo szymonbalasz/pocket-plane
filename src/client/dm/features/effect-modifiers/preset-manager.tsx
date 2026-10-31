@@ -51,10 +51,10 @@ function Row({ c, onEdit }: { c: PresetChoice; onEdit(): void }) {
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1">
-          <span className="min-w-0 break-words">{c.preset.name}</span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">{c.preset.name}</span>
           {c.source === "customised" && <Badge variant="secondary">Customised</Badge>}
         </div>
-        <div className="text-xs break-words whitespace-pre-wrap text-muted-foreground">
+        <div className="text-xs [overflow-wrap:anywhere] whitespace-pre-wrap text-muted-foreground">
           {modifiersText(c.preset.modifiers)}
           {c.preset.note ? ` · ${c.preset.note}` : ""}
         </div>

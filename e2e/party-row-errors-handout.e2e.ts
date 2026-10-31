@@ -28,7 +28,7 @@ test("full text: a handout row's error shows whole under the row, which grows; t
     const e = document.createElement("span");
     e.setAttribute("role", "alert");
     e.dataset.slot = "party-row-error";
-    e.className = "order-last w-full basis-full break-words text-xs text-destructive";
+    e.className = "order-last w-full basis-full [overflow-wrap:anywhere] text-xs text-destructive";
     e.textContent = text;
     li.insertBefore(e, li.lastElementChild);
   }, MESSAGE);

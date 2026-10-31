@@ -279,7 +279,7 @@ describe("FR-CHARX-73 summary counts", () => {
     expect(html).not.toContain("gem-award");
     // FR-CHARX-114: the summary card's name wraps, never cut.
     const name = html.match(/<span[^>]*data-testid="charx-summary-name"[^>]*>/)?.[0] ?? "";
-    expect(name).toContain("break-words");
+    expect(name).toContain("[overflow-wrap:anywhere]");
     expect(name).not.toContain("truncate");
 
     const off = store("p2", false);

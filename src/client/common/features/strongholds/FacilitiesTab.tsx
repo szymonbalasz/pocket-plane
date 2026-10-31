@@ -206,7 +206,10 @@ function FacilityRow({
         </p>
       )}
       {f.effect !== "" && (
-        <p data-testid="hold-facility-effect" className="text-xs break-words whitespace-pre-wrap">
+        <p
+          data-testid="hold-facility-effect"
+          className="text-xs [overflow-wrap:anywhere] whitespace-pre-wrap"
+        >
           {f.effect}
         </p>
       )}

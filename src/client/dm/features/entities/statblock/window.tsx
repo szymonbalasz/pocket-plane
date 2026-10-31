@@ -316,11 +316,11 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
     // rows with their buttons fit; hence the tighter gaps, the inline modifiers, the small Save row.
     <StatBlockCard data-testid="ent-statblock" data-record-id={def.id} className="space-y-1">
       <header>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-2">
           <h2
             data-testid="ent-statblock-name"
             data-slot="statblock-name"
-            className="min-w-0 flex-1 break-words text-lg font-semibold leading-tight text-primary"
+            className="min-w-0 flex-auto [overflow-wrap:anywhere] text-lg font-semibold leading-tight text-primary"
           >
             {combatant?.name ?? def.name}
           </h2>

@@ -349,7 +349,7 @@ describe("Stronghold window (FR-HOLD-23–34)", () => {
     const html = render(<StrongholdWindow kind={HOLD_WINDOW_KIND} instance="main" />, { you: DM });
     const effect = /<p data-testid="hold-facility-effect"[^>]*>/.exec(html)?.[0] ?? "";
     expect(effect).toContain("whitespace-pre-wrap");
-    expect(effect).toContain("break-words");
+    expect(effect).toContain("[overflow-wrap:anywhere]");
     expect(effect).not.toContain("line-clamp");
     expect(html).not.toContain("hold-facility-effect-more");
     expect(html).toContain("HOLD-SECRET-VAULT keeps the old ledger.");

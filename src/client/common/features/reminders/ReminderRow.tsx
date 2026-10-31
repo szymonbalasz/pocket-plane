@@ -63,7 +63,7 @@ function RollChip({
       disabled={block !== null}
       data-reason={block ?? undefined}
     >
-      <span className="min-w-0 break-words">{roll.label}</span>
+      <span className="min-w-0 [overflow-wrap:anywhere]">{roll.label}</span>
       <span className="shrink-0 font-mono text-xs text-muted-foreground">{roll.expression}</span>
     </RollButton>
   );
@@ -110,10 +110,11 @@ export function ReminderRow({
       data-dm-only={hidden !== null}
       className="flex min-w-0 flex-col gap-1 rounded-md border px-2 py-1.5"
     >
-      <div className="flex min-w-0 items-start gap-1.5">
+      {/* Below 10rem the badge and the menu take the next line, not the text's width. */}
+      <div className="flex min-w-0 flex-wrap items-start gap-1.5">
         <p
           data-testid="rem-row-text"
-          className="min-w-0 flex-1 text-sm break-words whitespace-pre-wrap"
+          className="min-w-0 flex-[1_1_10rem] text-sm [overflow-wrap:anywhere] whitespace-pre-wrap"
         >
           {r.text}
         </p>

@@ -8,6 +8,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
+import { brokenWords, dmIntent, resizeTo } from "./support/text-fit";
 
 const NAME = "Accursed-Specter-Of-The-Very-Long-Unbroken-Feature-Name-Here";
 const WORD = "Hexbladecursedsoulboundspectralshadowarmourofthedarkfathom";
@@ -35,20 +36,6 @@ async function setText(field: Locator, value: string) {
   await field.fill(value);
   await field.blur();
   await expect(field).toHaveValue(value);
-}
-
-async function resizeTo(page: Page, win: Locator, w: number) {
-  const now = (await win.boundingBox())?.width ?? 0;
-  const handle = await win.getByTestId("ui-window-resize").boundingBox();
-  if (!handle) throw new Error("no resize handle");
-  const y = handle.y + handle.height / 2;
-  const x = handle.x + handle.width / 2;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x + (w - now) / 2, y, { steps: 4 });
-  await page.mouse.move(x + (w - now), y, { steps: 4 });
-  await page.mouse.up();
-  await expect.poll(async () => Math.round((await win.boundingBox())?.width ?? 0)).toBe(w);
 }
 
 async function moveTo(page: Page, win: Locator, x: number, y: number) {
@@ -152,4 +139,57 @@ test("FR-CHARX-114 FR-CHARX-118 full text: long feature and item text wraps at 2
   await win.screenshot({ path: ".verify/sheet-full-text/limited-uses-680.png" });
   await expect(main.getByTestId("dicex-notation").first()).toHaveAttribute("data-value", "1d6");
   expect(await overflow(win)).toEqual({ scroll: 0, past: [] });
+});
+
+test("full text: the header's level line wraps a 40-character species at 280 px, nothing cut; the name keeps its two lines; a short line stays one line", async ({
+  browser,
+}) => {
+  const { secret, recordId } = e2eEnv();
+  const mira = recordId("char-mira", "entity");
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  const species = "Reborn Half-Dragon of the Shattered Isle";
+  expect(species).toHaveLength(40);
+  await dmIntent(dm, secret, "char.edit", {
+    creatureId: mira,
+    set: { species, name: "Mirabelle of the Very Long Sheet Name Xy" },
+  });
+  const win = await openWindow(dm, "char.sheet");
+  await pickSheet(win, mira);
+  await resizeTo(dm, win, 280);
+
+  const level = win.getByTestId("char-sheet-level");
+  await expect(level).toContainText(species);
+  const cut = await level.evaluate((l) => {
+    const right = (l.closest('[data-testid="charx-header"]') as HTMLElement).getBoundingClientRect()
+      .right;
+    const parts = [...l.querySelectorAll("span"), l];
+    return {
+      past: parts.filter((p) => p.getBoundingClientRect().right > right + 1).length,
+      lines: Math.round(
+        l.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(l).lineHeight),
+      ),
+    };
+  });
+  expect(cut.past).toBe(0);
+  expect(cut.lines).toBeGreaterThan(1);
+  expect(await brokenWords(win.getByTestId("charx-header"))).toEqual([]);
+  await win.screenshot({ path: ".verify/sheet-full-text/level-line-280.png" });
+  const name = await win.getByTestId("char-sheet-name").evaluate((n) => ({
+    h: n.getBoundingClientRect().height,
+    line: Number.parseFloat(getComputedStyle(n).lineHeight),
+  }));
+  expect(Math.round(name.h / name.line)).toBeLessThanOrEqual(2);
+
+  // A short line is one unit still (K13).
+  await dmIntent(dm, secret, "char.edit", { creatureId: mira, set: { species: "Human" } });
+  await expect(level).toContainText("· Human");
+  await resizeTo(dm, win, 460);
+  const short = await level.evaluate((l) =>
+    Math.round(
+      l.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(l).lineHeight),
+    ),
+  );
+  expect(short).toBe(1);
 });

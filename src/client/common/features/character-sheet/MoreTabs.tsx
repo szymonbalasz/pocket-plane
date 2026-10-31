@@ -118,7 +118,7 @@ function FeatureText({ f }: { f: FeatureRow }) {
   const ctx = useSheet();
   if (!f.text) return null;
   return (
-    <p className="text-xs break-words whitespace-pre-wrap text-muted-foreground">
+    <p className="text-xs [overflow-wrap:anywhere] whitespace-pre-wrap text-muted-foreground">
       <DiceText text={f.text} context={notationContext(ctx, f.name)} />
     </p>
   );
@@ -189,9 +189,13 @@ function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count:
         </>
       ) : (
         <>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="min-w-0 break-words text-sm font-medium">{f.name}</span>
-            {f.source && <span className="text-[10px] text-muted-foreground">{f.source}</span>}
+          <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+            <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">{f.name}</span>
+            {f.source && (
+              <span className="ml-auto min-w-0 text-[10px] [overflow-wrap:anywhere] text-muted-foreground">
+                {f.source}
+              </span>
+            )}
           </div>
           <FeatureText f={f} />
         </>
@@ -244,7 +248,7 @@ export function LimitedUsesBox() {
           className="flex flex-col gap-0.5 border-b py-1.5 last:border-b-0"
         >
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
-            <span className="min-w-0 break-words text-sm font-medium">{f.name}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">{f.name}</span>
             <FeatureUses f={f} />
           </div>
           <FeatureText f={f} />
@@ -306,7 +310,7 @@ function ItemView({ it, index, count }: { it: ItemRow; index: number; count: num
         </div>
       ) : (
         <div className="flex items-baseline justify-between gap-2 text-sm">
-          <span className="min-w-0 break-words">
+          <span className="min-w-0 [overflow-wrap:anywhere]">
             {it.name}
             {it.qty !== 1 && <span className="text-muted-foreground"> ×{it.qty}</span>}
           </span>

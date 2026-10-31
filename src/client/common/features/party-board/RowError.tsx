@@ -8,7 +8,7 @@ export function RowError({ children }: { children: ReactNode }) {
     <span
       role="alert"
       data-slot="party-row-error"
-      className="order-last w-full basis-full break-words text-xs text-destructive"
+      className="order-last w-full basis-full [overflow-wrap:anywhere] text-xs text-destructive"
     >
       {children}
     </span>

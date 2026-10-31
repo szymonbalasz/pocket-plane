@@ -602,13 +602,15 @@ describe("K13 wide Main (DM #363)", () => {
     const para = /<p [^>]*>.*<\/p>/s.exec(row)?.[0] ?? "";
     expect(text(para)).toBe(body);
     expect(para).toContain("whitespace-pre-wrap");
-    expect(para).toContain("break-words");
+    expect(para).toContain("[overflow-wrap:anywhere]");
     expect(para).toContain('data-testid="dicex-notation" data-value="1d6"');
     // Nothing cuts it, name included, and no Tooltip trigger wraps the paragraph.
     expect(row).not.toContain("truncate");
     expect(row).not.toContain("line-clamp");
     expect(/<p [^>]*>/.exec(para)?.[0]).not.toContain("data-state");
-    expect(row).toContain(`<span class="min-w-0 break-words text-sm font-medium">${name}</span>`);
+    expect(row).toContain(
+      `<span class="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">${name}</span>`,
+    );
     // Same rendering as the Features tab.
     expect(render(<FeaturesTab />, { client: "player", features: rows })).toContain(para);
   });
@@ -627,7 +629,9 @@ describe("K13 wide Main (DM #363)", () => {
     const wide = wideMain({ client: "dm" });
     const row = elementAt(wide, 'data-testid="charx-attack" data-record-id="lb" data-scope="main"');
     expect(row).toContain("py-[7px] last:border-b-0");
-    expect(row).toContain('<span class="min-w-0 break-words text-[15px] font-bold">Longbow</span>');
+    expect(row).toContain(
+      '<span class="min-w-0 [overflow-wrap:anywhere] text-[15px] font-bold">Longbow</span>',
+    );
     expect(row).toContain('class="mt-[5px] flex flex-wrap gap-[5px]"');
     expect(row).not.toContain("justify-end");
     const btn = /<button[^>]*data-testid="charx-roll-attack"[^>]*>/.exec(row)?.[0] ?? "";
@@ -1064,7 +1068,7 @@ describe("K11 walkthrough fixes", () => {
     expect(text(derive)).toBe("");
     expect(html).toContain('data-testid="charx-readonly"');
     expect(html).toContain("line-clamp-2 min-w-0 break-normal text-balance");
-    expect(html).not.toMatch(/<span class="[^"]*break-words[^"]*">Elite Goblin</);
+    expect(html).not.toMatch(/<span class="[^"]*overflow-wrap[^"]*">Elite Goblin</);
   });
 
   test("FR-KIT-85 level line wraps between parts, never right after a '·' (each later part keeps its '·')", () => {
@@ -1073,9 +1077,9 @@ describe("K11 walkthrough fixes", () => {
     // The level line closes the name column (K13: the actions float before the name).
     const line = `<span ${html.slice(from, html.indexOf("</span></div>", from))}`;
     expect(text(line)).toBe("CR 1 · 200 XP");
-    expect(line).toContain('<span class="whitespace-nowrap">· 200 XP</span>');
+    expect(line).toContain('<span class="inline-block max-w-full">· 200 XP</span>');
     // Every "·" opens an unbreakable part.
-    expect(line.match(/·/g)?.length).toBe(line.match(/whitespace-nowrap">·/g)?.length);
+    expect(line.match(/·/g)?.length).toBe(line.match(/inline-block max-w-full">·/g)?.length);
   });
 
   test("FR-CHARX-106 custom NPC boxes: HP max is a plain box (value under its label, as Speed); the Initiative button's label and value start at the top as Speed / Prof", () => {
@@ -1206,13 +1210,13 @@ describe("full text on the sheet (DM: reading text is never cut)", () => {
   test("FR-CHARX-114 long attack, spell and skill names wrap", () => {
     const html = wide({ client: "player" });
     expect(elementAt(html, 'data-testid="charx-attack" data-record-id="lb"')).toContain(
-      '<span class="min-w-0 break-words text-[15px] font-bold">Longbow</span>',
+      '<span class="min-w-0 [overflow-wrap:anywhere] text-[15px] font-bold">Longbow</span>',
     );
     expect(elementAt(html, 'data-testid="charx-spell" data-record-id="hm"')).toContain(
-      "min-w-0 break-words text-[15px] font-bold",
+      "min-w-0 [overflow-wrap:anywhere] text-[15px] font-bold",
     );
     expect(elementAt(html, 'data-testid="charx-skill" data-value="stealth"')).toContain(
-      '<span class="min-w-0 flex-1 break-words">Stealth</span>',
+      '<span class="min-w-0 flex-1 [overflow-wrap:anywhere]">Stealth</span>',
     );
   });
 
@@ -1222,7 +1226,9 @@ describe("full text on the sheet (DM: reading text is never cut)", () => {
       inventory({ client: "player", items: [item] }),
       'data-testid="charx-item" data-record-id="i1"',
     );
-    expect(row).toContain('<span class="min-w-0 break-words">Very Long Named Bag of Holding');
+    expect(row).toContain(
+      '<span class="min-w-0 [overflow-wrap:anywhere]">Very Long Named Bag of Holding',
+    );
     expect(text(row)).toContain("Very Long Named Bag of Holding ×2");
   });
 });

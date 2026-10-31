@@ -364,7 +364,7 @@ describe("Party status (FR-PARTY-51–56)", () => {
     const html = render(DM, inputs.dm);
     expect(ids(html, "party-summary-row")).toEqual(["brakka", "mira", "thorn"]);
     // Full text: the summary line under the name wraps, never cut.
-    expect(html).toContain('data-testid="party-summary-line" class="break-words');
+    expect(html).toContain('data-testid="party-summary-line" class="[overflow-wrap:anywhere]');
     expect(ids(html, "party-companion-group")).toEqual(["brakka", "mira", "thorn"]);
     expect(ids(html, "party-companion-row")).toEqual(["c-fe", "owl"]);
     expect(html.match(/data-testid="party-summary-hidden"/g)).toHaveLength(1);
@@ -720,7 +720,7 @@ describe("FR-KIT-83 companion row", () => {
     );
     // No error on the row: it stays one line (the wrap only applies with a `RowError` inside).
     expect(owl).not.toMatch(/[ "]flex-wrap/);
-    expect(owl).not.toContain("break-words");
+    expect(owl).not.toContain("overflow-wrap");
     expect(owl).toContain('class="flex min-w-0 flex-1 items-center gap-x-1.5"');
   });
 
