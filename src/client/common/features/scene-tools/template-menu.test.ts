@@ -1,17 +1,29 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { RecordStore } from "@shared/protocol/store";
-import { AOE_TEMPLATE_TYPE, type TemplateRecordView } from "@shared/scene-tools/schemas";
+import {
+  AOE_TEMPLATE_TYPE,
+  SCN_SIGNALS,
+  type TemplateRecordView,
+} from "@shared/scene-tools/schemas";
 import type { LayerMenuContext } from "../scenes-map/layers";
 import { useMapTool } from "../scenes-map/tool-store";
 import {
+  bindAoe,
   closeTemplateMenu,
   editFromMenu,
+  showOwn,
+  templateCleared,
   templateContextMenu,
   useAoe,
   useTemplateMenu,
 } from "./aoe-store";
 import {
+  clearFrame,
+  type EphemeralTemplate,
+  ephemeralAt,
+  placeFrame,
   type TemplateHitOptions,
+  type TemplateView,
   templateAt,
   templateMenuItems,
   templateMenuStays,
@@ -105,6 +117,119 @@ describe("FR-SCN-49 templateAt", () => {
     expect(idAt(350, 350, { ...p1, blind: true })).toBe("sphere");
     expect(idAt(350, 350, { ...p2, blind: true })).toBe("cube");
     expect(idAt(350, 350, { ...p1, blind: true, myPlayerId: null })).toBeUndefined();
+  });
+});
+
+describe("FR-SCN-58 right click removes a template under the AoE tool", () => {
+  // A sphere at (5, 5) (r 140 px around (350, 350)) and a cube at (10, 10) (700..840).
+  const view = (t: Partial<TemplateView>): TemplateView => ({
+    shape: "sphere",
+    x: 5,
+    y: 5,
+    size: 10,
+    width: null,
+    angle: 0,
+    label: "",
+    ...t,
+  });
+  const other = (id: string, from: EphemeralTemplate["from"], t: Partial<TemplateView>) =>
+    ({
+      id,
+      key: `key-${id}`,
+      sceneId: "s1",
+      from,
+      template: view(t),
+      dmOnly: false,
+      at: 0,
+    }) as EphemeralTemplate;
+  const mira = other("mira", { role: "player", playerId: "p1" }, { x: 5, y: 5 });
+  const tab2 = other("tab2", { role: "dm" }, { shape: "cube", x: 10, y: 10 });
+  const opts = { client: "dm", scale: 1, grid: GRID } as const;
+
+  afterEach(() => {
+    closeTemplateMenu();
+    useAoe.setState({ own: null, others: [], gesture: null, originCell: null });
+  });
+
+  const ctx = (client: "dm" | "player", tool: string | null) =>
+    ({
+      client,
+      myPlayerId: client === "player" ? "p2" : null,
+      scene: { id: "s1" },
+      store: { records: {} },
+      cam: { x: 0, y: 0, scale: 1 },
+      grid: GRID,
+      off: {},
+      activeTool: tool ? { id: tool } : null,
+    }) as unknown as LayerMenuContext;
+
+  test("FR-SCN-58 ephemeralAt: own on top, then the DM's others; a player never hits another's", () => {
+    expect(ephemeralAt(at(350, 350), view({}), [mira], opts)).toBe("own");
+    expect(ephemeralAt(at(350, 350), null, [mira], opts)).toBe(mira);
+    expect(ephemeralAt(at(770, 770), null, [mira, tab2], opts)).toBe(tab2);
+    expect(ephemeralAt(at(350, 350 - 140 - 5), null, [mira], opts)).toBe(mira); // within 6 px
+    expect(ephemeralAt(at(350, 350 - 140 - 8), null, [mira], opts)).toBeNull();
+    const player = { ...opts, client: "player" } as const;
+    expect(ephemeralAt(at(350, 350), null, [mira], player)).toBeNull();
+    expect(ephemeralAt(at(350, 350), view({}), [mira], player)).toBe("own");
+  });
+
+  test("FR-SCN-58 clearFrame names the player; a DM tab's has none", () => {
+    expect(clearFrame(mira)).toEqual({ sceneId: "s1", key: "key-mira", playerId: "p1" });
+    expect(clearFrame(tab2)).toEqual({ sceneId: "s1", key: "key-tab2" });
+  });
+
+  test("FR-SCN-58 own ephemeral: only with the AoE tool on, gone at once with one end frame", () => {
+    const sent: [string, unknown][] = [];
+    bindAoe(
+      (n, d) => sent.push([n, d]),
+      async () => null,
+    );
+    showOwn("s1", view({}));
+    sent.length = 0;
+    expect(templateContextMenu.hit(at(350, 350), ctx("player", "aoe"))).toBe(true);
+    expect(templateContextMenu.hit(at(350, 350), ctx("player", null))).toBe(false);
+    expect(templateContextMenu.first?.(ctx("player", "aoe"))).toBe(true);
+    expect(templateContextMenu.first?.(ctx("player", null))).toBe(false);
+    templateContextMenu.open(at(350, 350), at(1, 2), ctx("player", "aoe"));
+    expect(useAoe.getState().own).toBeNull();
+    expect(useTemplateMenu.getState().open).toBeNull();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.[0]).toBe(SCN_SIGNALS.template);
+    expect(sent[0]?.[1]).toMatchObject({ sceneId: "s1", end: true });
+  });
+
+  test("FR-SCN-58 the DM clears another's ephemeral by signal; a player's press on it does nothing", () => {
+    const sent: [string, unknown][] = [];
+    bindAoe(
+      (n, d) => sent.push([n, d]),
+      async () => null,
+    );
+    useAoe.setState({ others: [mira] });
+    expect(templateContextMenu.hit(at(350, 350), ctx("player", "aoe"))).toBe(false);
+    expect(templateContextMenu.hit(at(350, 350), ctx("dm", "aoe"))).toBe(true);
+    templateContextMenu.open(at(350, 350), at(1, 2), ctx("dm", "aoe"));
+    expect(sent).toEqual([
+      [SCN_SIGNALS.templateClear, { sceneId: "s1", key: "key-mira", playerId: "p1" }],
+    ]);
+  });
+
+  test("FR-SCN-58 templateCleared: only this connection's key ends it, a placement in progress too", () => {
+    const sent: unknown[] = [];
+    bindAoe(
+      (_n, d) => sent.push(d),
+      async () => null,
+    );
+    const press = { x: 5, y: 5 };
+    showOwn("s1", view({}));
+    useAoe.setState({ gesture: { kind: "place", press, angle: 0 } });
+    templateCleared("someone-else");
+    expect(useAoe.getState().own).not.toBeNull();
+    const key = (sent[0] as { key: string }).key;
+    expect(key).toBe(placeFrame("s1", key, view({}), false).key);
+    templateCleared(key);
+    expect(useAoe.getState().own).toBeNull();
+    expect(useAoe.getState().gesture).toBeNull();
   });
 });
 

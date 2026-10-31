@@ -57,6 +57,13 @@ export interface PushOptions {
   now?: () => Date;
 }
 
+/** What a refused schema change leaves the DM and the builder to do (AGENTS §3, ADR-0076). */
+const AFTER_REFUSAL = [
+  "Get the campaign back: stop, go back to the previous version of the app and restart, or restore a `play` start-up backup or a `<db>.pre-push-*.bak`.",
+  "Fix the code: keep the old column or table, add the new one and copy at boot (ADR-0076). Never rename or drop in place.",
+  "On a disposable dir (dev, fixtures), `bun run fixtures:reset-load <bundle>` also works.",
+].join("\n");
+
 /** Tables a drizzle-kit table rebuild creates and renames away; left over = interrupted push. */
 export function leftoverRebuildTables(sqlite: Database): string[] {
   return sqlite
@@ -101,10 +108,78 @@ export function applyStatements(sqlite: Database, stmts: readonly string[]): voi
   }
 }
 
+/** Tables drizzle-kit's introspection skips (`filterIgnoredTablesByField`, 0.31). */
+const KIT_IGNORED_TABLE = /^(__drizzle_migrations$|_cf_|_litestream_|libsql_|sqlite_)/;
+
 /**
- * Brings an existing dev DB up to the current schema. Refuses changes that lose data
- * (run `fixtures:reset` on a disposable dir instead) and DBs an interrupted push left
- * half-rebuilt. File DBs are backed up first; statements apply in one transaction (#163).
+ * The questions drizzle-kit would ask before it can diff (0.31, `promptNamedWithSchemasConflict`,
+ * `promptColumnsConflicts`): the schema has a table the DB lacks while the DB has one the schema
+ * lacks, or the same for a table's columns. It can't tell a rename from an add and a drop, and
+ * the push API has no way to answer. One readable line per question; empty = no question.
+ */
+export function renameQuestions(
+  sqlite: Database,
+  wanted: Record<string, { columns: Record<string, unknown> }>,
+): string[] {
+  const live = sqlite
+    .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table'")
+    .all()
+    .map((r) => r.name)
+    .filter((n) => !KIT_IGNORED_TABLE.test(n));
+  const wantedTables = Object.keys(wanted);
+  const onlyWanted = wantedTables.filter((t) => !live.includes(t));
+  const onlyLive = live.filter((t) => !wantedTables.includes(t));
+  const out: string[] = [];
+  if (onlyWanted.length > 0 && onlyLive.length > 0) {
+    out.push(`new table(s) ${onlyWanted.join(", ")}; old table(s) ${onlyLive.join(", ")}`);
+  }
+  for (const table of wantedTables.filter((t) => live.includes(t))) {
+    const liveCols = sqlite
+      .query<{ name: string }, [string]>("SELECT name FROM pragma_table_xinfo(?)")
+      .all(table)
+      .map((c) => c.name);
+    const wantedCols = Object.keys(wanted[table]?.columns ?? {});
+    const added = wantedCols.filter((c) => !liveCols.includes(c));
+    const gone = liveCols.filter((c) => !wantedCols.includes(c));
+    if (added.length > 0 && gone.length > 0) {
+      out.push(
+        `table ${table}: new column(s) ${added.join(", ")}; old column(s) ${gone.join(", ")}`,
+      );
+    }
+  }
+  return out;
+}
+
+const refusedRename = (questions: readonly string[]) =>
+  new SchemaPushError(
+    `Schema change refused; nothing was changed. It looks like a rename, which the schema update at start can't do:\n${questions.map((q) => `  ${q}`).join("\n")}\n${AFTER_REFUSAL}`,
+  );
+
+/**
+ * drizzle-kit prompts only when `process.stdin.isTTY && process.stdout.isTTY` (hanji `render`);
+ * otherwise it rejects with "Interactive prompts require a TTY terminal". In a real terminal the
+ * prompt would wait forever behind the hidden stdout, so stdout says it's no terminal while `fn`
+ * runs: any question `renameQuestions` didn't foresee rejects too, and never waits.
+ */
+export async function withoutPrompts<T>(fn: () => Promise<T>): Promise<T> {
+  const before = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+  Object.defineProperty(process.stdout, "isTTY", { value: false, configurable: true });
+  try {
+    return await fn();
+  } finally {
+    if (before) Object.defineProperty(process.stdout, "isTTY", before);
+    else delete (process.stdout as { isTTY?: boolean }).isTTY;
+  }
+}
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: drizzle-kit colours its warnings with ANSI codes.
+const plainText = (s: string) => s.replace(/\u001b\[\d+m/g, "");
+
+/**
+ * Brings an existing DB up to the current schema. Refuses, with nothing applied and a message
+ * saying what to do, changes drizzle-kit would ask about (BL-172) or that lose data, and DBs an
+ * interrupted push left half-rebuilt. File DBs are backed up first; statements apply in one
+ * transaction (#163).
  */
 export async function pushSchema(
   sqlite: Database,
@@ -122,19 +197,28 @@ export async function pushSchema(
   if (leftovers.length > 0) {
     const where = isFileDb(sqlite) ? sqlite.filename : "the DB";
     throw new SchemaPushError(
-      `${where} has table(s) ${leftovers.join(", ")} left by an interrupted schema change. ` +
-        "Stop the server, copy the newest `<db>.pre-push-*.bak` over the DB (delete its -wal / -shm files), " +
-        "or on a disposable dir run `bun run fixtures:reset-load <bundle>`.",
+      `${where} has table(s) ${leftovers.join(", ")} left by an interrupted schema change; nothing was changed now.\n` +
+        "Get the campaign back: stop, copy the newest `<db>.pre-push-*.bak` or `play` start-up backup over the DB (delete its -wal / -shm files), and restart.\n" +
+        "On a disposable dir (dev, fixtures), `bun run fixtures:reset-load <bundle>` also works.",
     );
   }
   const api = await loadKit();
+  const questions = renameQuestions(sqlite, (await api.generateSQLiteDrizzleJson(schema)).tables);
+  if (questions.length > 0) throw refusedRename(questions);
   const { drizzle } = await import("drizzle-orm/bun-sqlite");
   // drizzle-kit draws a spinner on stdout; keep server output clean.
   const write = process.stdout.write;
   process.stdout.write = (() => true) as typeof write;
   let res: Awaited<ReturnType<typeof api.pushSQLiteSchema>>;
   try {
-    res = await api.pushSQLiteSchema(schema, drizzle(sqlite) as never);
+    res = await withoutPrompts(() => api.pushSQLiteSchema(schema, drizzle(sqlite) as never));
+  } catch (err) {
+    if (/Interactive prompts require/.test(String(err))) {
+      throw refusedRename([
+        "compare schema.ts with the DB: drizzle-kit asked about a table or column",
+      ]);
+    }
+    throw err;
   } finally {
     process.stdout.write = write;
   }
@@ -144,7 +228,7 @@ export async function pushSchema(
   const lossy = res.hasDataLoss ? dropFalseTruncates(res.statementsToExecute, res.warnings) : [];
   if (lossy.length > 0) {
     throw new SchemaPushError(
-      `Schema change would lose data:\n${lossy.join("\n")}\nOn a disposable dir run \`bun run fixtures:reset\`.`,
+      `Schema change refused; nothing was changed. It would lose data:\n${lossy.map((w) => `  ${plainText(w).trim()}`).join("\n")}\n${AFTER_REFUSAL}`,
     );
   }
   const stmts = dropDuplicateIndexCreates(res.statementsToExecute);
@@ -193,9 +277,7 @@ export function dropFalseTruncates(stmts: string[], warnings: string[]): string[
   }
   const truncates = new Set<string>();
   const real = warnings.filter((w) => {
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: drizzle-kit underlines names with ANSI codes.
-    const plain = w.replace(/\u001b\[\d+m/g, "");
-    const col = /add not-null (\S+) column without default value,/.exec(plain)?.[1];
+    const col = /add not-null (\S+) column without default value,/.exec(plainText(w))?.[1];
     const table = col ? addedWithDefault.get(col)?.shift() : undefined;
     if (table) truncates.add(`delete from ${table};`);
     return !table;

@@ -514,6 +514,7 @@ const luckRow = (key: string, name: string, over: Record<string, unknown> = {}) 
   avg: 10.5,
   nat20: 1,
   nat1: 0,
+  faces: new Array<number>(20).fill(0),
   ...over,
 });
 const PLAYER_LUCK: PlayerLuckResult = {
@@ -549,6 +550,22 @@ const luckRows = (html: string) =>
   [...html.matchAll(/data-testid="stats-luck-row" data-record-id="([^"]+)"/g)].map((m) => m[1]);
 
 describe("FR-STATS-41 Luck tab", () => {
+  test("FR-STATS-90 the chart button sits beside the scope picker when the tab can open it", () => {
+    const withChart = wrap(
+      PLAYER,
+      <LuckView
+        list={ok(SESSIONS)}
+        luck={ok(PLAYER_LUCK)}
+        live={true}
+        onPick={() => {}}
+        onChart={() => {}}
+        retry={() => {}}
+      />,
+    );
+    expect(withChart).toContain('data-testid="stats-luck-chart"');
+    expect(luckHtml(PLAYER, ok(PLAYER_LUCK))).not.toContain('data-testid="stats-luck-chart"');
+  });
+
   test("FR-STATS-41 stats-luck: the scope picker, a stats-luck-table of stats-luck-row (data-record-id = character id) in ack order: Name, Rolls, d20s, Avg ('—' with none), Nat 20, Nat 1", () => {
     const html = luckHtml(PLAYER, ok(PLAYER_LUCK));
     expect(html).toContain('data-testid="stats-luck-scope"');

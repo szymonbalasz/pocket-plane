@@ -59,7 +59,7 @@ export function HandoutRow({
       data-record-id={h.id}
       data-shared={sharedModeOf(h)}
       data-new={mark ? "true" : "false"}
-      className="flex items-center gap-1"
+      className="flex items-center gap-1 has-[[data-slot=party-row-error]]:flex-wrap"
     >
       <button
         type="button"
@@ -68,8 +68,8 @@ export function HandoutRow({
       >
         <Thumb h={h} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-medium">{h.title}</span>
+          <span className="flex flex-wrap items-center gap-x-1.5">
+            <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">{h.title}</span>
             {mark}
           </span>
           <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
