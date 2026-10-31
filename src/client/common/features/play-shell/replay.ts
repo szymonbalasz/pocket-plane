@@ -5,6 +5,7 @@
 // runs in the app.
 import { MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
 import { footprint } from "@shared/scenes-map/geometry";
+import { DICEX_TRAY_KIND } from "../dice-extras/window-kind";
 import {
   appearanceKeeps,
   type Camera,
@@ -24,7 +25,14 @@ import { fitRooms, renderedWindowRects, storedLayout } from "./free-area";
 import { isRemembered, placedRect, type Rect, type Viewport, workArea } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import { bruteBest, overlaps, REFERENCE_VIEWPORTS } from "./layout-checks";
-import { defaultLayout, pushBars, useful, type WindowAction, type Windows } from "./manager";
+import {
+  defaultLayout,
+  pushBars,
+  useful,
+  type WindowAction,
+  type Windows,
+  windowId,
+} from "./manager";
 import { type PlacementToken, pcBoxes } from "./placement";
 import type { ShellClient, WindowRegistry } from "./registry";
 import {
@@ -201,6 +209,8 @@ interface Sim {
   lastFull: number;
   /** The last fit's `data-fit-visible` (FR-MAP-46, -59). */
   visible?: FitVisible;
+  /** The window focus is in for the next open (FR-SHELL-210: a script's `from`). */
+  inUse?: string;
   /** The canvas's camera per viewport size (H2 FAIL 5), dropped at a page load. */
   sizeCams: ReturnType<typeof createSizeCameras<SizeCam>>;
   key: string;
@@ -252,6 +262,7 @@ function newController(sim: Omit<Sim, "ctl">): ShellController {
     camera: () => sim.mode,
     dryFit: (obstacles, reason) => dryFit(sim as Sim, obstacles, reason),
     lastFullCell: () => sim.lastFull || null,
+    inUse: () => (sim as Sim).inUse,
     // FR-MAP-97: an accepted yield refits once, still `fitted`.
     onYield: () => {
       (sim as Sim).cam = fitNow(sim as Sim, undefined, "window").cam;
@@ -678,6 +689,8 @@ function checkPutAway(sim: Sim, before: Windows, opened: string, beforeTokens: P
     .filter((w) => !isProtected(sim.registry, w.kind) && !sim.registry.get(w.kind)?.fixedDefault)
     // FR-SHELL-151: only untouched launcher windows are put away.
     .filter((w) => !isRemembered(w))
+    // FR-SHELL-210: the window a tray open came from gives way last.
+    .filter((w) => opened !== DICEX_TRAY_KIND || windowId(w.kind, w.instance) !== sim.inUse)
     .map((w, i) => ({ w, i }))
     .sort((a, b) => a.w.z - b.w.z || a.i - b.i)
     .map((e) => e.w.kind);
@@ -1053,7 +1066,8 @@ export function runReplay(
  * settle, then the resize refit while `fitted`).
  */
 export type ScriptStep =
-  | { open: string }
+  /** `from`: a Dice tray opened from inside that window (focus there, FR-SHELL-210). */
+  | { open: string; from?: string }
   | { close: string }
   | { drag: string; rect: Rect; resized?: boolean }
   | { viewport: Viewport }
@@ -1156,9 +1170,11 @@ export function runScript(
       }
     } else if ("open" in step) {
       const beforeTokens = tokensNow(sim);
+      sim.inUse = step.from === undefined ? undefined : windowId(step.from);
       userOpen(sim, step.open);
       const problems = check(sim, before, { opened: step.open });
       problems.push(...checkPutAway(sim, before, step.open, beforeTokens));
+      sim.inUse = undefined;
       record(`open ${step.open}`, problems);
     } else {
       dispatch(sim, { type: "close", kind: step.close });

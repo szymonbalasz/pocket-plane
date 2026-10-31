@@ -23,6 +23,7 @@
 // squeezed, displaced or pushed (its tool-bar push and on-screen nudge are render-only); zones
 // ignore it. The ladder above runs for untouched windows only.
 import { MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
+import { DICEX_TRAY_KIND } from "../dice-extras/window-kind";
 import {
   clampRect,
   EDGE_GAP,
@@ -154,6 +155,11 @@ export interface ManagerContext {
   onAutoMinimise?: (id: string, forKind: string) => void;
   /** Windows the shell put away, still minimised (`data-auto-minimised`, client memory). */
   autoMinimised?: () => ReadonlySet<string>;
+  /**
+   * The window a Dice tray open came from (FR-SHELL-210: focus was inside it), by window id: it
+   * counts as in use, so it gives way last. Absent: an open from the launcher, the palette, a key.
+   */
+  inUse?: () => string | undefined;
 }
 
 /**
@@ -523,6 +529,15 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   let refit: "window" | undefined;
   const late = new Set<string>();
   const label = trigger.type;
+  /** FR-SHELL-210: the window this Dice tray open came from gives way only as a last resort. */
+  const inUse =
+    (trigger.type === "open" || trigger.type === "reopen" || trigger.type === "settle") &&
+    trigger.kind === DICEX_TRAY_KIND
+      ? ctx.inUse?.()
+      : undefined;
+  /** FR-SHELL-77, -78's candidates for `kind`, without the window in use. */
+  const givesWay = (kind: string, instance: string) =>
+    autoMinimiseOrder(out, ctx, kind, instance, late).filter((w) => idOf(w) !== inUse);
 
   const get = (id: string) => out.find((w) => idOf(w) === id);
   /** FR-SHELL-145: a remembered window is never written by the placer (I9, I12). */
@@ -771,7 +786,12 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       }
       return null;
     };
-    const order = () => autoMinimiseOrder(out, ctx, w0.kind, w0.instance, late);
+    const order = () => givesWay(w0.kind, w0.instance);
+    /** FR-SHELL-212: the window in use, while it could still be put away. */
+    const held = () =>
+      o.putAway
+        ? autoMinimiseOrder(out, ctx, w0.kind, w0.instance, late).find((w) => idOf(w) === inUse)
+        : undefined;
     let aheadUseful: boolean | null = null;
     let aheadMin: boolean | null = null;
     /**
@@ -779,8 +799,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
      * size the map's yield counts too (F9: put Stats away, then the map yields to the card, before
      * either goes below useful).
      */
-    const lookAhead = (more: Partial<PlaceInput>) => {
-      const gone = new Set(order().map(idOf));
+    const lookAhead = (more: Partial<PlaceInput>, also?: WindowState) => {
+      const gone = new Set([...order(), ...(also ? [also] : [])].map(idOf));
       const keep: Obstacle[] = [];
       for (const [w, r] of shownMap()) {
         if (idOf(w) === id || gone.has(idOf(w))) continue;
@@ -922,6 +942,14 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
           continue;
         }
       }
+      // FR-SHELL-212: PCs clear first. The window in use goes only when nothing else keeps them
+      // clear, the others before it, and it comes back when the window placed ends.
+      const inUseWin = held();
+      if (inUseWin && lookAhead({}, inUseWin)) {
+        if (first) putAwayWin(first, o.cause ?? null, w0.kind);
+        else putAwayWin(inUseWin, `window:${w0.kind}`, w0.kind);
+        continue;
+      }
       const e = placeWindow(def, vp, { ...input(), leastPc: true });
       if (e.clear && !e.pcClear && o.prev && staysAt(id, o.prev, e.rect)) {
         // Least movement (ADR-0060 §4): L5 never trades the window's own clear rect for one over
@@ -931,6 +959,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       if (e.clear) return { rect: e.rect, rung: e.pcClear ? "L4" : "L5", pcClear: e.pcClear };
       if (first) {
         putAwayWin(first, o.cause ?? null, w0.kind);
+        continue;
+      }
+      if (inUseWin) {
+        putAwayWin(inUseWin, `window:${w0.kind}`, w0.kind);
         continue;
       }
       const last = placeWindow(def, vp, { ...input(), leastPc: true, lastResort: true });
@@ -1016,7 +1048,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
    */
   const shrinkFor = (w: WindowState, retry: () => Spot | null): Spot | null => {
     const done: { id: string; before: WindowState }[] = [];
-    for (const o of autoMinimiseOrder(out, ctx, w.kind, w.instance, late)) {
+    for (const o of givesWay(w.kind, w.instance)) {
       const def = defOf(o);
       if (!def) continue;
       const r = rendered(o);

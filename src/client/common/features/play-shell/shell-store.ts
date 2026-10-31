@@ -271,6 +271,8 @@ export function createShellController(opts: {
   onReset?: () => void;
   /** Who this page is, for `onAbsorb` (FR-SHELL-155). */
   you?: () => You | null;
+  /** The window keyboard focus is in, by window id (FR-SHELL-210: where a tray open came from). */
+  inUse?: () => string | undefined;
   warn?: (msg: string) => void;
 }): ShellController {
   const { registry, storage } = opts;
@@ -293,6 +295,8 @@ export function createShellController(opts: {
   const regionsAt = (vp: Viewport) => opts.keepOuts?.(vp) ?? keepOuts(registry.client, vp);
   const allKinds = () => new Set(registry.defs.map((d) => d.kind));
   let blocked = false;
+  /** FR-SHELL-210: the window the last open came from; its `settle` runs with the same one. */
+  let opener: string | undefined;
   const queued = new Map<string, { action: WindowAction; available: ReadonlySet<string> }>();
   const queueKey = (a: WindowAction) =>
     isLayoutAction(a) ? a.type : `${a.type}:${windowId(a.kind, a.instance)}`;
@@ -318,6 +322,7 @@ export function createShellController(opts: {
       settledViewport: state.settledAt ?? viewport,
       onAutoMinimise: (id, forKind) => moves.set(id, forKind),
       autoMinimised: () => state.autoMinimised,
+      inUse: () => opener,
     };
   };
   const ctl: ShellController = {
@@ -417,6 +422,7 @@ export function createShellController(opts: {
         return;
       }
       const moves = new Map<string, string>();
+      if (action.type === "open" || action.type === "toggle") opener = opts.inUse?.();
       const ctx = contextFor(state, available, moves);
       // FR-SHELL-56: whether a user reopen finds its stored rect covered (`data-placed`).
       const named = isLayoutAction(action)
