@@ -81,7 +81,7 @@ function Segments({
 }
 
 /**
- * FR-SCN-57: one-way walls as one shape: the line and its arrows, the way sight passes. Also the
+ * FR-SCN-61: one-way walls as one shape: the line and its arrows, the way sight passes. Also the
  * Structure tool's preview of a polyline in progress.
  */
 export function OneWaySegments({
@@ -361,7 +361,7 @@ export function ScnStructureLayer() {
             width={width}
             attrs={{ count: walls.plain.length }}
           />
-          {/* FR-SCN-57: a window is a hollow line: glass between two edges. */}
+          {/* FR-SCN-61: a window is a hollow line: glass between two edges. */}
           <Segments
             segs={walls.windows}
             name="scn-windows"

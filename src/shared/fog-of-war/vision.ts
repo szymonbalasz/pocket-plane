@@ -8,7 +8,7 @@
 //   `occluders` (raw segments or `prepareOccluders(...)`). r ≤ 0 → null. A segment through the
 //   origin (origin on a wall, or on its line) never occludes: both sides are seen, every other
 //   occluder still cuts beyond. `sightPolygons(origin, radii, occluders)`: the same for several
-//   radii from one sweep (a source's `see` and `dark`, FR-FOG-33). A one-way segment (FR-SCN-57)
+//   radii from one sweep (a source's `see` and `dark`, FR-FOG-33). A one-way segment (FR-SCN-61)
 //   only occludes for an origin on the left of its direction, as seen on screen (y down).
 // - `prepareOccluders(segs)`: scaled segments + their pairwise crossings, computed once per scene
 //   and shared by every source (the angular sweep needs crossings as events).
@@ -42,7 +42,7 @@ import {
   shapeEdges,
 } from "./shapes";
 
-/** A segment `[x1, y1, x2, y2]` in grid units; a final `1` = one-way (FR-SCN-57). */
+/** A segment `[x1, y1, x2, y2]` in grid units; a final `1` = one-way (FR-SCN-61). */
 export type Seg = readonly [x1: number, y1: number, x2: number, y2: number, oneWay?: 1];
 
 /**
@@ -84,7 +84,7 @@ const TWO_PI = 2 * Math.PI;
 export interface PreparedOccluders {
   readonly segs: Float64Array;
   readonly crossings: Float64Array;
-  /** FR-SCN-57: 1 per one-way segment; null when the scene has none. */
+  /** FR-SCN-61: 1 per one-way segment; null when the scene has none. */
   readonly oneWay: Uint8Array | null;
 }
 
@@ -323,7 +323,7 @@ function arcBins(a: number, b: number, visit: (bin: number) => void) {
  * pass 1 sweeps only the occluders within 4 cells (no crossings: its boundary can only be
  * farther than the true one, so it is an upper bound per direction); pass 2 sweeps only the
  * occluders that come nearer than that bound somewhere in their angular span (the others are
- * never the nearest), with their crossings. Same result as one sweep over everything. FR-SCN-57:
+ * never the nearest), with their crossings. Same result as one sweep over everything. FR-SCN-61:
  * a one-way segment whose see-through side holds the origin is dropped here; a crossing of it
  * only adds a harmless event direction.
  */

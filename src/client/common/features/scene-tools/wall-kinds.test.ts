@@ -1,4 +1,4 @@
-// FR-SCN-57–59 in the Structure tool: Window and One-way draw like Wall with their kind and
+// FR-SCN-61–63 in the Structure tool: Window and One-way draw like Wall with their kind and
 // `replace`; undo gives back what a polyline replaced, by kind; Flip picks one-way walls only (a
 // click or a Ctrl-drag box) and undoes itself; a one-way wall's arrows point the way sight passes.
 import { afterEach, describe, expect, test } from "bun:test";
@@ -82,8 +82,8 @@ const steps = () =>
     .stacks.s1?.at(-1)
     ?.steps.map((s) => [s.name, s.input]);
 
-describe("FR-SCN-57 / -58 drawing", () => {
-  test("FR-SCN-57 the modes: which draw lines, with which kind; which show the Free chip", () => {
+describe("FR-SCN-61 / -62 drawing", () => {
+  test("FR-SCN-61 the modes: which draw lines, with which kind; which show the Free chip", () => {
     expect(STRUCTURE_MODES.filter(drawsLine)).toEqual(["wall", "window", "one-way"]);
     expect(lineKind("wall")).toBeUndefined();
     expect(lineKind("window")).toBe(WINDOW);
@@ -98,7 +98,7 @@ describe("FR-SCN-57 / -58 drawing", () => {
     ["window", WINDOW],
     ["one-way", ONE_WAY],
   ] as const) {
-    test(`FR-SCN-57 ${mode}: clicks, a double-click ends with one scn.addWalls of that kind, in drawn order`, async () => {
+    test(`FR-SCN-61 ${mode}: clicks, a double-click ends with one scn.addWalls of that kind, in drawn order`, async () => {
       const h = harness({ [S.addWalls]: { ns: [6, 7] } });
       setStructureMode(mode);
       h.p.down?.(h.at(1, 1));
@@ -123,7 +123,7 @@ describe("FR-SCN-57 / -58 drawing", () => {
     });
   }
 
-  test("FR-SCN-58 undo: what the polyline replaced comes back first, per kind and with its direction; then what it drew and the pieces go", async () => {
+  test("FR-SCN-62 undo: what the polyline replaced comes back first, per kind and with its direction; then what it drew and the pieces go", async () => {
     const h = harness({
       [S.addWalls]: {
         ns: [6],
@@ -145,7 +145,7 @@ describe("FR-SCN-57 / -58 drawing", () => {
     ]);
   });
 
-  test("FR-SCN-57 erase: undo re-adds each wall with its kind and direction", async () => {
+  test("FR-SCN-61 erase: undo re-adds each wall with its kind and direction", async () => {
     const h = harness();
     setStructureMode("erase");
     h.p.down?.(h.at(7, 0, { shift: true }));
@@ -170,8 +170,8 @@ describe("FR-SCN-57 / -58 drawing", () => {
   });
 });
 
-describe("FR-SCN-59 Flip", () => {
-  test("FR-SCN-59 a click flips the one-way wall under it; undo flips it back", async () => {
+describe("FR-SCN-63 Flip", () => {
+  test("FR-SCN-63 a click flips the one-way wall under it; undo flips it back", async () => {
     const h = harness();
     setStructureMode("flip");
     h.p.down?.(h.at(10, 2));
@@ -180,7 +180,7 @@ describe("FR-SCN-59 Flip", () => {
     expect(steps()).toEqual([[S.flipWalls, { sceneId: "s1", ns: [3] }]]);
   });
 
-  test("FR-SCN-59 a click on a plain wall, a window or a door does nothing", async () => {
+  test("FR-SCN-63 a click on a plain wall, a window or a door does nothing", async () => {
     const h = harness();
     setStructureMode("flip");
     for (const x of [8, 9, 12]) {
@@ -192,7 +192,7 @@ describe("FR-SCN-59 Flip", () => {
     expect(h.sent).toEqual([]);
   });
 
-  test("FR-SCN-59 hover names the wall it would flip; a Ctrl-drag box flips one-way walls only", async () => {
+  test("FR-SCN-63 hover names the wall it would flip; a Ctrl-drag box flips one-way walls only", async () => {
     const h = harness();
     setStructureMode("flip");
     h.p.move?.(h.at(11, 2));
@@ -203,7 +203,7 @@ describe("FR-SCN-59 Flip", () => {
     expect(h.sent).toEqual([[S.flipWalls, { sceneId: "s1", ns: [3, 4] }]]);
   });
 
-  test("FR-SCN-59 a box with no one-way wall sends nothing", async () => {
+  test("FR-SCN-63 a box with no one-way wall sends nothing", async () => {
     const h = harness();
     setStructureMode("flip");
     h.p.down?.(h.at(7.5, 0, { ctrl: true }));
@@ -213,8 +213,8 @@ describe("FR-SCN-59 Flip", () => {
   });
 });
 
-describe("FR-SCN-57 drawing the kinds", () => {
-  test("FR-SCN-57 wallsByKind splits them in map px", () => {
+describe("FR-SCN-61 drawing the kinds", () => {
+  test("FR-SCN-61 wallsByKind splits them in map px", () => {
     const k = wallsByKind(REC.walls, GRID);
     expect(k.plain).toEqual([[560, 0, 560, 350]]);
     expect(k.windows).toEqual([[630, 0, 630, 350]]);
@@ -224,7 +224,7 @@ describe("FR-SCN-57 drawing the kinds", () => {
     ]);
   });
 
-  test("FR-SCN-57 about one arrow per cell, and they point the way sight passes", () => {
+  test("FR-SCN-61 about one arrow per cell, and they point the way sight passes", () => {
     const arrows = oneWayArrows([560, 0, 560, 700], 70);
     expect(arrows).toHaveLength(10);
     for (const [x1, , tx, , x2] of arrows) {
@@ -240,14 +240,14 @@ describe("FR-SCN-57 drawing the kinds", () => {
     expect(oneWayArrows([560, 700, 560, 0], 70).every(([, , tx]) => tx < 560)).toBe(true);
   });
 
-  test("FR-SCN-57 a wall under a cell long still gets one arrow, no wider than itself", () => {
+  test("FR-SCN-61 a wall under a cell long still gets one arrow, no wider than itself", () => {
     const [a] = oneWayArrows([0, 0, 7, 0], 70);
     expect(a?.[0]).toBeCloseTo(0);
     expect(a?.[4]).toBeCloseTo(7);
     expect(oneWayArrows([5, 5, 5, 5], 70)).toEqual([]);
   });
 
-  test("FR-SCN-59 oneWayView leaves only one-way walls to hit", () => {
+  test("FR-SCN-63 oneWayView leaves only one-way walls to hit", () => {
     const v = oneWayView(structureView(REC));
     expect(v.walls.map((w) => w[0])).toEqual([3, 4]);
     expect(v.doors).toEqual([]);

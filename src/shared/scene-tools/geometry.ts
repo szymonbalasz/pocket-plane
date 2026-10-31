@@ -5,7 +5,7 @@
 // points carry ≤ 2 decimals; the blocking rule runs on integers scaled by 200 (FR-SCN-10); walls
 // and non-open doors are FOG's sight occluders (FR-SCN-37); door sample points (FR-SCN-36); the
 // first-crossing wall hint for `map.checkMove` (FR-SCN-38). Sprint 4: template cells come from
-// the shared coverage helper `@shared/scenes-map/area` (FR-SCN-41, -42). FR-SCN-57: window and
+// the shared coverage helper `@shared/scenes-map/area` (FR-SCN-41, -42). FR-SCN-61: window and
 // one-way walls block moves like any wall; only `sightOccluders` tells them apart.
 import { cells, footprintCells, templateArea } from "@shared/scenes-map/area";
 import { distanceFt as distance5105, type Grid, type MapRect } from "@shared/scenes-map/geometry";
@@ -204,7 +204,7 @@ export function blockingSegments(
 export type SightSegment = readonly [x1: number, y1: number, x2: number, y2: number, oneWay?: 1];
 
 /**
- * FR-SCN-37: walls and doors whose state ≠ open, as FOG's sight occluders (grid units). FR-SCN-57:
+ * FR-SCN-37: walls and doors whose state ≠ open, as FOG's sight occluders (grid units). FR-SCN-61:
  * without windows; a one-way wall keeps its direction and says so.
  */
 export function sightOccluders(structure: {

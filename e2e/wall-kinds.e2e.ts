@@ -1,5 +1,5 @@
 // e2e-bundle: wall-kinds
-// Windows and one-way walls (FR-SCN-57–59), DM + player-1 in separate contexts on Goblin Ambush.
+// Windows and one-way walls (FR-SCN-61–63), DM + player-1 in separate contexts on Goblin Ambush.
 // The wall at x = 8 stands between Mira (moved to (7, 7)) and the Goblin (12, 6). The DM draws a
 // Window into it: player-1 sees the Goblin but can't walk through; the DM can. Undo closes it.
 // Then a One-way wall, drawn downwards so its arrows point east: player-1 sees the Goblin from the
@@ -66,7 +66,7 @@ async function draw(dm: Page, points: [number, number][]) {
   }
 }
 
-test("FR-SCN-57 / -58 / -59 windows see through, one-way walls one way, nobody walks through but the DM (DM + player-1)", async ({
+test("FR-SCN-61 / -62 / -63 windows see through, one-way walls one way, nobody walks through but the DM (DM + player-1)", async ({
   browser,
 }) => {
   const { secret, link, recordId } = e2eEnv();
@@ -106,7 +106,7 @@ test("FR-SCN-57 / -58 / -59 windows see through, one-way walls one way, nobody w
   await dm.getByTestId("map-tool-structure").click();
   await expect(dm.getByTestId("scn-structure-panel")).toBeVisible();
 
-  // FR-SCN-57 / -58: a Window into the wall takes its place: the Goblin shows through it.
+  // FR-SCN-61 / -62: a Window into the wall takes its place: the Goblin shows through it.
   await dm.getByTestId("scn-structure-mode-window").click();
   await draw(dm, [
     [8, 7],
@@ -127,13 +127,13 @@ test("FR-SCN-57 / -58 / -59 windows see through, one-way walls one way, nobody w
   await expect.poll(() => cellOf(player, mira)).toEqual({ col: 7, row: 7 });
   await dm.getByTestId("map-tool-structure").click();
 
-  // FR-SCN-58: Undo gives the wall back whole; the Goblin goes.
+  // FR-SCN-62: Undo gives the wall back whole; the Goblin goes.
   await dm.getByTestId("scn-undo").click();
   await expect.poll(() => count(dm, "scn-windows")).toBe(0);
   await expect.poll(() => count(dm, "scn-walls")).toBe(walls);
   await expect.poll(() => tokenNode(player, goblin)).toBeNull();
 
-  // FR-SCN-57: a One-way wall drawn downwards: its arrows point east, so west sees through.
+  // FR-SCN-61: a One-way wall drawn downwards: its arrows point east, so west sees through.
   await dm.getByTestId("scn-structure-mode-one-way").click();
   await draw(dm, [
     [8, 7],
@@ -142,7 +142,7 @@ test("FR-SCN-57 / -58 / -59 windows see through, one-way walls one way, nobody w
   await expect.poll(() => count(dm, "scn-one-way")).toBe(1);
   await expect.poll(() => tokenNode(player, goblin)).not.toBeNull();
 
-  // FR-SCN-59: Flip turns it round: the Goblin goes; Undo brings it back.
+  // FR-SCN-63: Flip turns it round: the Goblin goes; Undo brings it back.
   await dm.getByTestId("scn-structure-mode-flip").click();
   const p = await mapToPage(dm, 8 * 70, 7.5 * 70);
   await dm.mouse.move(p.x, p.y);

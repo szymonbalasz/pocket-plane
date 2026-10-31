@@ -94,7 +94,7 @@ export type Segment = z.infer<typeof Segment>;
 
 const SegmentN = Int.min(1);
 /**
- * FR-SCN-57: what a wall lets sight do; absent = a plain wall (blocks sight both ways). Every kind
+ * FR-SCN-61: what a wall lets sight do; absent = a plain wall (blocks sight both ways). Every kind
  * blocks player moves both ways (FR-SCN-10). A window never blocks sight; a one-way wall blocks it
  * only for a viewer on the left of its direction `(x1, y1)` → `(x2, y2)`, as seen on screen.
  */
@@ -315,9 +315,9 @@ export interface TemplateGeometry {
 export const AddWallsInput = z.strictObject({
   sceneId: Id,
   segments: z.array(Segment).min(1).max(ADD_WALLS_MAX),
-  /** FR-SCN-57: absent = a plain wall. */
+  /** FR-SCN-61: absent = a plain wall. */
   kind: WallKind.optional(),
-  /** FR-SCN-58: the drawing tool: each segment replaces the differing wall under it. */
+  /** FR-SCN-62: the drawing tool: each segment replaces the differing wall under it. */
   replace: z.boolean().optional(),
 });
 export type AddWallsInput = z.input<typeof AddWallsInput>;
@@ -333,7 +333,7 @@ export const RemoveSegmentsInput = z.strictObject({
   sceneId: Id,
   ns: z.array(SegmentN).min(1).max(REMOVE_SEGMENTS_MAX),
 });
-/** FR-SCN-59: one-way walls whose direction reverses, by `n`. */
+/** FR-SCN-63: one-way walls whose direction reverses, by `n`. */
 export const FlipWallsInput = z.strictObject({
   sceneId: Id,
   ns: z.array(SegmentN).min(1).max(REMOVE_SEGMENTS_MAX),
@@ -341,7 +341,7 @@ export const FlipWallsInput = z.strictObject({
 /**
  * `scn.addWalls` ack: one `n` per input segment, in order; a segment identical to one of the same
  * kind already there, or to a door (or earlier in the batch), gets that one's `n` (FR-SCN-07
- * dedupe). Undo remaps by position. FR-SCN-58, only when it replaced wall: the walls as they were
+ * dedupe). Undo remaps by position. FR-SCN-62, only when it replaced wall: the walls as they were
  * and the `n`s of the pieces left of them, for undo.
  */
 export const AddWallsResult = z.object({

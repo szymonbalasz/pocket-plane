@@ -71,12 +71,12 @@ export function structureView(
 
 export const doorStateName = (s: DoorState): DoorStateName => DOOR_STATE_NAMES[s];
 
-/** FR-SCN-59: what Flip can pick: one-way walls only. */
+/** FR-SCN-63: what Flip can pick: one-way walls only. */
 export function oneWayView(s: StructureView): StructureView {
   return { ...s, walls: s.walls.filter((w) => w[5] === WALL_ONE_WAY), doors: [] };
 }
 
-/** FR-SCN-57: the wall kinds' segments as drawn, map px. */
+/** FR-SCN-61: the wall kinds' segments as drawn, map px. */
 export function wallsByKind(
   walls: readonly Wall[],
   g: Grid,
@@ -91,12 +91,12 @@ export function wallsByKind(
   return out;
 }
 
-/** FR-SCN-57: an arrow's height and half width, in cells. */
+/** FR-SCN-61: an arrow's height and half width, in cells. */
 const ARROW_TALL = 0.18;
 const ARROW_HALF = 0.16;
 
 /**
- * FR-SCN-57: a one-way wall's arrows, about one per cell, as `[x1, y1, tipX, tipY, x2, y2]` in map
+ * FR-SCN-61: a one-way wall's arrows, about one per cell, as `[x1, y1, tipX, tipY, x2, y2]` in map
  * px. They point to the left of its direction as seen on screen: the way sight passes.
  */
 export function oneWayArrows(

@@ -1,4 +1,4 @@
-// FR-SCN-57: windows and one-way walls. Every kind blocks moves both ways; only sight tells them
+// FR-SCN-61: windows and one-way walls. Every kind blocks moves both ways; only sight tells them
 // apart: a window never blocks it, a one-way wall only for a viewer on the left of its direction
 // as seen on screen. The old wall shape stays valid.
 import { describe, expect, test } from "bun:test";
@@ -18,8 +18,8 @@ function sees(walls: Wall[], from: { x: number; y: number }, to: { x: number; y:
   return pointInPolygon(poly, to.x, to.y);
 }
 
-describe("FR-SCN-57 wall kinds", () => {
-  test("FR-SCN-57 the wall tuple: kind optional, 1 window or 2 one-way, nothing else", () => {
+describe("FR-SCN-61 wall kinds", () => {
+  test("FR-SCN-61 the wall tuple: kind optional, 1 window or 2 one-way, nothing else", () => {
     expect(Wall.safeParse(PLAIN).success).toBe(true);
     expect(Wall.safeParse(WINDOW).success).toBe(true);
     expect(Wall.safeParse(ONE_WAY).success).toBe(true);
@@ -31,14 +31,14 @@ describe("FR-SCN-57 wall kinds", () => {
     ).toBe(false);
   });
 
-  test("FR-SCN-57 sight: a plain wall blocks both ways, a window neither", () => {
+  test("FR-SCN-61 sight: a plain wall blocks both ways, a window neither", () => {
     expect(sees([PLAIN], WEST, EAST)).toBe(false);
     expect(sees([PLAIN], EAST, WEST)).toBe(false);
     expect(sees([WINDOW], WEST, EAST)).toBe(true);
     expect(sees([WINDOW], EAST, WEST)).toBe(true);
   });
 
-  test("FR-SCN-57 sight: a one-way wall passes it only the way it points; reversed, the other way", () => {
+  test("FR-SCN-61 sight: a one-way wall passes it only the way it points; reversed, the other way", () => {
     expect(sees([ONE_WAY], WEST, EAST)).toBe(true);
     expect(sees([ONE_WAY], EAST, WEST)).toBe(false);
     const reversed: Wall = [1, 8, 10, 8, 0, WALL_ONE_WAY];
@@ -46,12 +46,12 @@ describe("FR-SCN-57 wall kinds", () => {
     expect(sees([reversed], EAST, WEST)).toBe(true);
   });
 
-  test("FR-SCN-57 a viewer standing on a one-way wall's line sees both sides, like any wall", () => {
+  test("FR-SCN-61 a viewer standing on a one-way wall's line sees both sides, like any wall", () => {
     expect(sees([ONE_WAY], { x: 8, y: 5 }, EAST)).toBe(true);
     expect(sees([ONE_WAY], { x: 8, y: 5 }, WEST)).toBe(true);
   });
 
-  test("FR-SCN-57 another wall behind a one-way wall still cuts sight; prepared occluders agree", () => {
+  test("FR-SCN-61 another wall behind a one-way wall still cuts sight; prepared occluders agree", () => {
     const behind: Wall = [2, 10, 0, 10, 10];
     expect(sees([ONE_WAY, behind], WEST, EAST)).toBe(false);
     expect(sees([ONE_WAY, behind], WEST, { x: 9, y: 5 })).toBe(true);
@@ -59,7 +59,7 @@ describe("FR-SCN-57 wall kinds", () => {
     expect(sightPolygon(WEST, 40, prepareOccluders(segs))).toEqual(sightPolygon(WEST, 40, segs));
   });
 
-  test("FR-SCN-57 a one-way wall crossing a plain one: each viewer gets the right side", () => {
+  test("FR-SCN-61 a one-way wall crossing a plain one: each viewer gets the right side", () => {
     const cross: Wall = [2, 0, 5, 16, 5];
     const north = { x: 5, y: 2 };
     // North-west sees through the one-way wall east, but the plain one still stops it going south.
@@ -68,7 +68,7 @@ describe("FR-SCN-57 wall kinds", () => {
     expect(sees([ONE_WAY, cross], { x: 11, y: 2 }, north)).toBe(false);
   });
 
-  test("FR-SCN-57 moves: every kind blocks both ways; the hint names the piece", () => {
+  test("FR-SCN-61 moves: every kind blocks both ways; the hint names the piece", () => {
     const from = { col: 5, row: 5 };
     const to = { col: 10, row: 5 };
     for (const w of [PLAIN, WINDOW, ONE_WAY]) {
@@ -79,7 +79,7 @@ describe("FR-SCN-57 wall kinds", () => {
     }
   });
 
-  test("FR-SCN-57 occluders: plain as before, windows left out, one-way flagged, order kept", () => {
+  test("FR-SCN-61 occluders: plain as before, windows left out, one-way flagged, order kept", () => {
     expect(
       sightOccluders({
         walls: [PLAIN, [2, 1, 1, 2, 2, WALL_WINDOW], [3, 3, 3, 4, 4, WALL_ONE_WAY]],

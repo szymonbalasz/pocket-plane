@@ -1079,7 +1079,7 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN, `complete`; DM ga
 |---|---|---|---|
 | sceneId (PK), campaignId | ID → Scene (`ON DELETE CASCADE`), ID → Campaign | One row per scene, created on the first edit; wire `id` = `sceneId` | SCN §8 |
 | rev, nextN | int, int | `rev` +1 per edit; `n` taken from `nextN`, unique per scene, never reused after a remove; an edit that changes nothing writes nothing *(built, build/scene-tools-structure)* | FR-SCN-07 |
-| walls | **JSON** `[n, x1, y1, x2, y2, kind?][]` | *(#427, FR-SCN-57)* `kind` absent = plain, 1 window, 2 one-way (direction = `(x1, y1)` → `(x2, y2)`, sees through from its right); no migration, old rows stay valid. Vertex to vertex, length > 0, endpoints in the vertex range ± 1, deduped (either direction, walls per kind, doors against every kind); walls + doors ≤ 2,000 per scene | FR-SCN-07 |
+| walls | **JSON** `[n, x1, y1, x2, y2, kind?][]` | *(#431, FR-SCN-61)* `kind` absent = plain, 1 window, 2 one-way (direction = `(x1, y1)` → `(x2, y2)`, sees through from its right); no migration, old rows stay valid. Vertex to vertex, length > 0, endpoints in the vertex range ± 1, deduped (either direction, walls per kind, doors against every kind); walls + doors ≤ 2,000 per scene | FR-SCN-07 |
 | doors | **JSON** `[n, x1, y1, x2, y2, state, f][]` | `state` 0 open / 1 closed / 2 locked; `f` server-written fog flag: set by `scn.addDoor` (via `deriveSceneObject`, before the write), kept by `scn.setDoor`, re-derived by FOG; a door on an existing segment → `conflict` | FR-SCN-07, [FR-SCN-36](../specs/scene-tools.md#6-functional-requirements) |
 | updatedAt | timestamp | `ctx.clock` | SCN §8 |
 

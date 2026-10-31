@@ -1,4 +1,4 @@
-// FR-SCN-57–59: windows and one-way walls on the server. `scn.addWalls` stores the kind (dedupe per
+// FR-SCN-61–63: windows and one-way walls on the server. `scn.addWalls` stores the kind (dedupe per
 // kind); with `replace` a segment takes the place of the differing wall under it, leaving pieces
 // of their kind that run the way their wall did; `scn.flipWalls` reverses one-way walls in place.
 // The wall guard refuses players at every kind both ways, never the DM; sight reads the kinds
@@ -39,8 +39,8 @@ function setup() {
   return { ...t, sid, walls, add, flip, lastEvent };
 }
 
-describe("FR-SCN-57 scn.addWalls kinds", () => {
-  test("FR-SCN-57 stores the kind and the drawn direction; a plain wall's tuple is unchanged", () => {
+describe("FR-SCN-61 scn.addWalls kinds", () => {
+  test("FR-SCN-61 stores the kind and the drawn direction; a plain wall's tuple is unchanged", () => {
     const t = setup();
     t.add([[8, 0, 8, 5]]);
     t.add([[9, 5, 9, 0]], WINDOW);
@@ -69,15 +69,15 @@ describe("FR-SCN-57 scn.addWalls kinds", () => {
   });
 });
 
-describe("FR-SCN-58 drawing over a wall", () => {
-  test("FR-SCN-58 without replace nothing is cut: both stand", () => {
+describe("FR-SCN-62 drawing over a wall", () => {
+  test("FR-SCN-62 without replace nothing is cut: both stand", () => {
     const t = setup();
     t.add([[8, 0, 8, 10]]);
     expect(t.add([[8, 4, 8, 5]], WINDOW)).toEqual({ ns: [2] });
     expect(t.walls()).toHaveLength(2);
   });
 
-  test("FR-SCN-58 a window mid-wall replaces that section: two pieces, ack for undo, one event", () => {
+  test("FR-SCN-62 a window mid-wall replaces that section: two pieces, ack for undo, one event", () => {
     const t = setup();
     t.add([[8, 0, 8, 10]]);
     const n0 = t.events.length;
@@ -95,7 +95,7 @@ describe("FR-SCN-58 drawing over a wall", () => {
     expect(t.lastEvent()?.payload).toEqual({ sceneId: t.sid, op: "addWalls", ns: [4, 1, 2, 3] });
   });
 
-  test("FR-SCN-58 the undo steps give back the wall as it was, even an identical one", () => {
+  test("FR-SCN-62 the undo steps give back the wall as it was, even an identical one", () => {
     const t = setup();
     t.add([[8, 0, 8, 1]]);
     const r = t.add([[8, 0, 8, 1]], WINDOW, true);
@@ -106,7 +106,7 @@ describe("FR-SCN-58 drawing over a wall", () => {
     expect(t.walls()).toEqual([[3, 8, 0, 8, 1]]);
   });
 
-  test("FR-SCN-58 a plain wall drawn over a window takes its place; the same kind is left alone", () => {
+  test("FR-SCN-62 a plain wall drawn over a window takes its place; the same kind is left alone", () => {
     const t = setup();
     t.add([[8, 0, 8, 10]], WINDOW);
     expect(t.add([[8, 4, 8, 5]], WINDOW, true)).toEqual({ ns: [2] });
@@ -116,7 +116,7 @@ describe("FR-SCN-58 drawing over a wall", () => {
     expect(t.walls()).toEqual([[3, 8, 0, 8, 10]]);
   });
 
-  test("FR-SCN-58 a polyline over one wall: later segments cut the pieces too; only the old wall is reported", () => {
+  test("FR-SCN-62 a polyline over one wall: later segments cut the pieces too; only the old wall is reported", () => {
     const t = setup();
     t.add([[8, 0, 8, 10]]);
     const r = t.add(
@@ -140,7 +140,7 @@ describe("FR-SCN-58 drawing over a wall", () => {
     expect(t.walls()).toHaveLength(4);
   });
 
-  test("FR-SCN-58 one-way pieces keep their kind and direction, also under a segment drawn the other way", () => {
+  test("FR-SCN-62 one-way pieces keep their kind and direction, also under a segment drawn the other way", () => {
     const t = setup();
     t.add([[8, 10, 8, 0]], ONE_WAY);
     t.add([[8, 4, 8, 5]], WINDOW, true);
@@ -151,7 +151,7 @@ describe("FR-SCN-58 drawing over a wall", () => {
     ]);
   });
 
-  test("FR-SCN-58 a one-way wall drawn back over itself reverses; the same way is a no-op", () => {
+  test("FR-SCN-62 a one-way wall drawn back over itself reverses; the same way is a no-op", () => {
     const t = setup();
     t.add([[8, 0, 8, 5]], ONE_WAY);
     const rev = readStructure(t.s.db, t.sid)?.rev;
@@ -177,8 +177,8 @@ describe("FR-SCN-58 drawing over a wall", () => {
   });
 });
 
-describe("FR-SCN-59 scn.flipWalls", () => {
-  test("FR-SCN-59 reverses in place: same n, one StructureEdited; twice = back", () => {
+describe("FR-SCN-63 scn.flipWalls", () => {
+  test("FR-SCN-63 reverses in place: same n, one StructureEdited; twice = back", () => {
     const t = setup();
     t.add([[8, 0, 8, 5]], ONE_WAY);
     const rev = readStructure(t.s.db, t.sid)?.rev as number;
@@ -191,7 +191,7 @@ describe("FR-SCN-59 scn.flipWalls", () => {
     expect(t.walls()).toEqual([[1, 8, 0, 8, 5, ONE_WAY]]);
   });
 
-  test("FR-SCN-59 refuses what isn't one-way and any unknown n, changing nothing; DM only", () => {
+  test("FR-SCN-63 refuses what isn't one-way and any unknown n, changing nothing; DM only", () => {
     const t = setup();
     t.add([[8, 0, 8, 5]], ONE_WAY);
     t.add([[9, 0, 9, 5]]);
@@ -210,7 +210,7 @@ describe("FR-SCN-59 scn.flipWalls", () => {
   });
 });
 
-describe("FR-SCN-57 everyone else", () => {
+describe("FR-SCN-61 everyone else", () => {
   function withMira() {
     const t = setup();
     t.run(I.activateScene, { sceneId: t.sid });
@@ -223,7 +223,7 @@ describe("FR-SCN-57 everyone else", () => {
     return { ...t, mira, p1: t.player(t.h.p1) };
   }
 
-  test("FR-SCN-57 / FR-SCN-10 a player can't walk through a window or a one-way wall, either way; the DM can", () => {
+  test("FR-SCN-61 / FR-SCN-10 a player can't walk through a window or a one-way wall, either way; the DM can", () => {
     const cases: [Segment, WallKind][] = [
       [[8, 6, 8, 9], WINDOW],
       [[8, 6, 8, 9], ONE_WAY],
@@ -243,7 +243,7 @@ describe("FR-SCN-57 everyone else", () => {
     }
   });
 
-  test("FR-SCN-57 sight reads the kinds from the row, and a flip turns it round", () => {
+  test("FR-SCN-61 sight reads the kinds from the row, and a flip turns it round", () => {
     const t = setup();
     const senses = { darkvisionFt: 0, seesMagicalDarkness: false };
     const sees = (x: number, tx: number) => {

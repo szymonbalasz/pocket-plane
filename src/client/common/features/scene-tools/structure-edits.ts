@@ -35,8 +35,8 @@ function restoreWalls(sceneId: string, walls: readonly Wall[]): UndoStep[] {
 }
 
 /**
- * FR-SCN-08 Wall, FR-SCN-57 Window / One-way: one polyline. Undo removes the segments that were
- * new (n ≥ the old nextN). FR-SCN-58: a polyline that replaced wall gets that wall back first, so
+ * FR-SCN-08 Wall, FR-SCN-61 Window / One-way: one polyline. Undo removes the segments that were
+ * new (n ≥ the old nextN). FR-SCN-62: a polyline that replaced wall gets that wall back first, so
  * the scene is never open between the steps.
  */
 export async function addWallsEdit(
@@ -76,7 +76,7 @@ export async function addWallsEdit(
   return ns;
 }
 
-/** FR-SCN-59: reverses one-way walls. Undo reverses them again. */
+/** FR-SCN-63: reverses one-way walls. Undo reverses them again. */
 export async function flipEdit(
   send: Send,
   sceneId: string,

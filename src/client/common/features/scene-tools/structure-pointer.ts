@@ -1,4 +1,4 @@
-// Structure tool pointer handlers (FR-SCN-08, -57, -59), dispatched by MapCanvas (FR-SCN-06). Wall,
+// Structure tool pointer handlers (FR-SCN-08, -61, -63), dispatched by MapCanvas (FR-SCN-06). Wall,
 // Window, One-way: click vertices (snapped), double-click ends → one `scn.addWalls`; Door: two
 // clicks → `scn.addDoor`
 // (closed). Sprint 3: a click with Ctrl held places the free point under the pointer (0.01 cell);

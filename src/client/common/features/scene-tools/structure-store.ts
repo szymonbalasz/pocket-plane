@@ -14,7 +14,7 @@ import { EMPTY_STRUCTURE, type PxBox, type StructureView } from "./structure-vie
 export const STRUCTURE_MODES = ["wall", "window", "one-way", "door", "erase", "flip"] as const;
 export type StructureMode = (typeof STRUCTURE_MODES)[number];
 
-/** The modes that draw a polyline of walls, with the kind each draws (FR-SCN-57). */
+/** The modes that draw a polyline of walls, with the kind each draws (FR-SCN-61). */
 const LINE_KINDS: Partial<Record<StructureMode, WallKind | null>> = {
   wall: null,
   window: WALL_WINDOW,
@@ -23,7 +23,7 @@ const LINE_KINDS: Partial<Record<StructureMode, WallKind | null>> = {
 export const drawsLine = (mode: StructureMode): boolean => LINE_KINDS[mode] !== undefined;
 export const lineKind = (mode: StructureMode): WallKind | undefined =>
   LINE_KINDS[mode] ?? undefined;
-/** The modes that pick existing segments rather than place points (FR-SCN-08, -59). */
+/** The modes that pick existing segments rather than place points (FR-SCN-08, -63). */
 export const picksSegments = (mode: StructureMode): boolean => mode === "erase" || mode === "flip";
 
 export interface StructureToolState {

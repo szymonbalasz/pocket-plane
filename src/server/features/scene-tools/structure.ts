@@ -1,4 +1,4 @@
-// Structure commands (SCN §9; FR-SCN-07, -08, -09, -33, -36, -57–59): `scn.addWalls`,
+// Structure commands (SCN §9; FR-SCN-07, -08, -09, -33, -36, -61–63): `scn.addWalls`,
 // `scn.addDoor`, `scn.setDoor`, `scn.removeSegments`, `scn.flipWalls`, DM only, any scene of the
 // campaign. One structure row per
 // scene, created lazily; edits go by `n` (never a whole-list replace) and bump `rev`. Each edit is
@@ -81,7 +81,7 @@ function checkSegment(scene: SceneRecord, seg: Segment, path: (string | number)[
   }
 }
 
-/** A wall's dedupe key: walls of different kinds may share a segment (FR-SCN-07, -57). */
+/** A wall's dedupe key: walls of different kinds may share a segment (FR-SCN-07, -61). */
 const wallKey = (seg: Segment, kind: WallKind | undefined) => `${kind ?? 0}|${segmentKey(seg)}`;
 
 /** Every segment's dedupe key → its `n`: a door's stands for every wall kind. */
@@ -106,7 +106,7 @@ function sameDirection(a: Segment, b: Segment): boolean {
   return (a[2] - a[0]) * (b[2] - b[0]) + (a[3] - a[1]) * (b[3] - b[1]) >= 0;
 }
 
-/** FR-SCN-58: a wall a new segment leaves alone: same kind and, if one-way, same way. */
+/** FR-SCN-62: a wall a new segment leaves alone: same kind and, if one-way, same way. */
 function sameWall(w: Wall, seg: Segment, kind: WallKind | undefined): boolean {
   if (w[5] !== kind) return false;
   return kind !== WALL_ONE_WAY || sameDirection(segmentOf(w), seg);
@@ -161,8 +161,8 @@ function commit(env: CommandEnv, st: Structure, op: Op, ns: number[]): void {
 }
 
 /**
- * FR-SCN-08: one polyline's segments (≤ 200); identical ones dedupe (FR-SCN-07). FR-SCN-57: all
- * of one `kind`. FR-SCN-58: with `replace`, each segment takes the place of any differing wall
+ * FR-SCN-08: one polyline's segments (≤ 200); identical ones dedupe (FR-SCN-07). FR-SCN-61: all
+ * of one `kind`. FR-SCN-62: with `replace`, each segment takes the place of any differing wall
  * under it; a piece a later segment also covers goes too, and only walls that were there before
  * are reported.
  */
@@ -181,7 +181,7 @@ export const addWalls = defineCommand({
     for (const seg of segments) {
       const key = wallKey(seg, kind);
       const known = keys.get(key);
-      // A one-way wall drawn back over itself reverses: it isn't the same wall (FR-SCN-58).
+      // A one-way wall drawn back over itself reverses: it isn't the same wall (FR-SCN-62).
       const reversed =
         replace === true &&
         !added.has(known ?? 0) &&
@@ -215,7 +215,7 @@ export const addWalls = defineCommand({
   },
 });
 
-/** FR-SCN-59: reverses one-way walls in place (same `n`s); undoing it is doing it again. */
+/** FR-SCN-63: reverses one-way walls in place (same `n`s); undoing it is doing it again. */
 export const flipWalls = defineCommand({
   name: SCN_INTENTS.flipWalls,
   input: FlipWallsInput,
@@ -238,7 +238,7 @@ export const flipWalls = defineCommand({
 });
 
 /**
- * FR-SCN-56: takes the walls `only` allows under `over` (a door, or FR-SCN-58 a drawn wall) out of
+ * FR-SCN-56: takes the walls `only` allows under `over` (a door, or FR-SCN-62 a drawn wall) out of
  * `st.walls` and appends what is left of them as new segments of their kind; a one-way piece runs
  * the way its wall did. Returns the walls as they were and the new pieces' `n`s.
  */
