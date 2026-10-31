@@ -330,6 +330,59 @@ test("BL-06 new scene dialog shows the chosen map's name", async ({ browser }) =
   await dm.context().close();
 });
 
+test("FR-MAP-150 token menu Size: DM and player see it; the creature's size puts it back", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const ogre = recordId("scenes-extras", "token", 2);
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  // Goblin Ambush shown by the tests above; shown here when run alone.
+  const scenes = await showToPlayers(dm, "Goblin Ambush");
+  await scenes.getByTestId("ui-window-close").click();
+  await expect(scenes).toBeHidden();
+  await shellWindow(dm, "dice.log").getByTestId("ui-window-minimise").click();
+  const player = await rolePage(browser);
+  await player.goto(link("Player 1"));
+  await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  await expect.poll(() => tokenNode(dm, ogre)).not.toBeNull();
+  await expect.poll(() => tokenNode(player, ogre)).not.toBeNull();
+
+  const side = async (page: Page) => {
+    const scale = await stageScale(page);
+    return Math.round(((await tokenNode(page, ogre))?.width ?? 0) / scale / 70);
+  };
+  // Keyboard, as in the Shape flow: the submenu may flip over its parent near an edge.
+  const openSizes = async () => {
+    const o = (await tokenNode(dm, ogre))!;
+    await dm.mouse.click(o.x, o.y, { button: "right" });
+    await dm.getByTestId("map-token-menu-size").click();
+    return (size: string) =>
+      dm.locator(`[data-testid="map-token-size-option"][data-value="${size}"]`);
+  };
+
+  // Cave Ogre is Large (2 cells), marked as the creature's; Huge is 3 cells on both screens.
+  expect(await side(dm)).toBe(2);
+  const option = await openSizes();
+  await expect(option("large")).toHaveAttribute("data-own", "true");
+  await expect(option("large")).toHaveAttribute("data-state", "checked");
+  await option("huge").press("Enter");
+  await expect.poll(() => side(dm)).toBe(3);
+  await expect.poll(() => side(player)).toBe(3);
+  await expect(dm.getByTestId("map-token-menu")).toHaveCount(0);
+
+  // The next spell: Huge is checked, the creature's own size is one pick away.
+  const again = await openSizes();
+  await expect(again("huge")).toHaveAttribute("data-state", "checked");
+  await again("large").press("Enter");
+  await expect.poll(() => side(dm)).toBe(2);
+  await expect.poll(() => side(player)).toBe(2);
+
+  await player.context().close();
+  await dm.context().close();
+});
+
 test("BL-163 FR-MAP-17 Ctrl-D: the copy takes a free cell and stays selected", async ({
   browser,
 }) => {

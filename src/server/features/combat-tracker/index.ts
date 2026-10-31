@@ -8,6 +8,7 @@ import type { Feature } from "../../services";
 import { rollAbility } from "./abilities";
 import { ApplyHooks, applyHooks, bindApplyHooks } from "./apply-hooks";
 import { attackCommand } from "./attack";
+import { clearDamageCommand } from "./clear-damage";
 import { setCompanionCommand } from "./companions";
 import { rollDamageCommand } from "./damage";
 import { dismissCommand } from "./dismiss";
@@ -55,6 +56,7 @@ export const combatTracker: Feature = {
       dismissCommand,
       // Sprint 15 (FR-CBT-173, #385): a logged roll used as an attack / damage card.
       useRollCommand,
+      clearDamageCommand,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
     for (const t of combatRecordTypes) r.recordType(t);

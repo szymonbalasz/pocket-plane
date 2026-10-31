@@ -21,6 +21,7 @@ import { createStore } from "zustand";
 import { PopupBody } from "./attack-popup";
 import {
   blurField,
+  clearShown,
   FIELD_EMPTY,
   fieldValue,
   focusField,
@@ -338,6 +339,29 @@ describe("FR-CBT-89 popup render (fresh load: card + ruling only)", () => {
     expect(html).toContain('data-testid="cbt-popup-step" data-value="to-hit"');
     expect(html).toContain("cbt-popup-target-add");
     expect(html).toContain('data-testid="cbt-popup-waiting-damage"');
+  });
+
+  test("FR-CBT-178 Clear shows while the card holds damage or a typed total, never on a waiting or damage-only card", () => {
+    expect(clearShown(card(), true)).toBe(true);
+    expect(clearShown(card(), false)).toBe(false);
+    expect(clearShown(card({ toHit: null, damage }), true)).toBe(false);
+    const clear = 'data-testid="cbt-popup-damage-clear"';
+    // A ruled card with damage, and an unruled full card.
+    expect(render(card({ damage }), [ruling([t("gob", true)])])).toContain(clear);
+    expect(render(card({ damage }), [])).toContain(clear);
+    // Waiting for the roll, ruled or not: nothing to clear.
+    expect(render(card(), [ruling([t("gob", true)])])).not.toContain(clear);
+    expect(render(card(), [])).not.toContain(clear);
+    // Damage-only: Dismiss ends it.
+    expect(render(card({ toHit: null, damage }), [])).not.toContain(clear);
+  });
+
+  test("FR-CBT-178 a cleared card reads as any card waiting for its roll, and fills from the next one", () => {
+    const ruled = [ruling([t("gob", true)])];
+    const waiting = render(card({ damageCleared: true }), ruled);
+    expect(waiting).toContain('data-testid="cbt-popup-waiting"');
+    expect(waiting).not.toContain("cbt-popup-crit-changed");
+    expect(render(card({ damage }), ruled)).toContain('value="6"');
   });
 
   test("FR-CBT-72 a damage-only card's header says what it shows, never 'To-hit step' (R1 note, sprint 5 R2)", () => {

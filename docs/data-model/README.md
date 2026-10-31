@@ -416,7 +416,8 @@ An instance of a creature definition: own name, read-only display copies, play s
 | definitionId | ID → Entity | Via `resolveDefinition`: global or same campaign. **Never sent to players** | [FR-MAP-13](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-26](../specs/scenes-map.md#6-functional-requirements) |
 | name | text 1–40 | **Token-owned** instance state; numbered `B <N>` on place/duplicate; never changed by a definition edit | [FR-MAP-16](../specs/scenes-map.md#6-functional-requirements), #126 |
 | imageAssetId | ID → Asset \| null | **Display copy**: portrait at place; refreshed by the hook only while it equals the old portrait (#127); DM may set custom art | FR-MAP-13, [FR-MAP-18](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-20](../specs/scenes-map.md#6-functional-requirements) |
-| size | `tiny`…`gargantuan` | **Display copy** of `statBlock.size`; never per-token editable; refreshed by the hook | FR-MAP-13, FR-MAP-20, #120 |
+| size | `tiny`…`gargantuan` | **Display copy** of `statBlock.size`, refreshed by the hook, unless the DM set this token's size (`sizeOverridden`) | FR-MAP-13, FR-MAP-20, #120, FR-MAP-150 |
+| sizeOverridden *(#429)* | bool | Column `size_overridden` not null default false. The DM set `size` from the token menu; the hook leaves it. Copied by token and scene duplicate. Server only: on no wire | [FR-MAP-150](../specs/scenes-map.md#6-functional-requirements) |
 | col, row | int | Top-left cell; footprint must overlap the map | [FR-MAP-14](../specs/scenes-map.md#6-functional-requirements) |
 | ownerPlayerId | ID → Player \| null | One owner; defaults from the character's owner; DM reassigns | FR-MAP-13, FR-MAP-18, #124 |
 | hidden | bool | Visibility flag on the record | [FR-MAP-19](../specs/scenes-map.md#6-functional-requirements) |
@@ -2050,7 +2051,7 @@ From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP
 | `player.color` | lowercase `#rrggbb` (a palette key only in pre-sprint-6 rows, migrated at boot) | written at `player.add` (the default, below); null / invalid → the default at boot | unchanged (every connection of the campaign) | [FR-CAMP-30](../specs/campaign-management.md#6-functional-requirements), -34 |
 | `campaign.dm_color` | lowercase `#rrggbb` | DB default stays `'amber'` but is **never relied on**: `campaign.create` writes `#e69f00`; a still-invalid value → `#e69f00` at boot | unchanged | FR-CAMP-24, -34 |
 
-- **Rules** (pure, `@shared/campaign-management/colors.ts`; server and picker share them): `colorProblem(hex)` = `too-dark` (WCAG < 1.6 : 1 on `#171717`; under 4.5 : 1 names are drawn in the `readableColor` shade, #428) / `too-grey` (CIELAB C\* < 25) / `too-red` (ΔE2000 < 15 from `#ef4444` in normal vision, or < 5 from `#ef4444` or `#ff6467` in the worst of normal / deuteranopia / protanopia) / null. `colorDistance(a, b)` = min ΔE2000 over normal, deuteranopia, protanopia (Machado 2009, severity 1.0). A **pick** must be ≥ 9 from the DM colour and every other player's (`colorClash`). Thresholds in the spec only.
+- **Rules** (pure, `@shared/campaign-management/colors.ts`; server and picker share them): `colorProblem(hex)` = `too-dark` (WCAG < 1.6 : 1 on `#171717`; under 4.5 : 1 names are drawn in the `readableColor` shade, #431) / `too-grey` (CIELAB C\* < 25) / `too-red` (ΔE2000 < 15 from `#ef4444` in normal vision, or < 5 from `#ef4444` or `#ff6467` in the worst of normal / deuteranopia / protanopia) / null. `colorDistance(a, b)` = min ΔE2000 over normal, deuteranopia, protanopia (Machado 2009, severity 1.0). A **pick** must be ≥ 9 from the DM colour and every other player's (`colorClash`). Thresholds in the spec only.
 - **Default** (`defaultColor(taken)`, deterministic): the first palette colour (`PLAYER_COLORS`, order unchanged) at distance ≥ 9 from every colour of the campaign; none → the palette colour whose smallest distance is largest, ties in palette order. Only defaults may break the rule (no unique index, as before).
 - **Boot migration** (start hook `campaign-management.color-backfill`, `migratePlayerColors`, one transaction, before the server listens; no event, no log row): **pass 1** palette key → its hex, uppercase hex → lowercase, on both columns; **pass 2** invalid `dm_color` → `#e69f00`, then per campaign the null / invalid `player.color` rows get defaults against the pass-1 colours in `createdAt`, `rowid` order, each seeing the ones before it. Rerun = no-op (`state:digest` equal).
 - **Derived (never stored):** a colour's validity and distances; its palette name (`colorName`: a palette hex → "Rose", else the hex); the client's CSS colour = `colorOf` (a hex as is; an old key → its palette hex via `--player-<key>`; else the role accent; system → null).
@@ -2890,3 +2891,11 @@ From [log-share](../specs/log-share.md#8-data-model) (#415). **No new table, col
 ## 152. AoE tool polish (fix/aoe-template-polish)
 
 From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57–60 ([#427](../decisions-log.md)). **No new table, column or record type.** `aoe_template.shape` keeps `cylinder` as a valid value: rows kept earlier stay as they are, the AoE tool just no longer places new ones. Protocol side: [protocol §193](../protocol/README.md#193-aoe-tool-polish-fixaoe-template-polish).
+
+## 153. Clear damage (build/cbt-clear-damage)
+
+No new table or column.
+
+| Field | Change | Rule | FR |
+|---|---|---|---|
+| `notification.payload` (kind `damage-card`) | + optional `damageCleared: true` | Set by `cbt.clearDamage` with `damage: null` (`unusedRolls`, `diceMaxed` removed); removed when new damage attaches | FR-CBT-178 |

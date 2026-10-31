@@ -1,5 +1,6 @@
 // FR-MAP-20: token display copies follow a definition edit, inside `entities.update`'s
-// transaction (FR-ENT-19). Size and speed (FR-MAP-36) always follow; the image follows only on
+// transaction (FR-ENT-19). Speed (FR-MAP-36) always follows, size unless the DM set this token's
+// (FR-MAP-150; the definition reaching that size ends it); the image follows only on
 // tokens still showing the old portrait (#127), the shape only on tokens still on the old default
 // shape (FR-MAP-35, amended); `characterId` is re-asserted (FR-MAP-50). Names and cells untouched
 // (#126). A size change re-derives `fogged` / `seenBy` for
@@ -46,7 +47,9 @@ export function refreshTokenCopies(
   const now = env.ctx.clock.iso();
   for (const t of rows) {
     const set: Partial<typeof token.$inferInsert> = {};
-    if (sizeChanged && t.size !== after.statBlock.size) {
+    if (t.sizeOverridden === true) {
+      if (sizeChanged && t.size === after.statBlock.size) set.sizeOverridden = false;
+    } else if (sizeChanged && t.size !== after.statBlock.size) {
       set.size = after.statBlock.size;
       const n = footprint(after.statBlock.size);
       const { fogged, seenBy } = deriveSceneObject(env.tx, {

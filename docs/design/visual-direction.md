@@ -79,5 +79,5 @@ A player colour marks a person's laser, pings, templates, drag paths, log names 
 
 - Every key ≥ 4.5 : 1 on the window surface (log names are text) and ≥ 5 : 1 on the casing. No white or grey key (selection outline, `visibility.hidden`); no pure red (`accent.danger`: every key ΔE2000 ≥ 15 from it).
 - Colour-blind check (CIEDE2000 between every pair after the Machado 2009 simulation at full severity): normal min 14.1 (sky–blue), deuteranopia 9.7 (sky–blue), protanopia 9.6 (sky–rose), tritanopia 6.8 (sky–jade). Name chips and "by ‹name›" labels back colour up (OQ-CAMP-25). Checked by `FR-CAMP-28 palette contrast`.
-- A free colour may be darker than the palette (FR-CAMP-31, #428): its names on windows use a lighter shade of the same hue, fills use the colour itself, map marks the colour itself on a light casing `#e7e5e4`.
+- A free colour may be darker than the palette (FR-CAMP-31, #431): its names on windows use a lighter shade of the same hue, fills use the colour itself, map marks the colour itself on a light casing `#e7e5e4`.
 - Every palette colour passes FR-CAMP-31 (tightest: Bronze 4.52 : 1 and C* 29.9; Vermillion 5.4 and Bronze 5.7 from `#ef4444` in the worst colour-blind view) and the 8 stay ≥ 9.61 apart (Sky–Rose), so all of them fit in one campaign. Checked by `FR-CAMP-31 colour validity` and `FR-CAMP-32 distance rule`.

@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   CRIT_CHANGED_TEXT,
   DAMAGE_CARD_KIND,
+  DAMAGE_CLEARED_TEXT,
   type DamageCardPayload,
 } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
@@ -41,5 +42,7 @@ describe("FR-CBT-127 crit flip", () => {
     );
     // A plain to-hit-only card still waits for the DM.
     expect(outcomeText(card())).toBe("Waiting for DM");
+    // FR-CBT-178 (#428): the DM cleared the damage: the owner is told to roll again.
+    expect(outcomeText(card({ damageCleared: true }))).toBe(DAMAGE_CLEARED_TEXT);
   });
 });
