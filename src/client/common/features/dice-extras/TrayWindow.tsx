@@ -43,6 +43,7 @@ import {
   ChevronUpIcon,
   EyeIcon,
   EyeOffIcon,
+  PlusIcon,
   SettingsIcon,
   XIcon,
 } from "lucide-react";
@@ -114,25 +115,28 @@ import {
   trayScale,
 } from "./tray-logic";
 import {
-  baseConstant,
+  addToGroup,
   type Composition,
   compositionIssue,
   compositionOf,
   dropDie,
   groupRecordId,
   joinDie,
+  lastGroupType,
   lockedDie,
   normalize,
   offersNoType,
   PART_TYPES,
   type PartType,
   partSlotLabels,
-  partsOf,
   presetActor,
   retype,
+  rowsOf,
   setBaseConstant,
+  setGroupConstant,
   setGroupType,
   stagedPartsOf,
+  startGroup,
   type TrayPurpose,
   typeLabel,
 } from "./tray-parts";
@@ -452,21 +456,27 @@ function PurposeToggle({
   );
 }
 
-/** FR-DICEX-101: a damage die group's type Select ("No type" only while the base is untyped). */
+/**
+ * FR-DICEX-101: a damage die group's type Select ("No type" only while the base is untyped).
+ * FR-DICEX-105: one fixed width, so its label never moves the row's dice.
+ */
 function GroupType({
-  comp,
-  term,
+  value,
+  noType,
+  testId,
+  recordId,
+  label,
   disabled,
   onChange,
 }: {
-  comp: Composition;
-  term: number;
+  value: PartType | null;
+  noType: boolean;
+  testId: string;
+  recordId?: string;
+  label: string;
   disabled: boolean;
   onChange(type: PartType | null): void;
 }) {
-  const value = comp.types[term] ?? null;
-  const t = comp.terms[term];
-  const faces = t?.kind === "dice" ? t.faces : 0;
   return (
     <Select
       value={value ?? NO_TYPE}
@@ -474,27 +484,99 @@ function GroupType({
       onValueChange={(v) => onChange(v === NO_TYPE ? null : (v as PartType))}
     >
       <SelectTrigger
-        data-testid="dicex-tray-group-type"
-        data-record-id={groupRecordId(comp, term)}
+        data-testid={testId}
+        {...(recordId ? { "data-record-id": recordId } : {})}
         data-value={value ?? NO_TYPE}
-        aria-label={`Damage type of the d${faces} dice`}
-        className={cn(SELECT, "relative max-w-24")}
+        aria-label={label}
+        className={cn(SELECT, "relative w-24")}
       >
         <SelectValue>{typeLabel(value)}</SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {offersNoType(comp) && (
-          <SelectItem value={NO_TYPE} data-testid="dicex-tray-group-type-option" data-value="none">
+        {noType && (
+          <SelectItem value={NO_TYPE} data-testid={`${testId}-option`} data-value="none">
             {typeLabel(null)}
           </SelectItem>
         )}
         {PART_TYPES.map((p) => (
-          <SelectItem key={p} value={p} data-testid="dicex-tray-group-type-option" data-value={p}>
+          <SelectItem key={p} value={p} data-testid={`${testId}-option`} data-value={p}>
             {typeLabel(p)}
           </SelectItem>
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+/** The modifier text of a group: "+3", "-1", empty for none. */
+export const modifierText = (n: number): string => (n === 0 ? "" : n > 0 ? `+${n}` : `${n}`);
+
+/** What a modifier Input may hold while typing: an optional sign and up to three digits. */
+export const MODIFIER_INPUT = /^[+-]?\d{0,3}$/;
+
+/**
+ * FR-DICEX-105: a die group's "+" (one more die of its size) and its own modifier. The text is kept
+ * while typing, so "-" can lead to "-1"; every valid edit goes to the group at once.
+ */
+function GroupControls({
+  faces,
+  recordId,
+  constant,
+  disabled,
+  onAdd,
+  onConstant,
+  onEnter,
+}: {
+  faces: number;
+  recordId: string;
+  constant: number;
+  disabled: boolean;
+  onAdd(): void;
+  onConstant(n: number): void;
+  onEnter(keys: KeyboardEvent): void;
+}) {
+  const [typing, setTyping] = useState<string | null>(null);
+  return (
+    <>
+      <Tip content={`Add one d${faces} to this group`}>
+        <Button
+          type="button"
+          data-testid="dicex-tray-group-add"
+          data-record-id={recordId}
+          aria-label={`Add one d${faces} to this group`}
+          size="icon"
+          variant="ghost"
+          className="relative size-6 shrink-0"
+          disabled={disabled}
+          onClick={onAdd}
+        >
+          <PlusIcon className="size-3.5" />
+        </Button>
+      </Tip>
+      <Input
+        data-testid="dicex-tray-group-constant"
+        data-record-id={recordId}
+        aria-label={`Modifier of the d${faces} dice`}
+        inputMode="numeric"
+        placeholder="+0"
+        className="relative h-7 w-12 shrink-0 px-1.5 text-right font-mono text-sm"
+        disabled={disabled}
+        value={typing ?? modifierText(constant)}
+        onChange={(e) => {
+          const v = e.target.value.replace("−", "-");
+          if (!MODIFIER_INPUT.test(v)) return;
+          setTyping(v);
+          const n = Number.parseInt(v, 10);
+          onConstant(Number.isNaN(n) ? 0 : n);
+        }}
+        onBlur={() => setTyping(null)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          onEnter(e);
+        }}
+      />
+    </>
   );
 }
 
@@ -683,6 +765,8 @@ export function TrayWindow() {
   const [held, trackKeys] = useHeldMode();
   const [error, setError] = useState<string | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  // FR-DICEX-105: "+ Group" was pressed: the next palette die starts this new group.
+  const [newGroup, setNewGroup] = useState<{ type: PartType | null } | null>(null);
   const [macros, setMacros] = useState<{ open: boolean; preset: MacroDraft | null }>({
     open: false,
     preset: null,
@@ -702,6 +786,7 @@ export function TrayWindow() {
   useEffect(() => {
     const r = diceExtras.api.getState().request;
     setError(null);
+    setNewGroup(null);
     const expression = r?.kind === "free" ? r.expression : "";
     setDraft(expression);
     lastValid.current = termsOf(expression) ?? [];
@@ -778,6 +863,7 @@ export function TrayWindow() {
   const setPurpose = (v: TrayPurpose) => {
     if (v === purpose) return;
     setError(null);
+    setNewGroup(null);
     const untyped = { terms: comp.terms, types: comp.terms.map(() => null) };
     const next = v !== "damage" ? untyped : purpose === "damage" ? comp : normalize(untyped);
     const expression = notationOf(next.terms);
@@ -849,6 +935,7 @@ export function TrayWindow() {
       }
     }
     diceExtras.api.setState({ result: null });
+    setNewGroup(null);
     control.roll({ shiftKey: keys.shiftKey, ctrlKey: keys.ctrlKey }); // never Alt: already staged
   };
 
@@ -863,8 +950,9 @@ export function TrayWindow() {
   const terms = comp.terms;
   const locked = editable ? lockedDie(comp, purpose) : null;
   // FR-DICEX-48: what the dice area previews: `free` / an editable control = the composed terms
-  // (damage: one group per die size and type, led by its type Select, FR-DICEX-101; the dice as
-  // entered, FR-DICEX-100); a read-only `control` = each expression's dice (crit per FR-DICE-31),
+  // (damage: one row per die group, its type Select, dice, "+" and modifier, FR-DICEX-101, -105;
+  // the dice as entered, FR-DICEX-100); a read-only `control` = each expression's dice (crit per
+  // FR-DICE-31),
   // the first with the previewed mode, each group with its slot label (FR-DICE-41).
   const groups = ((): TrayGroup[] => {
     if (controlReq && !editable) {
@@ -885,28 +973,75 @@ export function TrayWindow() {
         { chips: chipsOf(terms, shownMode), constant: constantOfTerms(terms), label, locked },
       ];
     }
-    // A part's constant follows its last group (the base part's is also the constant Input).
-    const constants = new Map(partsOf(comp).map((p) => [p.dice[p.dice.length - 1], p.constant]));
     const chips = chipsOf(terms, "normal");
-    return terms.flatMap((t, i) =>
-      t.kind !== "dice"
-        ? []
-        : [
-            {
-              chips: chips.filter((c) => c.term === i),
-              constant: constants.get(i) ?? 0,
-              locked,
-              lead: (
-                <GroupType
-                  comp={comp}
-                  term={i}
-                  disabled={state === "rolling"}
-                  onChange={(type) => setComp(setGroupType(comp, i, type))}
-                />
-              ),
-            },
-          ],
-    );
+    const rolling = state === "rolling";
+    const rows: TrayGroup[] = rowsOf(comp).map((r) => {
+      const t = terms[r.term];
+      const faces = t?.kind === "dice" ? t.faces : 0;
+      const recordId = groupRecordId(comp, r.term);
+      return {
+        chips: chips.filter((c) => c.term === r.term),
+        constant: 0, // its own Input, in `trail`
+        locked,
+        lead: (
+          <GroupType
+            value={r.type}
+            noType={offersNoType(comp)}
+            testId="dicex-tray-group-type"
+            recordId={recordId}
+            label={`Damage type of the d${faces} dice`}
+            disabled={rolling}
+            onChange={(type) => setComp(setGroupType(comp, r.term, type))}
+          />
+        ),
+        trail: (
+          <GroupControls
+            faces={faces}
+            recordId={recordId}
+            constant={r.constant}
+            disabled={rolling}
+            onAdd={() => setComp(addToGroup(comp, r.term))}
+            onConstant={(n) => setComp(setGroupConstant(comp, r.term, n))}
+            onEnter={(keys) => roll(keys)}
+          />
+        ),
+      };
+    });
+    if (!newGroup || fresh) return rows;
+    // FR-DICEX-105: the group "+ Group" just opened, until a palette die starts it.
+    return [
+      ...rows,
+      {
+        chips: [],
+        constant: 0,
+        hint: "Pick a die above",
+        lead: (
+          <GroupType
+            value={newGroup.type}
+            noType={offersNoType(comp) || rows.length === 0}
+            testId="dicex-tray-new-group-type"
+            label="Damage type of the new group"
+            disabled={rolling}
+            onChange={(type) => setNewGroup({ type })}
+          />
+        ),
+        trail: (
+          <Tip content="Cancel the new group">
+            <Button
+              type="button"
+              data-testid="dicex-tray-new-group-cancel"
+              aria-label="Cancel the new group"
+              size="icon"
+              variant="ghost"
+              className="relative size-6 shrink-0"
+              onClick={() => setNewGroup(null)}
+            >
+              <XIcon className="size-3.5" />
+            </Button>
+          </Tip>
+        ),
+      },
+    ];
   })();
   const { options: actorList, selected } = actorSelection(
     actors,
@@ -977,8 +1112,14 @@ export function TrayWindow() {
               className="h-7 min-w-0 px-0 font-mono text-xs"
               onClick={() => {
                 // After a result the palette starts a new roll; else it adds to the request
-                // (FR-DICEX-101: a damage die joins its size's group or starts one).
+                // (FR-DICEX-101: a damage die joins its size's group or starts one; FR-DICEX-105:
+                // after "+ Group" it always starts one).
                 diceExtras.api.setState({ result: null });
+                if (newGroup && !fresh && purpose === "damage") {
+                  setNewGroup(null);
+                  setComp(startGroup(comp, f, newGroup.type));
+                  return;
+                }
                 const from = fresh ? { terms: [], types: [] } : comp;
                 setComp(joinDie(from, f, fresh ? "plain" : purpose), fresh);
               }}
@@ -1009,7 +1150,7 @@ export function TrayWindow() {
             mode={shownMode}
             onRemove={
               state === "compose" || (state === "adjust" && editable)
-                ? (term) => setComp(dropDie(comp, term))
+                ? (term) => setComp(dropDie(comp, term, purpose))
                 : undefined
             }
             dimmed={state === "rolling"}
@@ -1060,22 +1201,37 @@ export function TrayWindow() {
               }}
             />
           )}
-          <Input
-            data-testid="dicex-tray-constant"
-            aria-label="Constant"
-            inputMode="numeric"
-            className="h-7 w-16 font-mono text-sm"
-            style={notation}
-            value={String(fresh ? constantOfTerms(terms) : baseConstant(comp, purpose))}
-            onChange={(e) => {
-              const n = Number.parseInt(e.target.value.replace("−", "-"), 10);
-              const from = fresh ? { terms, types: terms.map(() => null) } : comp;
-              setComp(
-                setBaseConstant(from, Number.isNaN(n) ? 0 : n, fresh ? "plain" : purpose),
-                fresh,
-              );
-            }}
-          />
+          {!fresh && purpose === "damage" ? (
+            // FR-DICEX-105: each group has its own modifier; this adds a group.
+            <Tip content="Add a die group: pick its type, then a die">
+              <Button
+                type="button"
+                data-testid="dicex-tray-add-group"
+                size="sm"
+                variant="outline"
+                aria-pressed={newGroup !== null}
+                className="h-7 shrink-0 gap-1 px-1.5 text-xs"
+                onClick={() => setNewGroup(newGroup ? null : { type: lastGroupType(comp) })}
+              >
+                <PlusIcon className="size-3.5" />
+                Group
+              </Button>
+            </Tip>
+          ) : (
+            <Input
+              data-testid="dicex-tray-constant"
+              aria-label="Constant"
+              inputMode="numeric"
+              className="h-7 w-16 font-mono text-sm"
+              style={notation}
+              value={String(constantOfTerms(terms))}
+              onChange={(e) => {
+                const n = Number.parseInt(e.target.value.replace("−", "-"), 10);
+                const from = fresh ? { terms, types: terms.map(() => null) } : comp;
+                setComp(setBaseConstant(from, Number.isNaN(n) ? 0 : n), fresh);
+              }}
+            />
+          )}
         </div>
       )}
       {issue && state !== "result" && (

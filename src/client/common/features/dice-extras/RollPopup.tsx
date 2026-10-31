@@ -248,6 +248,7 @@ function Miniature({
             value: d.value as number,
             kept: d.kept,
             look: pop.looks[d.entryId] ?? STYLE_LOOK.ivory,
+            ...(d.damage && { damage: d.damage }),
           })),
           onRest: (info) => {
             setSettled(info.settled);

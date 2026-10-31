@@ -56,7 +56,18 @@ declare module "three" {
     updateProjectionMatrix(): void;
   }
 
-  export class BufferAttribute {}
+  export class Color {
+    constructor(hex?: number | string);
+    r: number;
+    g: number;
+    b: number;
+    setHex(hex: number): this;
+  }
+
+  export class BufferAttribute {
+    array: Float32Array;
+    needsUpdate: boolean;
+  }
   export class Float32BufferAttribute extends BufferAttribute {
     constructor(array: ArrayLike<number>, itemSize: number);
   }
@@ -101,6 +112,18 @@ declare module "three" {
   }
   export class MeshStandardMaterial extends Material {
     constructor(parameters?: MeshStandardMaterialParameters);
+    emissive: Color;
+    emissiveIntensity: number;
+  }
+  export interface PointsMaterialParameters extends MaterialParameters {
+    map?: Texture | null;
+    size?: number;
+    sizeAttenuation?: boolean;
+    vertexColors?: boolean;
+  }
+  export class PointsMaterial extends Material {
+    constructor(parameters?: PointsMaterialParameters);
+    size: number;
   }
   export interface MeshPhysicalMaterialParameters extends MeshStandardMaterialParameters {
     clearcoat?: number;
@@ -117,6 +140,11 @@ declare module "three" {
     constructor(geometry?: BufferGeometry, material?: Material);
     geometry: BufferGeometry;
     material: Material;
+  }
+
+  export class Points extends Object3D {
+    constructor(geometry?: BufferGeometry, material?: Material);
+    frustumCulled: boolean;
   }
 
   export class Light extends Object3D {}

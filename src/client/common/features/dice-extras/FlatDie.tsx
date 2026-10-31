@@ -6,7 +6,12 @@
 import type { DiceLook } from "@shared/dice-extras/looks";
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import type { ThrowDie } from "@shared/dice-extras/throw";
+import { useEffect, useRef } from "react";
 import { DieShape } from "./DieShape";
+import { dieFxOf, fxCss } from "./die-fx";
+
+/** FR-DICEX-106: a flat throw's damage effect: one short glow in the type's colour. */
+const FLAT_FX_MS = 1100;
 
 export function FlatDie({
   die,
@@ -29,10 +34,27 @@ export function FlatDie({
   /** FR-DICEX-96: the tray's dice scale. */
   scale?: number;
 }) {
+  const el = useRef<HTMLSpanElement>(null);
+  const color = flat ? dieFxOf(die.damage)?.color : undefined;
+  useEffect(() => {
+    if (color === undefined) return;
+    const css = fxCss(color);
+    const anim = el.current?.animate?.(
+      [
+        { filter: `drop-shadow(0 0 0 ${css})` },
+        { filter: `drop-shadow(0 0 8px ${css})`, offset: 0.25 },
+        { filter: `drop-shadow(0 0 0 ${css})` },
+      ],
+      { duration: FLAT_FX_MS, easing: "ease-out" },
+    );
+    return () => anim?.cancel();
+  }, [color]);
   return (
     <span
+      ref={el}
       data-testid={settled === undefined ? "dicex-result-die" : "dicex-throw-die"}
       data-entry-id={die.entryId}
+      {...(die.damage && { "data-damage": die.damage })}
       data-faces={die.faces}
       data-value={blank ? undefined : (die.value ?? "")}
       data-kept={die.kept}

@@ -253,3 +253,47 @@ describe("FR-DICEX-54 tray dice area fits", () => {
     expect(many).not.toContain("data-grouped");
   });
 });
+
+describe("FR-DICEX-105 group rows", () => {
+  const area: AreaBox = { w: 420, h: 190 };
+  const rowsSize = (cells: number[]) =>
+    stillSize(
+      {
+        cells: cells.reduce((a, b) => a + b, 0),
+        groupedCells: cells.length,
+        byCount: false,
+        rows: { cells, groupedCells: cells.map(() => 1) },
+      },
+      area,
+    );
+
+  test("FR-DICEX-105 rows stack: three fit at 40, more wrap down a step", () => {
+    expect(rowsSize([1, 1, 1])).toEqual({ cell: 40, grouped: false, scroll: false });
+    // Six rows of 40 don't fit in 190 px; of 28 they do (6 × 28 + 5 gaps = 188).
+    expect(rowsSize([1, 1, 1, 1, 1, 1]).cell).toBe(28);
+    // A flow of the same dice would still fit at 40: rows are what is measured.
+    expect(stillSize({ cells: 6, groupedCells: 6, byCount: false }, area).cell).toBe(40);
+  });
+
+  test("FR-DICEX-105 a group's row: type, dice, its own + and modifier; a label row stays flowing", () => {
+    const t = termsOf("2d6") ?? [];
+    const row: TrayGroup = {
+      chips: chipsOf(t),
+      constant: 0,
+      lead: <b data-testid="lead" />,
+      trail: <i data-testid="trail" />,
+    };
+    const html = preview([row], area);
+    expect(html).toMatch(/data-testid="dicex-tray-group" class="[^"]*w-full/);
+    const order = ["lead", "dicex-tray-die", "trail"].map((id) =>
+      html.indexOf(`data-testid="${id}"`),
+    );
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(preview([{ ...group("2d6"), label: "Fire" }], area)).not.toContain(
+      'data-testid="dicex-tray-group"',
+    );
+    // A new group has no dice yet: its hint.
+    const empty = { chips: [], constant: 0, hint: "Pick a die above", lead: <b /> };
+    expect(preview([empty], area)).toContain('data-testid="dicex-tray-group-hint"');
+  });
+});
