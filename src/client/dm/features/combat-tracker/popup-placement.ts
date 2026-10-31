@@ -21,7 +21,7 @@ import {
   workArea,
 } from "@ui/features/play-shell/geometry";
 import { windowId } from "@ui/features/play-shell/manager";
-import { RAIL_CLEAR } from "@ui/features/play-shell/placement";
+import { PC_MARGIN, RAIL_CLEAR } from "@ui/features/play-shell/placement";
 import { coveredArea, type TokenBox, tokenScreenBoxes } from "@ui/features/play-shell/token-boxes";
 import type { TargetCandidate } from "./targets";
 
@@ -99,6 +99,12 @@ export const POPUP_W = 440;
  * popup opened at 68, 60 clear of Mira and grew onto her. Counted for the PCs only.
  */
 export const TARGET_ROW_GROW = 84;
+
+/**
+ * FR-NOTE-84 (sim-17 walkthrough, DM 1280×720): the gap the popup keeps to Initiative when its 12 px
+ * is what leaves it on a PC: the frame's retry gap (ADR-0060, FR-SHELL-98). Never on Initiative.
+ */
+export const INITIATIVE_MIN_GAP = 4;
 
 export interface PlacementInput {
   viewport: { w: number; h: number };
@@ -246,6 +252,25 @@ export function popupPlacement(i: PlacementInput): Placement {
         bestScore = s;
       }
     }
+  }
+  // FR-NOTE-84: still on a PC, and Initiative's 12-px gap is what stops it: the gap gives way down
+  // to `INITIATIVE_MIN_GAP`, only if that clears the PCs' footprints and no target pays for it.
+  const [bestT0 = 0, bestT1 = 0, bestPc = 0] = bestScore;
+  if (bestPc > 0 && i.initiative) {
+    const tight = Math.max(left, i.initiative.x - INITIATIVE_MIN_GAP - i.width);
+    const bare = pcs.map((p) => ({
+      x: p.x + PC_MARGIN,
+      y: p.y + PC_MARGIN,
+      w: p.w - 2 * PC_MARGIN,
+      h: p.h - 2 * PC_MARGIN,
+    }));
+    const clears = (y: number) => {
+      const [t0 = 0, t1 = 0] = score(tight, y);
+      if (t0 > bestT0 || t1 > bestT1) return false;
+      return coveredArea({ x: tight, y, w: i.width, h: h + TARGET_ROW_GROW }, bare) === 0;
+    };
+    const y = tight > right ? ys.find(clears) : undefined;
+    if (y !== undefined) return result(tight, y);
   }
   return result(best.x, best.y);
 }

@@ -4,7 +4,7 @@
 // the DM's captured records (36-px cells, map origin 328, 122), PCs footprint + 4 px.
 import { describe, expect, test } from "bun:test";
 import { coveredArea } from "@ui/features/play-shell/token-boxes";
-import { popupPlacement, TARGET_ROW_GROW } from "./popup-placement";
+import { INITIATIVE_MIN_GAP, popupPlacement, TARGET_ROW_GROW } from "./popup-placement";
 
 const viewport = { w: 1440, h: 900 };
 const initiative = { x: 1030, w: 398 };
@@ -116,6 +116,74 @@ describe("FR-NOTE-81 the damage-card popup keeps off the PCs where a clear spot 
     const a = popupPlacement({ ...base, others: [[], REST], height: FINAL_H });
     const b = popupPlacement({ ...base, others: [[], REST], pcs: [], height: FINAL_H });
     expect(b).toEqual(a);
+  });
+
+  describe("FR-NOTE-84 the card gives up Initiative's gap for a PC", () => {
+    // Walkthrough step E, DM 1280×720 after Reset: 416, 446 (with the row 416, 432) on Thorn by 6 px.
+    const vp = { w: 1280, h: 720 };
+    const init = { x: 868, w: 400 };
+    const box = (x: number, y: number, s = 28) => ({ x, y, w: s, h: s });
+    const thorn = box(394, 472);
+    const mira = box(422, 360);
+    const brakka = box(366, 416);
+    const near = [thorn, mira, brakka].map(grown);
+    const OPEN = 262;
+    const WITH_ROW = 276;
+    const input = {
+      viewport: vp,
+      initiative: init,
+      width: 440,
+      tokens: [box(600, 200), box(700, 200), box(600, 300)],
+      height: OPEN,
+    };
+    const onScreen = (p: { x: number; y?: number }, h: number) =>
+      coveredArea({ x: p.x, y: p.y ?? 0, w: 440, h }, [thorn, mira, brakka]);
+
+    test("FR-NOTE-84 step E: before, 416, 446 on Thorn by 6 px; now 424, 446, 4 px from Initiative, off every PC with its row too", () => {
+      const before = popupPlacement(input);
+      expect(before).toMatchObject({ x: 416, y: 446 });
+      const beforeArea = coveredArea({ x: 416, y: 432, w: 440, h: WITH_ROW }, [thorn]);
+      expect(beforeArea).toBe(6 * 28);
+
+      const at = popupPlacement({ ...input, pcs: near });
+      expect(at).toMatchObject({ x: 868 - INITIATIVE_MIN_GAP - 440, y: 446 });
+      expect(onScreen(at, OPEN)).toBe(0);
+      // The row grows it upwards by the work area's bottom: 424, 432.
+      expect(onScreen({ x: at.x, y: 432 }, WITH_ROW)).toBe(0);
+      // Off Initiative itself.
+      expect(at.x + 440).toBeLessThanOrEqual(init.x - INITIATIVE_MIN_GAP);
+    });
+
+    test("FR-NOTE-84 FR-CBT-75 from a toast (the same case): the same spot, off Thorn", () => {
+      // A likely target past 864 blocks the toast's own spot, not the card's.
+      const tokens = [...input.tokens, box(880, 500)];
+      const before = popupPlacement({ ...input, tokens, prefer: { x: 480, y: 409 } });
+      expect(before).toMatchObject({ x: 416, y: 409 });
+      const at = popupPlacement({ ...input, tokens, pcs: near, prefer: { x: 480, y: 409 } });
+      expect(at.x).toBe(424);
+      expect(onScreen(at, OPEN)).toBe(0);
+      expect(at.x + 440).toBeLessThanOrEqual(init.x - INITIATIVE_MIN_GAP);
+    });
+
+    test("FR-NOTE-84 the 12 px stays when it clears the PCs, or when 4 px wouldn't clear them either", () => {
+      const clear = [box(300, 472)].map(grown);
+      expect(popupPlacement({ ...input, pcs: clear }).x + 440).toBeLessThanOrEqual(868 - 12);
+      // A PC 30 px deep: giving up the gap doesn't clear it, so the gap holds.
+      const deep = box(420, 472);
+      const at = popupPlacement({ ...input, pcs: [mira, deep, box(300, 472)].map(grown) });
+      expect(at.x).not.toBe(868 - INITIATIVE_MIN_GAP - 440);
+    });
+
+    test("FR-NOTE-84 a target doesn't pay for it: the 4-px spot on a likely target isn't taken", () => {
+      const onTarget = box(860, 500);
+      const at = popupPlacement({ ...input, tokens: [...input.tokens, onTarget], pcs: near });
+      expect(coveredArea({ x: at.x, y: at.y ?? 0, w: 440, h: OPEN }, [onTarget])).toBe(0);
+    });
+
+    test("FR-NOTE-84 no Initiative open: nothing to give up, the rules before", () => {
+      const at = popupPlacement({ ...input, initiative: null, pcs: near });
+      expect(onScreen(at, OPEN)).toBe(0);
+    });
   });
 
   test("FR-NOTE-81 round trip at 1280×720 and 1600×900: the same fight at each one's camera keeps the PCs clear", () => {
