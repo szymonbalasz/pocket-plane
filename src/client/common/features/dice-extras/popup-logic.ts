@@ -471,6 +471,17 @@ function spotOffPcs(
 }
 
 /**
+ * FR-NOTE-85 (walkthrough step B: first frame 120, 248 h59, 115 ms later 496, 312): the height the
+ * DM column is placed for. An own roll in flight counts as the card it becomes (`popupHeight`: one
+ * row, one dice line; the "Rolling…" card is 59 px, that card 138), so the column first appears
+ * where it will stay. `measured`: its drawn height (0 before the first measure). Pure.
+ */
+export function columnPlanH(measured: number, pending: boolean, g: PopupGeom): number {
+  if (!pending) return measured;
+  return Math.max(0, measured - popupHeight(1, 0, g)) + popupHeight(1, 1, g);
+}
+
+/**
  * FR-DICEX-47 short screens + BL-132 (sim-16 d01: three quick player rolls stacked 448-wide
  * popups from 104, 354 over the Game log's title bar): the DM column's room below its top `at`,
  * px: to the viewport's bottom; a column moved off its `home` (shifted or dropped by what it keeps

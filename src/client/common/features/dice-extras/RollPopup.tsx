@@ -61,6 +61,7 @@ import { dice3d, whenChunk } from "./lazy3d";
 import {
   CELL_LINES,
   cellTag,
+  columnPlanH,
   dmColumnTop,
   dmPopupAt,
   dmPopupClear,
@@ -809,7 +810,9 @@ export function RollPopupStack({
   }, [dm, sync, arrivals, settled]);
   // FR-NOTE-82 (BL-118): a showing column holds its spot while that stays clear.
   const held = useRef<{ left: number; top: number } | null>(null);
-  const at = dmPopupAt(vp, start, { w: g.w, h: box.h }, clear, others, heads, pcs, held.current);
+  // FR-NOTE-85: placed for the card an own roll becomes, so it first shows where it will stay.
+  const size = { w: g.w, h: columnPlanH(box.h, pending, g) };
+  const at = dmPopupAt(vp, start, size, clear, others, heads, pcs, held.current);
   const showingColumn = popups.length > 0 || pending;
   useLayoutEffect(() => {
     held.current = showingColumn && box.h > 0 ? at : null;

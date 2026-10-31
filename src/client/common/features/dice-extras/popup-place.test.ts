@@ -6,6 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Rect } from "../play-shell/geometry";
 import {
+  columnPlanH,
   dmColumnTop,
   dmPopupAt,
   dmPopupClear,
@@ -84,6 +85,43 @@ describe("FR-NOTE-82 the DM's roll popups keep off the PCs where a clear spot ex
     expect(dmPopupAt(vp, start, size, clear, windows, heads, [], first)).toEqual(
       dmPopupAt(vp, start, size, clear, windows, heads),
     );
+  });
+
+  test("FR-NOTE-85 walkthrough step B (one card up, stack 248, 100 h140): the rolling card first shows where it will stay: before, 120, 248 h59 then 496, 312; now 496, 312 from the first frame, and it holds at rest", () => {
+    const stack = { x: 248, y: 100, w: 320, h: 140 };
+    const board = { x: 580, y: 148, w: 472, h: 536 };
+    const trayB = { x: 618, y: 560, w: 360, h: 316 };
+    const logB = { x: 68, y: 608, w: 1150, h: 280 };
+    const initB = { x: 1028, y: 60, w: 400, h: 512 };
+    const mid = { x: 336, y: 334, w: 53, h: 53 };
+    const bra = { x: 246, y: 424, w: 53, h: 53 };
+    const tho = { x: 291, y: 514, w: 53, h: 53 };
+    const pcsB = [mid, bra, tho];
+    const winsB = [board, trayB, logB];
+    const headsB = windowHeads(winsB, [{ x: 580, y: 148, bottom: 300 }]);
+    const clearB = dmPopupClear(initB, [], [], new Map([["note.toasts", stack]]), "dicex.popups");
+    const startB = dmColumnTop(stack.h);
+    expect(startB).toBe(248);
+    const place = (h: number, held: { left: number; top: number } | null = null) =>
+      dmPopupAt(vp, startB, { w: W, h }, clearB, winsB, headsB, pcsB, held);
+    const rolling = popupHeight(1, 0, POPUP_BIG);
+    expect(rolling).toBe(59);
+    // Before: placed at the rolling card's height, then the rest card's.
+    expect(place(rolling)).toEqual({ left: 120, top: 248 });
+    const rest = place(CARD_H);
+    expect(rest).toEqual({ left: 496, top: 312 });
+    // Now: from the first render (nothing measured) and the first measure, then at rest.
+    expect(place(columnPlanH(0, true, POPUP_BIG))).toEqual(rest);
+    expect(place(columnPlanH(rolling, true, POPUP_BIG))).toEqual(rest);
+    expect(place(columnPlanH(CARD_H, false, POPUP_BIG), rest)).toEqual(rest);
+  });
+
+  test("FR-NOTE-85 columnPlanH: only an own roll in flight counts as a card; other cards as drawn", () => {
+    const rolling = popupHeight(1, 0, POPUP_BIG);
+    expect(columnPlanH(CARD_H, false, POPUP_BIG)).toBe(CARD_H);
+    expect(columnPlanH(0, false, POPUP_BIG)).toBe(0);
+    expect(columnPlanH(0, true, POPUP_BIG)).toBe(CARD_H);
+    expect(columnPlanH(CARD_H + 8 + rolling, true, POPUP_BIG)).toBe(2 * CARD_H + 8);
   });
 
   test("FR-NOTE-82 BL-132 a home spot already off the PCs doesn't move: default layout, up to 3 cards", () => {
