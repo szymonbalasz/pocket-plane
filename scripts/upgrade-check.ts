@@ -13,6 +13,8 @@
 import { Database } from "bun:sqlite";
 import {
   appendFileSync,
+  cpSync,
+  existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -420,20 +422,31 @@ interface Outcome {
   playerRows: number;
 }
 
-async function runCheck(args: Args, dataDir: string, tree: string): Promise<Outcome> {
-  const base = resolveBase(args.base);
+/**
+ * The load runs in `temp`: the base's fixture guards only know its own tree and the OS temp dir.
+ * `--data-dir` gets a copy to boot on, kept for a look afterwards; it must be new or empty.
+ */
+async function runCheck(args: Args, temp: string): Promise<Outcome> {
+  const tree = path.join(temp, "tree");
+  const loadDir = path.join(temp, "data");
+  const dataDir = args.dataDir ? path.resolve(WORKTREE_ROOT, args.dataDir) : loadDir;
   checkDataDir(dataDir);
+  if (args.dataDir && existsSync(dataDir) && readdirSync(dataDir).length > 0) {
+    throw new CannotRun(`refusing ${dataDir}: it is not empty. Nothing was touched.`);
+  }
+  const base = resolveBase(args.base);
   const deps = await checkOutBase(base, tree);
 
   let bundle = args.bundle;
   let bundleNote = "";
-  if (!(await loadWithBase(tree, dataDir, bundle))) {
+  if (!(await loadWithBase(tree, loadDir, bundle))) {
     bundleNote = `the base has no bundle ${bundle}: used ${FALLBACK_BUNDLE}`;
     bundle = FALLBACK_BUNDLE;
-    if (!(await loadWithBase(tree, dataDir, bundle))) {
+    if (!(await loadWithBase(tree, loadDir, bundle))) {
       throw new CannotRun(`the base has neither ${args.bundle} nor ${FALLBACK_BUNDLE}`);
     }
   }
+  if (dataDir !== loadDir) cpSync(loadDir, dataDir, { recursive: true });
   const dbPath = path.join(dataDir, "pocket-plane.db");
   const before = rowCounts(dbPath);
   const manifest = JSON.parse(readFileSync(manifestPath(dataDir), "utf8")) as {
@@ -598,10 +611,7 @@ async function main(): Promise<number> {
       console.log(`\nprove-refusal: ${ok ? "PASS" : "FAIL"}`);
       return ok ? 0 : 1;
     }
-    const dataDir = args.dataDir
-      ? path.resolve(WORKTREE_ROOT, args.dataDir)
-      : path.join(temp, "data");
-    const r = await runCheck(args, dataDir, path.join(temp, "tree"));
+    const r = await runCheck(args, temp);
     const secs = Math.round((performance.now() - t0) / 1000);
     if (r.bundleNote) console.log(`upgrade:check: ${r.bundleNote}`);
     console.log(

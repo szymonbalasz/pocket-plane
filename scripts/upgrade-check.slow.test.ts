@@ -2,7 +2,7 @@
 // against a commit made here (never on a branch) whose schema has a column under another name, so
 // this tree's schema "renames" it. Runs the script as the CI job does, on its own temp dir.
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { WORKTREE_ROOT } from "../src/server/config";
@@ -133,6 +133,22 @@ test(
     expect(r.stdout).toContain("no terminal here");
     expect(r.stdout.match(/--- PASS: exit 1 in/g)).toHaveLength(2);
     expect(r.code).toBe(0);
+    expect(leftovers()).toEqual([]);
+  },
+  TIMEOUT_MS,
+);
+
+test(
+  "BL-173 --data-dir keeps the upgraded data, and refuses a dir that isn't empty",
+  async () => {
+    const kept = path.join(temp, "kept");
+    const r = await runCheck(["--base=HEAD", "--bundle=base", `--data-dir=${kept}`]);
+    expect(r.stderr).not.toContain("left behind");
+    expect(r.code).toBe(0);
+    expect(existsSync(path.join(kept, "pocket-plane.db"))).toBe(true);
+    const again = await runCheck(["--base=HEAD", "--bundle=base", `--data-dir=${kept}`]);
+    expect(again.code).toBe(2);
+    expect(again.stderr).toContain("it is not empty");
     expect(leftovers()).toEqual([]);
   },
   TIMEOUT_MS,
