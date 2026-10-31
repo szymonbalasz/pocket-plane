@@ -4465,3 +4465,14 @@ From [scenes-map](../specs/scenes-map.md) FR-MAP-121–123 (#418). **Built by `b
 - **Server signal `vfx.poof`** (server-originated, transient: no event of its own, DB row, log, snapshot or `seq`): `signal {name: "vfx.poof", data: PoofCue, from: {role: "dm"}}`, `PoofCue = {id, sceneId, side, cells: [{col, row}]}` (1–2 cells, top-left of each footprint). Per connection after commit: the DM gets both ends; a player the ends where `records.view` shows them the token (the record before the move for the cell left, after it for the cell reached); neither → no signal.
 - **Canvas tool** `teleport`: DM, `offRail` (a new optional `CanvasToolDef` field: `toolsFor` leaves it off the rail).
 - **Test IDs:** `map-token-menu-teleport`, `map-teleport-panel`, `map-teleport-cancel`; canvas `map-teleport-target` (attrs `col`, `row`), `vfx-poof` (id = cue id; `x`, `y`, `size`), `vfx-over-pass` attr `lastPoof` = cue id.
+
+## 193. AoE tool polish (fix/aoe-template-polish)
+
+From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57–60 ([#427](../decisions-log.md)). **Built by `fix/aoe-template-polish`.** One new signal; no record type, event type, intent or field. `cylinder` stays valid in `TemplateShape` (old kept templates); only the tool stops offering it.
+
+| Signal | Payload | Who sends | Who receives | FR |
+|---|---|---|---|---|
+| `scn.templateClear` | `{sceneId, key, playerId?}` | DM only (`forbidden` otherwise). Scene not the campaign's → `not_found` | The DM's other tabs + the player named; no `playerId` or a non-active scene → the DM's tabs only | FR-SCN-58 |
+
+- **Receiver:** the connection whose ephemeral has `key` ends it (`scn.template {sceneId, key, end: true}`, FR-SCN-23), so everyone drops it; others ignore it. Transient: not stored, logged or queued; a sender that is gone drops out on the 3 s silence.
+- **Client only:** the label pill moves to its own canvas layer `scn-template-labels` (order 47, `top`; Konva nodes `scn-template-label`, id = template id, with `scn-template-label-text` and the new `scn-template-label-measures`), no longer inside the `scn-template` group. `LayerContextMenu.first?(ctx)`: true = asked ahead of the other layers' menus, and its hit goes ahead of the DM's token menu.

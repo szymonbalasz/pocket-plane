@@ -5,17 +5,16 @@
 // (FR-SCN-45, local preview until the commit). Each: the affected squares (> 50 % covered,
 // FR-SCN-41; cut to the map) tinted in its person's player colour (kept: the placer, null = the
 // DM; ephemeral: the sender; own: the own; FR-SCN-47), the shape's true outline (off-grid allowed)
-// over a dark casing (FR-MAP-72) and a label pill at the origin: a colour dot + "‹label› · N
-// squares", plus " · by ‹name›" while hovered (its area or its pill, FR-SCN-52) or selected.
+// over a dark casing (FR-MAP-72). Its label pill at the origin is worked out here and drawn above
+// the tokens by `scn-template-labels` (FR-SCN-59): " · by ‹name›" while hovered (its area or its
+// pill, FR-SCN-52) or selected.
 // With the AoE tool: an origin handle on every template this client may edit, and an end handle
 // on the selected one. DM: hidden / DM-only ones in `visibility.hidden` styling (OQ-SCN-41 A);
 // the "DM-only items" switch (`dm-only`) drops hidden ones. No pointer events: the AoE tool works
 // on the stage; the hover is read from the stage's pointer. Konva: name `scn-template`, id =
 // record ID or `eph-<key>`, attrs `shape`, `cells` ("c,r c,r …"), `origin` ("x,y"), `angle`,
 // `ephemeral`, `color` (the drawn hex), `by` (player id | `dm`); `map-casing` (id = template id)
-// under the outline; label `scn-template-label` (id = template id; `hovered` = true while
-// hovered) with `scn-template-label-dot`; handles `scn-template-handle-origin` / `-end` (id =
-// template id). While placing or moving an origin (#375), the cells it snaps to (a cell, or a big
+// under the outline; handles `scn-template-handle-origin` / `-end` (id = template id). While placing or moving an origin (#375), the cells it snaps to (a cell, or a big
 // token's footprint) are outlined in this client's colour over the casing: `scn-aoe-origin-cell`
 // (attrs `col`, `row`, `n`); the layer feeds the shown tokens' footprints to the tool's snap.
 // Mounts the right-click menu island (FR-SCN-48; the press routing is MapCanvas', FR-MAP-71).
@@ -24,13 +23,22 @@ import {
   AOE_TEMPLATE_TYPE,
   type DiagonalRule,
   SCN_SIGNALS,
+  TemplateClearData,
   type TemplateRecordView,
   TemplateSignalData,
 } from "@shared/scene-tools/schemas";
 import type { Grid } from "@shared/scenes-map/geometry";
-import Konva from "konva";
-import { type RefObject, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Circle, Group, Line, Rect, Shape, Text } from "react-konva";
+import type Konva from "konva";
+import {
+  type RefObject,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Circle, Group, Line, Rect, Shape } from "react-konva";
 import { useStore } from "zustand";
 import { SyncContext, useSignal, useSync } from "../../../sync/store";
 import { canvasBlind } from "../../fog-of-war/blind";
@@ -48,7 +56,7 @@ import {
 } from "../../scenes-map/mark-colors";
 import { useLayerToggles } from "../../scenes-map/tool-store";
 import { snapTokens } from "../aoe-snap";
-import { type AoeGesture, useAoe } from "../aoe-store";
+import { type AoeGesture, templateCleared, useAoe } from "../aoe-store";
 import { diagonalRuleIn } from "../diagonal-rule";
 import { useTemplateMenuIsland } from "../TemplateMenu";
 import {
@@ -68,9 +76,11 @@ import {
   templateCaptionBy,
   templateColor,
   templateHandles,
+  templateMeasures,
   templateOutline,
   templateUnder,
 } from "../templates";
+import { removeTemplatePill, setTemplatePill } from "./TemplateLabelsLayer";
 
 interface Drawn {
   id: string;
@@ -112,74 +122,6 @@ function Handle({
       stroke={stroke}
       strokeWidth={2 / cam.scale}
     />
-  );
-}
-
-/** Text width in map px for the label pill (Konva measures off-stage). */
-let measurer: Konva.Text | null = null;
-function textWidth(text: string, fontSize: number, padding: number): number {
-  measurer ??= new Konva.Text({});
-  measurer.setAttrs({ text, fontSize, padding });
-  return measurer.width();
-}
-
-/** FR-SCN-47: the label pill: a colour dot, then the caption (+ " · by ‹name›" when `named`). */
-function TemplateLabel({
-  d,
-  x,
-  y,
-  squares,
-  color,
-  named,
-  hovered,
-}: {
-  d: Drawn;
-  x: number;
-  y: number;
-  squares: number;
-  color: string;
-  named: boolean;
-  hovered: boolean;
-}) {
-  const { cam, colors, store } = useCanvas();
-  const s = cam.scale;
-  const text = templateCaptionBy(
-    d.template.label,
-    squares,
-    named ? personName(store, d.who) : null,
-  );
-  const font = 12 / s;
-  const pad = 3 / s;
-  const dot = 8 / s;
-  const lead = pad + dot;
-  const h = font + 2 * pad;
-  return (
-    <Group x={x} y={y} name="scn-template-label" id={d.id} {...(hovered && { hovered: true })}>
-      <Rect
-        width={lead + textWidth(text, font, pad)}
-        height={h}
-        fill={colors.background}
-        opacity={0.85}
-        cornerRadius={4 / s}
-      />
-      <Circle
-        name="scn-template-label-dot"
-        x={pad + dot / 2}
-        y={h / 2}
-        radius={dot / 2}
-        fill={color}
-        stroke={CASING_COLOR}
-        strokeWidth={1 / s}
-      />
-      <Text
-        x={lead}
-        text={text}
-        fontSize={font}
-        padding={pad}
-        fill={colors.foreground}
-        name="scn-template-label-text"
-      />
-    </Group>
   );
 }
 
@@ -250,6 +192,22 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
   // FR-MAP-72: the coloured outline over an opaque casing (hidden: grey styling, no casing).
   const casing = { name: CASING_NAME, id: d.id, stroke: CASING_COLOR, dash };
   const casingSw = casingWidth(swPx, cam.scale);
+  // FR-SCN-59: the pill is drawn above the tokens, by `scn-template-labels`.
+  const byName = hovered || d.selected === true ? personName(store, d.who) : null;
+  const caption = templateCaptionBy(t.label, cells.length, byName);
+  const measures = templateMeasures(t);
+  useLayoutEffect(() => {
+    setTemplatePill(d.id, {
+      x: ox,
+      y: oy,
+      caption,
+      measures,
+      color: stroke,
+      hidden: d.hidden,
+      hovered,
+    });
+  }, [d.id, ox, oy, caption, measures, stroke, d.hidden, hovered]);
+  useLayoutEffect(() => () => removeTemplatePill(d.id), [d.id]);
   return (
     <Group
       name="scn-template"
@@ -316,15 +274,6 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
           stroke={stroke}
         />
       )}
-      <TemplateLabel
-        d={d}
-        x={ox + 8 / cam.scale}
-        y={oy + 8 / cam.scale}
-        squares={cells.length}
-        color={stroke}
-        named={hovered || d.selected === true}
-        hovered={hovered}
-      />
     </Group>
   );
 }
@@ -361,8 +310,8 @@ function useTemplateHover(
       if (!p || (e.evt?.buttons ?? 0) !== 0) return setHovered(null);
       const at = group.getAbsoluteTransform().copy().invert().point(p);
       const pills: Record<string, PillRect> = {};
-      for (const n of group.find(".scn-template-label")) {
-        pills[n.id()] = n.getClientRect({ relativeTo: group });
+      for (const n of stage.find(".scn-template-label")) {
+        pills[n.id()] = n.getClientRect({ relativeTo: stage });
       }
       const { drawn: d, scale: s, grid: g, rule: r } = latest.current;
       setHovered(templateUnder(at, d, s, g, pills, r));
@@ -401,7 +350,10 @@ export function ScnTemplatesLayer() {
       editable: pickableTemplates(kept, client, myPlayerId, dmOnlyOff),
     });
   }, [kept, scene.id, client, myPlayerId, dmOnlyOff]);
-  useEffect(() => () => useAoe.setState({ editable: [], sceneId: null, tokens: [] }), []);
+  useEffect(
+    () => () => useAoe.setState({ editable: [], others: [], sceneId: null, tokens: [] }),
+    [],
+  );
   // #375: a sphere / cylinder over a big token snaps to its centre (the shown tokens only).
   useEffect(() => useAoe.setState({ tokens: snapTokens(tokens) }), [tokens]);
   useTemplateMenuIsland(useContext(SyncContext));
@@ -411,6 +363,11 @@ export function ScnTemplatesLayer() {
   useSignal(SCN_SIGNALS.template, (s) => {
     const d = TemplateSignalData.safeParse(s.data);
     if (d.success) receiveTemplate(eph, s.from, d.data, performance.now());
+  });
+  // FR-SCN-58: the DM cleared an ephemeral; if it is this connection's, it ends it for everyone.
+  useSignal(SCN_SIGNALS.templateClear, (s) => {
+    const d = TemplateClearData.safeParse(s.data);
+    if (d.success) templateCleared(d.data.key);
   });
   // A snapshot (a new scene window) or leaving live drops them all.
   const sceneWindow = useSync((s) => s.scenes);
@@ -429,9 +386,14 @@ export function ScnTemplatesLayer() {
   // FR-FOG-36: a blind player draws none of the others' previews (they still arrive).
   const blind = canvasBlind(client, store, scene.id, myPlayerId);
   const others = useMemo(
-    () => (blind ? [] : ephemeralsOn({ byId: ephById }, scene.id)),
-    [blind, ephById, scene.id],
+    () =>
+      blind
+        ? []
+        : ephemeralsOn({ byId: ephById }, scene.id).filter((e) => !(e.dmOnly && dmOnlyOff)),
+    [blind, ephById, scene.id, dmOnlyOff],
   );
+  // FR-SCN-58: the right press reads what is drawn.
+  useEffect(() => useAoe.setState({ others }), [others]);
 
   const drawn: Drawn[] = [];
   for (const r of kept) {
@@ -450,7 +412,6 @@ export function ScnTemplatesLayer() {
     });
   }
   for (const e of others) {
-    if (e.dmOnly && dmOnlyOff) continue;
     drawn.push({
       id: `eph-${e.id}`,
       template: e.template,

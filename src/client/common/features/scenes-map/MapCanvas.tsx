@@ -666,6 +666,8 @@ export function MapCanvas(props: MapCanvasProps) {
     menu: LayerContextMenu;
     ctx: LayerMenuContext;
   } | null>(null);
+  /** FR-SCN-58: the browser's `contextmenu` for this right press opens no token menu. */
+  const skipTokenMenu = useRef(false);
   useEffect(() => {
     if (live) return;
     for (const n of stageRef.current?.find(".map-token") ?? []) {
@@ -1094,14 +1096,18 @@ export function MapCanvas(props: MapCanvasProps) {
       const tp = menuTool?.pointer?.menu ? toolPointerRef.current(e.evt) : null;
       const toolMenu = tp !== null && menuTool?.pointer?.menu?.(tp) === true;
       const menuCtx: LayerMenuContext = { ...ctx, off: useLayerToggles.getState().off };
-      const asks = isLive && !toolMenu && !(onToken && client === "dm");
-      const hit = asks ? layerMenuAt(canvasLayers, p, menuCtx) : null;
+      const found = isLive && !toolMenu ? layerMenuAt(canvasLayers, p, menuCtx) : null;
+      // The DM's token menu goes first, unless the layer's menu asks to go ahead (FR-SCN-58).
+      const dmToken = onToken && client === "dm";
+      const ahead = dmToken && found?.contextMenu?.first?.(menuCtx) === true;
+      const hit = dmToken && !ahead ? null : found;
+      skipTokenMenu.current = ahead;
       const action = rightPress({
         client,
         live: isLive,
         signalsLive,
         nodeMenu: false,
-        onToken,
+        onToken: onToken && !ahead,
         toolMenu,
         layerHit: hit !== null,
       });
@@ -1192,6 +1198,10 @@ export function MapCanvas(props: MapCanvasProps) {
 
   const onContextMenu = (e: Konva.KonvaEventObject<PointerEvent>) => {
     e.evt.preventDefault();
+    // FR-SCN-58: this right press went to a layer's menu ahead of the token's.
+    const skip = skipTokenMenu.current;
+    skipTokenMenu.current = false;
+    if (skip) return;
     const node = tokenNodeOf(e.target);
     if (!node || client !== "dm" || !props.onTokenMenu || !liveRef.current) return;
     const t = tokens.find((x) => x.id === node.id());
