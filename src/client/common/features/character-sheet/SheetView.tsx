@@ -417,15 +417,17 @@ function NameRow({
         <SheetName picker={picker} />
         <span
           data-testid="char-sheet-level"
-          className="mt-1 inline-block max-w-full align-top text-sm [overflow-wrap:anywhere] text-muted-foreground @min-[560px]/sheet:text-base"
+          className="mt-1 inline-block max-w-full overflow-x-clip align-top text-sm [overflow-wrap:anywhere] text-muted-foreground @min-[560px]/sheet:text-base"
         >
-          <LevelParts parts={[...sub.split(" · "), ...(species ? [species] : [])]} />
-          {background && (
-            <span className="hidden @min-[560px]/sheet:inline">
-              {" "}
-              <span className="inline-block max-w-full">· {background}</span>
-            </span>
-          )}
+          <span className="-ml-[0.55em] block">
+            <LevelParts parts={[...sub.split(" · "), ...(species ? [species] : [])]} />
+            {background && (
+              <span className="hidden @min-[560px]/sheet:inline">
+                {" "}
+                <LevelPart dot>{background}</LevelPart>
+              </span>
+            )}
+          </span>
         </span>
       </div>
       {full && (
@@ -439,21 +441,31 @@ function NameRow({
 }
 
 /**
- * The level line's parts ("Level 1 Fighter", "Human"; "CR 1/4", "50 XP"): a later part keeps its
- * "·" and its words together, so the line wraps between parts, never right after a "·" (K11). A
- * part longer than the column wraps inside itself on its own line instead of being cut.
+ * One part of the level line, whole unless longer than the column (then it wraps inside itself).
+ * Its "·" hangs in the margin before it: a part that starts a line has its dot clipped by the
+ * level line, so no line begins with one and none ends with one (K11).
  */
-function LevelParts({ parts }: { parts: readonly string[] }) {
-  return parts.map((p, i) =>
-    i === 0 ? (
-      <span key={p}>{p}</span>
-    ) : (
-      <span key={p}>
-        {" "}
-        <span className="inline-block max-w-full">· {p}</span>
-      </span>
-    ),
+function LevelPart({ dot, children }: { dot?: boolean; children: ReactNode }) {
+  return (
+    <span className="relative ml-[0.55em] inline-block max-w-[calc(100%-0.55em)]">
+      {dot && (
+        <>
+          <span className="absolute right-full w-[0.55em] text-center">·</span>{" "}
+        </>
+      )}
+      {children}
+    </span>
   );
+}
+
+/** The level line's parts ("Level 1 Fighter", "Human"; "CR 1/4", "50 XP"). */
+function LevelParts({ parts }: { parts: readonly string[] }) {
+  return parts.map((p, i) => (
+    <span key={p}>
+      {i > 0 && " "}
+      <LevelPart dot={i > 0}>{p}</LevelPart>
+    </span>
+  ));
 }
 
 /** FR-KIT-85 chips line: the badges, then the `header` sections (effect chips, brain menu). */

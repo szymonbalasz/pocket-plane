@@ -2,7 +2,15 @@
 // client mirror blocks invalid input (nothing sent); a remote change to the field being edited
 // keeps the draft and shows "Changed by …"; a lost commit keeps the draft as "Not saved".
 import type { OverrideKey } from "@shared/entities/schemas";
-import { type KeyboardEvent, type ReactNode, useEffect, useId, useReducer, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
@@ -38,6 +46,8 @@ export interface FieldProps<T> {
   placeholder?: string;
   /** A number input whose arrows nudge by `step` (FR-CHARX-50 senses: ±5). */
   step?: number;
+  /** Checked on every keystroke, for what no further typing can fix; `parse` still decides. */
+  liveError?(text: string): string | null;
 }
 
 const isLost = (err: unknown) => err instanceof IntentRejected && err.code === "disconnected";
@@ -53,6 +63,15 @@ export function SheetField<T>(p: FieldProps<T>) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: `committed` is the value's identity.
   useEffect(() => dispatch({ type: "remote", committed: p.value }), [committed]);
   const shown = s.draft ?? p.format(p.value);
+  // A refused draft goes with the field (edit mode closed, tab changed): it must not go silently.
+  const refused = useRef<string | null>(null);
+  refused.current = s.error && `${p.label} not saved: ${s.error}`;
+  useEffect(
+    () => () => {
+      if (refused.current) toast.error(refused.current);
+    },
+    [],
+  );
 
   const commit = () => {
     if (s.draft === null || s.inFlight) return;
@@ -90,8 +109,11 @@ export function SheetField<T>(p: FieldProps<T>) {
     ...(p.step ? { type: "number", step: p.step } : {}),
     disabled: !live || s.inFlight,
     onFocus: () => dispatch({ type: "focus", text: p.format(p.value), committed: p.value }),
-    onChange: (e: { target: { value: string } }) =>
-      dispatch({ type: "input", text: e.target.value }),
+    onChange: (e: { target: { value: string } }) => {
+      dispatch({ type: "input", text: e.target.value });
+      const message = p.liveError?.(e.target.value);
+      if (message) dispatch({ type: "invalid", message });
+    },
     onKeyDown: onKey,
   };
   return (
@@ -122,7 +144,11 @@ export function SheetField<T>(p: FieldProps<T>) {
       ) : (
         <Input {...common} className={cn("h-7 px-1.5 text-xs", p.inputClassName)} onBlur={commit} />
       )}
-      {s.error && <span className="text-[10px] text-destructive">{s.error}</span>}
+      {s.error && (
+        <span data-testid="charx-field-error" className="text-[10px] text-destructive">
+          {s.error}
+        </span>
+      )}
       {s.changed && (
         <span data-testid="charx-field-changed" className="text-[10px] text-muted-foreground">
           {changedHint(ctx.client, { npc: ctx.npc, ownerName: ctx.ownerName })}
@@ -162,7 +188,10 @@ export function IntField(
   );
 }
 
-/** Text field: trimmed, `max` chars; `required` refuses empty. */
+const overMax = (text: string, p: { max: number; multiline?: boolean }) =>
+  [...(p.multiline ? text : text.trim())].length > p.max ? `At most ${p.max} characters` : null;
+
+/** Text field: trimmed, `max` chars (says so while typing); `required` refuses empty. */
 export function TextField(
   p: Omit<FieldProps<string>, "format" | "parse"> & { max: number; required?: boolean },
 ) {
@@ -170,11 +199,12 @@ export function TextField(
     <SheetField<string>
       {...p}
       format={(v) => v ?? ""}
+      liveError={(t) => overMax(t, p)}
       parse={(t) => {
         const v = p.multiline ? t : t.trim();
         if (p.required && v.trim() === "") return { error: "Required" };
-        if ([...v].length > p.max) return { error: `At most ${p.max} characters` };
-        return { value: v };
+        const over = overMax(t, p);
+        return over ? { error: over } : { value: v };
       }}
     />
   );

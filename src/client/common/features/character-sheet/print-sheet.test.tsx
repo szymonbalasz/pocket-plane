@@ -742,7 +742,7 @@ describe("K13 narrow sheet (round-2 gap 9)", () => {
     expect(html).toMatch(/data-testid="charx-header-actions" class="float-right ml-3 shrink-0"/);
     expect(at2("charx-header-actions")).toBeLessThan(at2("char-sheet-name"));
     expect(html).toMatch(
-      /data-testid="char-sheet-level" class="mt-1 inline-block max-w-full align-top text-sm/,
+      /data-testid="char-sheet-level" class="mt-1 inline-block max-w-full overflow-x-clip align-top text-sm/,
     );
     expect(text(elementAt(html, 'data-testid="charx-header-actions"'))).toBe("Edit");
   });
@@ -1077,9 +1077,11 @@ describe("K11 walkthrough fixes", () => {
     // The level line closes the name column (K13: the actions float before the name).
     const line = `<span ${html.slice(from, html.indexOf("</span></div>", from))}`;
     expect(text(line)).toBe("CR 1 · 200 XP");
-    expect(line).toContain('<span class="inline-block max-w-full">· 200 XP</span>');
-    // Every "·" opens an unbreakable part.
-    expect(line.match(/·/g)?.length).toBe(line.match(/inline-block max-w-full">·/g)?.length);
+    // Every "·" hangs in the margin of its own part, which stays whole.
+    expect(line.match(/·/g)?.length).toBe(1);
+    expect(line).toMatch(
+      /inline-block max-w-\[calc\(100%-0.55em\)\]"><span class="absolute right-full[^"]*">·<\/span> 200 XP<\/span>/,
+    );
   });
 
   test("FR-CHARX-106 custom NPC boxes: HP max is a plain box (value under its label, as Speed); the Initiative button's label and value start at the top as Speed / Prof", () => {
