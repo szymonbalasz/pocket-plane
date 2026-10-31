@@ -41,7 +41,7 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 ## 2. Next, in order
 
 
-**Next: linked notes with backlinks** ([world-builder](../specs/post-mvp/world-builder.md), the next big feature, #413): spec, then build. **Then** the quest log, in-game calendar and session timeline. Backlog candidates are in status.md. Work on the CI loop (AGENTS §9.4.1).
+**Now: [sprint 15](sprint-15.md) (DM #416):** upgrade guards, play fixes, window position memory, then **linked notes with backlinks** (the next big feature, #413): spec, the DM's gate, build. **Then** the quest log, in-game calendar, session timeline and NPC directory. The whole order is the [priority build list](../roadmap.md#priority-build-list-2026-10-31). Backlog candidates are in status.md. Work on the CI loop (AGENTS §9.4.1).
 
 *(Done, #366–#381.)* Sprint 14 on the CI test loop: fix pack F1–F4, Spell FX pulled in (#374), AoE cell origin, Map effects default Full; Agent / MCP API in a parallel session.
 

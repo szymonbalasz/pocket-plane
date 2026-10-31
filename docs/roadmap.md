@@ -47,7 +47,34 @@ graph LR
   CBT --> MAP
 ```
 
+## Priority build list (2026-10-31)
+
+DM decisions [#413](decisions-log.md), [#416](decisions-log.md). Items 1–4 are [sprint 15](agents/sprint-15.md). Tiers: [feature tiers](feature-tiers.md).
+
+| # | Work | Spec / items | Note |
+|---|---|---|---|
+| 1 | Upgrade guards: a clear refusal on renames, a CI upgrade check | BL-172, BL-173 | First: notes add tables, and the real campaign upgrades itself on every `play` |
+| 2 | Play fixes from session-sim-17 | BL-174, -175, -176, -164, -171, -151 | |
+| 3 | Window position memory and related placement bugs | BL-146, BL-143–145 | Approved in #381 |
+| 4 | **Linked notes with backlinks** | [world-builder](specs/post-mvp/world-builder.md), [ADR-0011](architecture/adr/0011-cross-references.md) | Next big feature |
+| 5 | Quest log | [world-builder](specs/post-mvp/world-builder.md) | Right after notes |
+| 6 | In-game calendar | [campaign-manager](specs/post-mvp/campaign-manager.md) | |
+| 7 | Session timeline | [campaign-manager](specs/post-mvp/campaign-manager.md) | The spec must settle how it fits [ADR-0013](architecture/adr/0013-session-journal-scope.md)'s "no session entity" |
+| 8 | NPC directory players build | [world-builder](specs/post-mvp/world-builder.md) | Builds on notes |
+
+**After that (tier B, unordered):** journal entries, shared party notes and map pins (all need notes); character builder and guided level-up ([levelling](specs/post-mvp/levelling.md)).
+
+**Background, between items:** attack and dice details (BL-150, -155–157, -177), stat block and AoE label polish (BL-149, -153), performance (BL-142, -152, -166), CI flakes (BL-154, -158, -159), smaller UI glitches (the backlog's other open rows).
+
+**Parked**
+- Tier C: legendary / lair actions, reaction tracker, encumbrance, Obsidian import.
+- Only if someone else runs it: [single executable](specs/post-mvp/single-executable.md) and generated migrations (BL-167 waits for the same point).
+
+**Handled by the MCP tools, no build:** importing existing characters, homebrew files, Griffon's Saddlebag items.
+
 ## After MVP (v1 candidates, unordered)
+
+Historical: the original post-MVP list, mostly built. Current order: [priority build list](#priority-build-list-2026-10-31).
 
 | Stub | From original MVP list |
 |---|---|

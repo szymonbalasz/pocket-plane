@@ -9,6 +9,8 @@ phase: post-mvp
 # World builder (post-MVP stub)
 
 > **2026-10-31 (DM, [#413](../../decisions-log.md)): order. Linked notes with backlinks are the **next big feature**; the quest log (tier C → A) follows right after them.**
+>
+> **Linked notes get their own spec, `linked-notes.md`, in [sprint 15](../../agents/sprint-15.md) ([#416](../../decisions-log.md)).** The player-built NPC directory comes after the session timeline ([priority build list](../../roadmap.md#priority-build-list-2026-10-31)).
 
 Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). Absorbs the former "deeper world builder" stub.
 
