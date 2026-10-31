@@ -1,6 +1,7 @@
 // Compendium window navigation (FR-CMP-18, -22, -23): query, tab, filters and the open view.
-// One window per client, so one store per client bundle. `listNonce` / `entryNonce` bump to
-// refetch (open, Back, the DM's own writes): results are read on demand, never pushed.
+// One window per client, so one store per client bundle (popped-out entries, FR-CMP-76, read
+// `entryNonce` too). `listNonce` / `entryNonce` bump to refetch (open, Back, the DM's own writes):
+// results are read on demand, never pushed.
 // `expanded`: the duplicate groups shown open (FR-CMP-35); a new search closes them, Back keeps them.
 import { createStore, useStore } from "zustand";
 import type { CmpTab, Filters } from "./logic";

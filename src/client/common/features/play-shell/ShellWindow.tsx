@@ -166,6 +166,7 @@ export function ShellWindow({
   const id = { kind: win.kind, instance: win.instance };
   const parked = win.state === "minimised";
   const Body = def.component;
+  const TitleView = def.titleView;
 
   /**
    * What a move stores: growth is never written (FR-SHELL-39), so the stored height stays, and a
@@ -265,19 +266,23 @@ export function ShellWindow({
           gesture(e, "move", (dx, dy) => moveRect(rect, dx, dy, viewport));
         }}
       >
-        <span className="flex-1 truncate">{def.title}</span>
-        {/* FR-SHELL-37: say what each button does. */}
-        <Tooltip content="Minimise — keep it on the launcher">
-          <button
-            type="button"
-            data-testid="ui-window-minimise"
-            aria-label={`Minimise ${def.title}`}
-            className="rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            onClick={() => dispatch({ type: "minimise", ...id })}
-          >
-            <MinusIcon className="size-3.5" />
-          </button>
-        </Tooltip>
+        <span className="flex-1 truncate">
+          {TitleView ? <TitleView kind={win.kind} instance={win.instance} /> : def.title}
+        </span>
+        {/* FR-SHELL-37: say what each button does. FR-SHELL-200: a pop-out has no launcher. */}
+        {!def.popout && (
+          <Tooltip content="Minimise — keep it on the launcher">
+            <button
+              type="button"
+              data-testid="ui-window-minimise"
+              aria-label={`Minimise ${def.title}`}
+              className="rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              onClick={() => dispatch({ type: "minimise", ...id })}
+            >
+              <MinusIcon className="size-3.5" />
+            </button>
+          </Tooltip>
+        )}
         <Tooltip content="Close">
           <button
             type="button"

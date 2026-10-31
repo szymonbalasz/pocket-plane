@@ -12,7 +12,7 @@ export const WindowKind = z
   .regex(/^[a-z]+\.[a-z0-9-]+$/, "kind must be <prefix>.<name>");
 export type WindowKind = z.infer<typeof WindowKind>;
 
-/** MVP uses `main` only; the key is ready for several windows of one kind. */
+/** `main`, except pop-out types (FR-SHELL-200): several windows of one kind, never stored. */
 export const WindowInstance = z
   .string()
   .max(64)

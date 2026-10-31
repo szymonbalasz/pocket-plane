@@ -115,6 +115,15 @@ export interface WindowDef {
    */
   restoreOpen?: false;
   /**
+   * FR-SHELL-200: a pop-out type, one window per instance (a feature opens each with its own
+   * `instance` and keeps what it shows). Lives in memory only: never stored, and a close removes
+   * it, so they can't fill the stored layout (`MAX_WINDOWS`). With no launcher to bring one back,
+   * it has no Minimise button and is never auto-minimised.
+   */
+  popout?: true;
+  /** FR-SHELL-200: the title bar's text per instance, in place of `title` (e.g. an entry's name). */
+  titleView?: ComponentType<WindowProps>;
+  /**
    * FR-SHELL-155: window kinds (removed from the registry) whose stored layout entry this type
    * takes over at `load`: an absorbed entry open or minimised, while this type is closed or has
    * no entry, gives it its state, z and (if the absorbed one was remembered) its x / y.

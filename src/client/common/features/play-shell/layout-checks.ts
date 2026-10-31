@@ -354,7 +354,7 @@ function autoPlaceProblems(
   const others = before.filter((w) => isOpen(w) && w.kind !== def.kind);
   const parkable = others.filter((w) => {
     const d = registry.get(w.kind);
-    return d !== undefined && !d.defaultOpen && !d.fixedDefault;
+    return d !== undefined && !d.defaultOpen && !d.fixedDefault && !d.popout; // FR-SHELL-200
   });
   const rectsOf = (list: Windows) =>
     renderedWindowRects(list, registry, o.available, vp, new Map(), scene.hard, []);
@@ -489,7 +489,7 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
         const on = [...rects, ...hard].some((r) => overlaps(rect, r));
         const parkable = others.some((w) => {
           const d = registry.get(w.kind);
-          return d !== undefined && !d.defaultOpen && !d.fixedDefault;
+          return d !== undefined && !d.defaultOpen && !d.fixedDefault && !d.popout; // FR-SHELL-200
         });
         if (on && parkable) problems.push("on a window while a launcher window could be parked");
         const scene = { windows: rects, hard, tokens };
