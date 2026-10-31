@@ -1,7 +1,7 @@
 // FR-DICEX-106: the damage effects' numbers: pure.
 import { describe, expect, test } from "bun:test";
 import { MODIFIER_DAMAGE_TYPES } from "@shared/effect-modifiers/schemas";
-import { dieFxOf, fxCss, fxEnvelope, fxGlow, fxMote } from "./die-fx";
+import { dieFxOf, flatGlow, fxCss, fxEnvelope, fxGlow, fxMote } from "./die-fx";
 
 const PHYSICAL = ["bludgeoning", "piercing", "slashing"];
 
@@ -45,14 +45,16 @@ describe("FR-DICEX-106 damage dice effects", () => {
   test("FR-DICEX-106 embers rise, every client draws the same", () => {
     const fire = dieFxOf("fire");
     if (!fire) throw new Error("fire");
-    // Same mote, same cycle: older = higher up the screen.
-    const clock = (t: number) => t / fire.life;
-    let t = 0.01;
-    while (clock(t) % 1 > 0.1) t += 0.001;
-    const young = fxMote(fire, 0, 0, t);
-    const old = fxMote(fire, 0, 0, t + fire.life * 0.5);
-    expect(old.y).toBeLessThan(young.y);
+    // On average over a throw, motes sit above the die (the screen's +y is down).
+    let sum = 0;
+    let n = 0;
+    for (let t = 0; t < 7; t += 0.01) {
+      for (let i = 0; i < 6; i++, n++) sum += fxMote(fire, 0, i, t).y;
+    }
+    expect(sum / n).toBeLessThan(-0.2);
     expect(fxMote(fire, 1, 2, 0.5)).toEqual(fxMote(fire, 1, 2, 0.5));
     expect(fxCss(0x0000ff)).toBe("#0000ff");
+    expect(flatGlow("fire")).toBe("#ff6a1a");
+    expect(flatGlow("slashing")).toBeUndefined();
   });
 });

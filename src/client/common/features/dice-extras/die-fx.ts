@@ -135,6 +135,12 @@ export const dieFxOf = (type: string | null | undefined): DieFx | null =>
 /** A CSS colour of `n`. */
 export const fxCss = (n: number): string => `#${n.toString(16).padStart(6, "0")}`;
 
+/** A flat die's glow colour for this damage type, if it has an effect. */
+export function flatGlow(type: string | null | undefined): string | undefined {
+  const fx = dieFxOf(type);
+  return fx ? fxCss(fx.color) : undefined;
+}
+
 /** Over a throw's progress (0–1): up quickly, then gone by its end so the die rests clean. */
 export function fxEnvelope(progress: number): number {
   const p = Math.min(1, Math.max(0, progress));
