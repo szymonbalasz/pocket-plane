@@ -12,7 +12,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Play fixes: toasts | `fix/s15-toasts` | — | — | **merged** (#437) |
 | Play fixes: frame and map | `fix/s15-frame` | — | — | **merged** (#432) |
 | Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | **DM reframed at the gate** (player notes, private and shared; no reveal, no world builder; handouts separate; a token and a note may share a name, no link between them; the DM doesn't see private notes): waits on how live shared notes are; then the spec is rewritten |
-| Window position memory | `fix/window-memory` | `build-window-memory`, `test-window-memory` | `fix-window-memory` (slot 3) | built, CI green; walkthrough running on port 4133 |
+| Window position memory | `fix/window-memory` | — | — | **merged** (#438) |
 | Linked notes build | split by the spec | — | — | upgrade guards are in; waits for the DM's gate |
 
 **Memory (2026-10-31):** ran low once with 13 agents across sessions; the DM freed some and said carry on. Watch it before starting more.
