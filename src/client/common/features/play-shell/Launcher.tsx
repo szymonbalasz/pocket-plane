@@ -162,6 +162,7 @@ export function Launcher({
     kind: d.kind,
     order: d.launcher?.order ?? 0,
     state: launcherState(windows, d.kind),
+    keepInBar: d.badge !== undefined,
   }));
   // Recomputed when its zone's width changes (a viewport resize, the title or status changing
   // width), on availability change and layout restore only (FR-SHELL-43): opening a window from
