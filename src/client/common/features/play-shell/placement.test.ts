@@ -516,3 +516,33 @@ test("FR-SHELL-158 roomFor is exact for clear spots (BL-82): whenever it says no
   }
   expect(none).toBeGreaterThan(0);
 });
+
+describe("FR-SHELL-224 a floor above the default rect's cut at a hard region", () => {
+  const def: Placeable = {
+    defaultSize: { w: 480, h: 560 },
+    minSize: { w: 340, h: 360 },
+    minOpenH: 400,
+    defaultPosition: { anchor: "top-right" },
+  };
+  const vp = { w: 1280, h: 720 };
+  const corner = { x: 908, y: 462, w: 356, h: 238 };
+
+  test("FR-SHELL-224 the cut is the corner's: another column holds the floor", () => {
+    const p = placeWindow(def, vp, { hard: [corner], floor: { w: 400, h: 400 }, usefulH: 400 });
+    expect(p.clear).toBe(true);
+    expect(p.rect.h).toBeGreaterThanOrEqual(400);
+  });
+
+  test("FR-SHELL-224 with no floor the fitted default rect stays the spot (FR-SHELL-51)", () => {
+    const p = placeWindow(def, vp, { hard: [corner] });
+    expect(p.rect).toEqual(fittedDefaultRect(def, vp, [corner]));
+    expect(p.rect.h).toBe(390);
+  });
+
+  test("FR-SHELL-224 roomFor agrees: no spot of the floor's height in a column full of windows", () => {
+    const wall = { x: 68, y: 60, w: 1200, h: 200 };
+    const input = { hard: [corner], windows: [wall], floor: { w: 400, h: 500 }, usefulH: 500 };
+    expect(roomFor(def, vp, input)).toBe(false);
+    expect(placeWindow(def, vp, input).clear).toBe(false);
+  });
+});

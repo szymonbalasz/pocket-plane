@@ -166,6 +166,11 @@ export interface PlaceInput {
   /** FR-SHELL-77 (e): over PCs, the least PC footprint area wins (not the PCs held whole). */
   leastPc?: boolean;
   /**
+   * FR-SHELL-224 (BL-143): the window's useful height. The default rect's cut at a hard region
+   * (the toast corner) is that spot's, not the window's: full height is never below this.
+   */
+  usefulH?: number;
+  /**
    * The window's full size (FR-SHELL-100's target: a user size, else the fitted default); absent
    * = the default size. Placed at the type's default anchor.
    */
@@ -301,7 +306,7 @@ export function roomFor(def: Placeable, vp: Viewport, input: PlaceInput = {}): b
   const a = usableArea(vp);
   const g = input.gap ?? EDGE_GAP;
   const need = Math.ceil(input.need ?? 0);
-  const fullH = Math.min(Math.max(base.h, need), a.bottom - a.top);
+  const fullH = Math.min(Math.max(base.h, need, input.usefulH ?? 0), a.bottom - a.top);
   const h = Math.min(Math.max(def.minSize.h, input.floor?.h ?? 0, need), fullH);
   const w = Math.min(Math.max(def.minSize.w, input.floor?.w ?? 0), base.w);
   const minX = Math.max(a.left, RAIL_CLEAR);
@@ -350,7 +355,7 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const g = input.gap ?? EDGE_GAP;
   const { w } = base;
   const need = Math.ceil(input.need ?? 0);
-  const fullH = Math.min(Math.max(base.h, need), a.bottom - a.top);
+  const fullH = Math.min(Math.max(base.h, need, input.usefulH ?? 0), a.bottom - a.top);
   const floorH = Math.max(def.minSize.h, input.floor?.h ?? 0);
   const minH = Math.min(Math.max(floorH, need), fullH);
   const openH = def.minOpenH === undefined ? null : Math.max(minH, Math.min(def.minOpenH, fullH));
@@ -640,7 +645,8 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
       if (free >= minH && !hs.includes(free)) consider({ x, y, w: cw, h: free }, inward);
     }
   };
-  consider(base, false);
+  // FR-SHELL-224: the default rect, cut below the useful height, is no spot for a floor above it.
+  if (base.h >= minH) consider(base, false);
   const edgeXs = (cw: number) => new Set(edges(cw).map((e) => e.v));
   for (const x of edgeXs(w)) column(x, false);
   // FR-SHELL-46, -58: inward columns only when no edge candidate passes (1), (1b), (2), (2c).

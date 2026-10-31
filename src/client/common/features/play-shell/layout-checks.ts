@@ -146,7 +146,10 @@ const grow = (r: Rect, m: number): Rect => ({
 function sizesOf(def: Placeable, vp: Viewport, hard: readonly Rect[], floor?: Size) {
   const base = fittedDefaultRect(def, vp, hard);
   const a = usableArea(vp);
-  const fullH = Math.min(base.h, a.bottom - a.top);
+  // FR-SHELL-224: the default rect's cut at a hard region never takes a window below its useful
+  // height (as the ladder's `usefulH`; a `floor` above that stays capped by the cut).
+  const wanted = Math.min(floor?.h ?? 0, def.usefulSize?.h ?? def.minOpenH ?? 0);
+  const fullH = Math.min(Math.max(base.h, wanted), a.bottom - a.top);
   const minH = Math.min(Math.max(def.minSize.h, floor?.h ?? 0), fullH);
   const openH = def.minOpenH === undefined ? null : Math.max(minH, Math.min(def.minOpenH, fullH));
   // FR-SHELL-166 (BL-76): candidates start at the rail, as placement's `minX` (FR-SHELL-109).

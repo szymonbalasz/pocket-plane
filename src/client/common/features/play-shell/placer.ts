@@ -112,6 +112,8 @@ export interface Displacement {
   at: Rect | null;
   shrunk?: true;
   under?: Displacement;
+  /** A squeeze or shrink a resize down itself caused: the size it left (FR-SHELL-223). */
+  trip?: Viewport;
 }
 
 /** L2b's dry fit (FR-SHELL-108, FR-MAP-97): the cell it would draw and whether it keeps clear. */
@@ -501,6 +503,12 @@ const causeGrown = (cause: string): Viewport | null => {
   return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
 };
 
+/** Parses a `zone:<w>×<h>` cause: a protected window's round trip (FR-SHELL-220, BL-146). */
+const causeZone = (cause: string): Viewport | null => {
+  const m = /^zone:(\d+)×(\d+)$/.exec(cause);
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
+};
+
 /**
  * One settle (FR-SHELL-95): `ws` = the windows before the trigger. Returns the plan: the next
  * windows (same array when nothing changed), the displacement memory, and what it did.
@@ -526,6 +534,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const from = ctx.settledViewport ?? vp;
   const up = trigger.type === "viewport" && vp.w >= from.w && vp.h >= from.h;
   const grewFrom = up && (vp.w > from.w || vp.h > from.h) ? `grown:${from.w}×${from.h}` : undefined;
+  /** The size a resize down left. */
+  const left = trigger.type === "viewport" && (vp.w < from.w || vp.h < from.h) ? from : undefined;
   let out: WindowState[] = [...ws];
   const memory = new Map<string, Displacement>(
     (ctx.memory?.() ?? []).map((d) => [windowId(d.kind, d.instance), d]),
@@ -669,7 +679,9 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const old = memory.get(id);
     const waits =
       old?.shrunk === true ||
-      (old !== undefined && causeGrown(old.cause) !== null && /^(toolbar|window):/.test(cause));
+      (old !== undefined &&
+        (causeGrown(old.cause) !== null || causeZone(old.cause) !== null) &&
+        /^(toolbar|window):/.test(cause));
     const under = old && waits && old.cause !== cause ? old : undefined;
     const prior = under ? undefined : old;
     memory.set(
@@ -686,6 +698,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
             cause,
             at,
             ...(under && { under }),
+            ...(left && cause.startsWith("window:") && { trip: left }),
           },
     );
   };
@@ -759,6 +772,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       exact?: boolean;
       /** BL-134: L1–L2 take only spots where the map keeps its all-tokens fit (`fitKeeps`). */
       keepFit?: boolean;
+      /** FR-SHELL-222: a return leaves a squeezed protected window's full zone free. */
+      owedZones?: boolean;
     },
   ): Spot | null => {
     const still = o.push === true || o.noYield === true;
@@ -771,12 +786,16 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const floor = o.exact ? size : { w: Math.min(u.w, size.w), h: Math.min(u.h, size.h) };
     const full = bandTarget(w0, size, u, bandAt(registry, vp));
     const input = (): PlaceInput => ({
-      windows: obstacles(id, o.protectedOnly),
+      windows: [
+        ...obstacles(id, o.protectedOnly),
+        ...(o.owedZones ? owedZones(w0.kind).map((z) => ({ ...z, protected: true })) : []),
+      ],
       hard,
       soft,
       tokens,
       need: need(w0, def),
       size,
+      usefulH: u.h,
       memo,
       ...(o.prev && { prev: o.prev }),
     });
@@ -1217,8 +1236,13 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     if (isProt(w)) {
       const spot = ladder(id, { cause, prev, putAway: false, push: true });
       if (!spot) return;
+      const def = defOf(w);
+      const u = def && useful(def, vp, registry);
+      const short = u !== undefined && (spot.rect.w < u.w || spot.rect.h < u.h);
+      if (short && roomFromPushed(id, cause, prev)) return;
       write(id, spot.rect, "pushed", { cause, rung: spot.rung });
       pcFlags.set(id, spot.pcClear);
+      pushed.push(id);
       return;
     }
     const spot = ladder(id, { cause, prev, putAway: false, maxL2: true, push: true });
@@ -1229,6 +1253,46 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     }
     putAwayWin(w, cause, cause.slice(cause.indexOf(":") + 1));
     log.push(`${label}:${w.kind}>put-away`);
+  };
+
+  /** The protected windows this push has placed so far, in order. */
+  const pushed: string[] = [];
+
+  /**
+   * FR-SHELL-225 (BL-144): a protected window a push would leave below its useful size takes a spot
+   * at it where one placed earlier by the same push (a window of the push: it has its own L2) goes
+   * down to its useful size in its corner: one such window, the latest first, then all of them.
+   * They come back with the bar (FR-SHELL-102). Nothing else moves.
+   */
+  const roomFromPushed = (id: string, cause: string, prev: Rect): boolean => {
+    const others = pushed.filter((p) => {
+      const o = get(p);
+      const d = o && defOf(o);
+      if (!o || !d) return false;
+      const u = useful(d, vp, registry);
+      return o.w > u.w || o.h > u.h;
+    });
+    const sets = [...[...others].reverse().map((p) => [p]), ...(others.length > 1 ? [others] : [])];
+    for (const set of sets) {
+      const before = set.map((p) => get(p) as WindowState);
+      for (const o of before) {
+        setWin(idOf(o), { ...o, ...squeezeRect(plainRect(o), defOf(o) as WindowDef) });
+      }
+      const spot = ladder(id, { cause, prev, putAway: false, maxL2: true, push: true });
+      if (spot) {
+        for (const o of before) {
+          const now = plainRect(get(idOf(o)) as WindowState);
+          setWin(idOf(o), o);
+          write(idOf(o), now, "pushed", { cause, rung: "L2" });
+        }
+        write(id, spot.rect, "pushed", { cause, rung: spot.rung });
+        pcFlags.set(id, spot.pcClear);
+        pushed.push(id);
+        return true;
+      }
+      for (const o of before) setWin(idOf(o), o);
+    }
+    return false;
   };
 
   /**
@@ -1292,6 +1356,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const w = get(id);
     // FR-SHELL-145, -149: a remembered protected window keeps its rect and makes no room.
     if (!w || !isShown(w, ctx.available) || isRemembered(w)) return;
+    if (tripBack(id, w)) {
+      if (displace) displaceFrom(id, cause);
+      return;
+    }
     const full = zoneOf(w);
     const def = defOf(w);
     // A squeeze whose cause goes on stays squeezed in the zone (a viewport change). After a
@@ -1341,6 +1409,28 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       }
     }
     if (displace) displaceFrom(id, cause);
+  };
+
+  /**
+   * FR-SHELL-220, -221 (BL-146): a protected window a resize down moved off the spot it held comes
+   * back to that spot once the screen is that big again, where the spot still holds (on screen,
+   * clear of the protected windows and hard keep-outs, PC-clear). The trip ends here either way;
+   * no longer there, the zone rule places it.
+   */
+  const tripBack = (id: string, w: WindowState): boolean => {
+    const d = memory.get(id);
+    if (!d || !causeZone(d.cause) || !ended(d)) return false;
+    memory.delete(id);
+    if (!sameRect(w, d.at) || !inside(d.rect)) return false;
+    const atSpot = { ...w, ...d.rect };
+    const at = shownRects(
+      out.map((x) => (idOf(x) === id ? atSpot : x)),
+      ctx,
+    );
+    const r = at.get(atSpot) ?? shownRect(out, atSpot, ctx);
+    if (!pcFree(r) || !clearOfProtected(r, id, at)) return false;
+    write(id, d.rect, "returned", { rung: "trip" });
+    return true;
   };
 
   /** Launcher windows over protected window `id` move out (FR-SHELL-99), highest z first. */
@@ -1436,6 +1526,20 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       .flatMap((d) => out.filter((w) => w.kind === d.kind && isShown(w, ctx.available)))
       .map(idOf);
 
+  /**
+   * The shown untouched protected windows off their zone at `size` (the viewport a resize leaves)
+   * with no memory of their own: the spots a resize down can take from them (FR-SHELL-220).
+   */
+  const offZone = (size: Viewport): WindowState[] => {
+    const zones = defaultLayout(registry, size, [], keepOuts(registry.client, size, new Map()));
+    return protectedIds().flatMap((id) => {
+      const w = get(id);
+      if (!w || isRemembered(w) || memory.has(id)) return [];
+      const zone = zones.find((z) => z.kind === w.kind);
+      return sameRect(w, zone) ? [] : [w];
+    });
+  };
+
   /** A memory entry whose cause ended (FR-SHELL-102). */
   const ended = (d: Displacement) => {
     if (d.cause.startsWith("toolbar:")) {
@@ -1446,6 +1550,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     if (v) return vp.w >= v.w && vp.h >= v.h;
     const g = causeGrown(d.cause);
     if (g) return vp.w <= g.w && vp.h <= g.h;
+    const z = causeZone(d.cause);
+    if (z) return vp.w >= z.w && vp.h >= z.h;
     if (d.cause.startsWith("window:")) {
       // The kind closes, is minimised by the user or ends; one the shell put away for a transient
       // cause comes back (one put away for an open hands its squeezes on, `putAwayWin`).
@@ -1469,7 +1575,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
    */
   const returns = (only?: (d: Displacement) => boolean) => {
     const due = [...memory.values()]
-      .filter((d) => ended(d) && (!only || only(d)))
+      // A round trip ends in the zone pass (`tripBack`), not here.
+      .filter((d) => !causeZone(d.cause) && ended(d) && (!only || only(d)))
       .map((d) => ({ d, w: find(out, d.kind, d.instance) }))
       .filter((e): e is { d: Displacement; w: WindowState } => e.w !== undefined)
       .sort((a, b) => a.w.z - b.w.z);
@@ -1483,6 +1590,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const untouched = d.at === null ? w.state === "minimised" : sameRect(w, d.at);
       if (!untouched || (d.at !== null && w.state !== "open")) continue;
       if (isProt(w) && d.cause.startsWith("window:") && !d.userSpot && !d.userSize) {
+        // A round trip the squeeze waited on goes on (FR-SHELL-221).
+        if (d.under && causeZone(d.under.cause)) {
+          memory.set(id, { ...d.under, at: plainRect(w) });
+        }
         zoneBack(id, d);
         continue;
       }
@@ -1494,7 +1605,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       };
       const others = out.filter((x) => idOf(x) !== id && !pending.has(idOf(x)));
       const r = shownRect([...others, back], back, ctx);
-      const blocked = [...shownRects(others, ctx).values()].some((o) => overlaps(r, o));
+      // A protected window isn't kept from its rect by a remembered one (FR-SHELL-225, -151).
+      const blocked = [...shownRects(others, ctx)].some(
+        ([o, or]) => !(isProt(w) && isRemembered(o)) && overlaps(r, or),
+      );
       const free = !blocked && !hard.some((k) => overlaps(r, k));
       if (free && (d.userSpot || pcFree(r))) {
         setWin(id, back);
@@ -1511,7 +1625,12 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       // opens only if that finds a spot.
       const was = w;
       if (w.state !== "open") setWin(id, { ...w, state: "open" });
-      const spot = ladder(id, { putAway: false, maxL2: true, prev: d.rect });
+      const spot = ladder(id, {
+        putAway: false,
+        maxL2: true,
+        prev: d.rect,
+        owedZones: trigger.type === "viewport",
+      });
       // A tool bar's put-away comes back when the bar goes, whatever holds its old spot (a
       // remembered window, walkthrough X1): the rest of the ladder places it (below useful, else
       // the least PC area), still putting nothing away. Nothing else would retry it.
@@ -1528,6 +1647,58 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         // still hold its spot, e.g. one whose own viewport cause ends one size later).
         memory.set(id, d);
       }
+    }
+  };
+
+  /**
+   * The full zones of the protected windows squeezed now, but for a squeeze `kind` itself caused:
+   * room a window coming back leaves free, so that squeeze can still end (FR-SHELL-222, BL-145).
+   */
+  const owedZones = (kind: string): Rect[] =>
+    protectedIds().flatMap((id) => {
+      const p = get(id);
+      const d = memory.get(id);
+      if (!p || !d || !squeezedNow(p) || d.cause === `window:${kind}`) return [];
+      const z = zoneOf(p);
+      return z ? [z] : [];
+    });
+
+  /**
+   * FR-SHELL-223 (BL-145): a squeeze or an L3s shrink a resize down caused ends when the screen is
+   * back at the size it left and the window that caused it no longer needs the room (clear of the
+   * full rect: a zone, a launcher window's rect before the shrink): the zone back as FR-SHELL-159,
+   * a launcher window back iff that rect is on screen, clear and PC-clear.
+   */
+  const endNeedless = () => {
+    for (const d of [...memory.values()]) {
+      if (d.at === null || !d.trip || vp.w < d.trip.w || vp.h < d.trip.h || ended(d)) continue;
+      const id = windowId(d.kind, d.instance);
+      const w = get(id);
+      if (!w || !isShown(w, ctx.available) || !sameRect(w, d.at)) continue;
+      const prot = isProt(w);
+      if (!prot && !d.shrunk) continue;
+      const full = prot ? zoneOf(w) : d.rect;
+      const kind = d.cause.slice("window:".length);
+      const held = [...shownMap()].some(([o, r]) => o.kind === kind && !!full && overlaps(full, r));
+      if (!full || held) continue;
+      if (prot) {
+        memory.delete(id);
+        zoneBack(id, d);
+        continue;
+      }
+      if (!inside(d.rect)) continue;
+      const back = shellRect(w, d.rect, d.area ?? area);
+      const r = shownRect(
+        out.map((x) => (idOf(x) === id ? back : x)),
+        back,
+        ctx,
+      );
+      if (!clearAt(r, id) || !pcFree(r)) continue;
+      memory.delete(id);
+      setWin(id, back);
+      placed.set(id, "returned");
+      pcFlags.set(id, true);
+      log.push(`${label}:${w.kind}>returned`);
     }
   };
 
@@ -1668,7 +1839,12 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const w = get(id);
       if (w?.state !== "minimised" || !ctx.available.has(w.kind)) continue;
       setWin(id, { ...w, state: "open" });
-      const spot = ladder(id, { putAway: false, maxL2: true, prev: d.rect });
+      const spot = ladder(id, {
+        putAway: false,
+        maxL2: true,
+        prev: d.rect,
+        owedZones: trigger.type === "viewport",
+      });
       if (spot) {
         write(id, spot.rect, "grown", { rung: spot.rung });
         memory.set(id, { ...d, at: plainRect(spot.rect) });
@@ -1696,16 +1872,40 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     case "viewport": {
       const shrank = vp.w < from.w || vp.h < from.h;
       const cause = shrank ? `viewport:${from.w}×${from.h}` : undefined;
+      const spots = shrank ? offZone(from) : [];
       // Zones first (the frame the rest fits around); a protected window's squeeze ends with them.
       zonePass(cause);
       for (const id of protectedIds()) {
         const p = get(id);
-        if (p && placed.get(id) === "zone" && !squeezedNow(p)) memory.delete(id);
-        else if (p && squeezedNow(p)) remember(p, "", plainRect(p));
+        const m = memory.get(id);
+        if (m && causeZone(m.cause)) continue;
+        if (p && placed.get(id) === "zone" && !squeezedNow(p)) {
+          memory.delete(id);
+          if (m?.under && causeZone(m.under.cause)) {
+            memory.set(id, { ...m.under, at: plainRect(p) });
+          }
+        } else if (p && squeezedNow(p)) remember(p, "", plainRect(p));
+      }
+      // FR-SHELL-220: what this resize moved off its spot remembers it for the way back up.
+      for (const before of spots) {
+        const id = idOf(before);
+        const now = get(id);
+        if (!now || sameRect(now, before) || memory.has(id)) continue;
+        memory.set(id, {
+          kind: before.kind,
+          instance: before.instance,
+          rect: plainRect(before),
+          ...(before.area && { area: before.area }),
+          cause: `zone:${from.w}×${from.h}`,
+          at: plainRect(now),
+        });
       }
       returns();
       for (const id of launchersByZ()) keepOrPlace(id, cause);
-      if (vp.w >= from.w && vp.h >= from.h) growBack();
+      if (vp.w >= from.w && vp.h >= from.h) {
+        endNeedless();
+        growBack();
+      }
       break;
     }
     case "open":
