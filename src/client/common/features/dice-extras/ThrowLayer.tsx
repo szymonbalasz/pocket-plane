@@ -105,12 +105,6 @@ function useTrayWindowSync() {
     const back = trayRestore(before.current);
     if (back) dispatch({ type: back, kind: DICEX_TRAY_KIND });
   }, [restored, dispatch]);
-  // FR-DICEX-03: closing the window drops the staged request; minimising keeps it.
-  const prev = useRef(status);
-  useEffect(() => {
-    if (prev.current !== "closed" && status === "closed") diceExtras.clear();
-    prev.current = status;
-  }, [status]);
 }
 
 export function DiceExtrasRuntime() {

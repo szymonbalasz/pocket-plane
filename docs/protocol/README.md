@@ -745,6 +745,7 @@ Window registries `src/client/{dm,player}/windows.ts` ([§18](#18-scenes-client-
 | `charx.companion` *(sprint 6, built, build/cp-card)* | CHARX | both | no | top-left `dx` 56, 320×360, min 280×240 (seams S3, FR-SHELL-61 (5)); the body scrolls (≤ 8 attacks); placement and reopen rules are play-shell's | player "Companions" (order 52, `available` iff they own a pet or an active companion combatant, OQ-CHARX-33); DM none (opened from a companion row / line or Party: `useOpenCompanionCard()(id)`) | — | [FR-CHARX-59](../specs/character-sheet-full.md#6-functional-requirements), [§120](#120-sprint-6-companion-card-cp4) |
 | `cmp.rules` *(sprint 9, built, build/sp-rules)* | CMP | both | no | top-left `dx` 56; 440×600 (short viewports 440×412; FR-CMP-63's 480 cut to FR-SHELL-61's new-kind width: at 480 the FR-SHELL-45 launcher sweep leaves no PC-clear spot at 1440×900 with Party Manager), min 340×320, `usefulSize` 420×360 ("page Tabs + 3 card headings"); opened `by: "user"` only (launcher, palette, Open in Rules); fits 1280×720, no product overlap at 1600×900; in `GOLDEN_KINDS` (min 340×320 above the contract's 320×280); replay D3 / P1 untouched (S4) | "Rules" (order 66, `ScrollText`) | — | [FR-CMP-63](../specs/compendium.md#61-sprint-9-rules-quick-reference-track-sp) |
 | `dice.details` *(built, build/log-menu)* | DICE | both | no; loads closed | top-left `dx` 56; 420×300, useful 400×280, min 320×240 | none (from a log row's menu or a double-click) | — | [FR-DICE-106](../specs/dice-roll-log.md#6-functional-requirements) |
+| `cmp.entry` *(built, build/cmp-popout)* | CMP | both | no; never stored | top-left `dx` 56; 400×500, useful 360×360, min 300×240; one window per `instance` (`popout: true`, FR-SHELL-201) | none (**Pop out** on an entry view) | — | [FR-CMP-76](../specs/compendium.md#6-functional-requirements) |
 
 - Dice settings gear lives in the `dice.log` body (no shell header slot, FR-DICE-22). Launcher `badge?(store)` is a pending shared change to play-shell ([OQ-NOTE-13](../specs/notifications.md#15-open-questions)).
 
@@ -1849,7 +1850,7 @@ From [dice-extras](../specs/dice-extras.md) (FR-DICEX-15, -17, -18, -32–38, -4
 | Piece | Contract |
 |---|---|
 | Dice layer (`@ui/features/dice-extras/DiceLayer`) | One element portalled to `document.body` (no `PlayFrame.tsx` line), `position: fixed; inset: 0`, `z-index` 2,147,483,647 (above sonner's toaster, dialogs z-50, the alert flash z-100), `pointer-events: none`, `aria-hidden`, `inert`. Holds the page's **one WebGL canvas** and the screen throw's DOM mirror; dice only, no caption. Mounted while the effective display is `screen` / `zone`. Test ID `dicex-screen` (+ `data-state` idle \| moving \| rest \| handoff, `data-chunk` idle \| loading \| ready \| failed) |
-| Arenas (renderer, lazy `dice3d` chunk) | Each running throw = its own scene + straight-down orthographic camera drawn into a viewport + scissor rect of the one canvas, in one render loop that stops when nothing moves. `screen` = the viewport; `zone` = the zone's dice area (FR-DICEX-17 rect, never over a window). Arena world size from the rect rounded to 50 px (`dice-extras/arena.ts`); die size 7 % of the viewport's short side, 40–96 px; dice enter from the bottom edge and bounce off the walls. Pixel ratio ≤ 1.5; no shadows above 2.5 MP. A rect is read every frame (a resize scales the running arena, no re-simulation). Hand-off: the rested dice are copied (cropped) into a 2D canvas in the frame's task (no `preserveDrawingBuffer`) and taken off the canvas; until D7 that still fades |
+| Arenas (renderer, lazy `dice3d` chunk) | Each running throw = its own scene + straight-down orthographic camera drawn into a viewport + scissor rect of the one canvas, in one render loop that stops when nothing moves. `screen` draws on the viewport, its walls on a centred box at least 20 % in from every edge (#417); `zone` = the zone's dice area (FR-DICEX-17 rect, never over a window). Arena world size from the rect rounded to 50 px, the screen box's rounded down (`dice-extras/arena.ts`); die size 7 % of the viewport's short side, 40–96 px; dice enter from the bottom edge and bounce off the walls. Pixel ratio ≤ 1.5; no shadows above 2.5 MP. A rect is read every frame (a resize scales the running arena, no re-simulation). Hand-off: the rested dice are copied (cropped) into a 2D canvas in the frame's task (no `preserveDrawingBuffer`) and taken off the canvas; until D7 that still fades |
 | Truth (FR-DICEX-34) | Whole throw simulated headless in its arena first (≤ 150 steps at 60 Hz, ≤ 50 ms for 20 dice), faces relabelled to the server values, then played; `data-settled` (from the rendered mesh) = `data-value`. Seed = FNV-1a of `DiceThrow.seedId` (first public entry id, else the first; `@shared/dice-extras/throw`) |
 | Which entries fly big (FR-DICEX-32, -38, -43) | `planThrow` (`dice-extras/display.ts`): the frame's `public` entries, and only own ones with "Show others' rolls" off; `public: false` (DM-only) never flies big or in the zone (D7: the DM's popup). `screen` → screen arena 3D; `zone` → zone 3D (caption only with popups off); `flat` → flat chips in the zone (until D7's popup, `ROLL_POPUPS` false); `off` → nothing; hidden tab → nothing |
 | Timing (FR-DICEX-35, `dice-extras/timing.ts`) | Store timeline per throw: `moving` ≤ 2.5 s → `rest` 1 s → `handoff` 0.4 s (popups setting on) / `rest` 1.5 s → `fading` 0.3 s (off) → gone. A new throw sends the running one to its hand-off at once (FR-DICEX-18). Flat dice rest after their 0.3 s fade-in |
@@ -4435,3 +4436,31 @@ Every item ID must be on `overviewId`, else `not_found`, nothing written. **Buil
 **CON-44** (measured, `FR-OVW-08 CON-44`, bundle `overview-scenes` with `ovw-crowd` shown, 300 items and 50 overviews): item row label 594 B, image 436 B, widest (80-char text) 684 B; overview row 277 B (the spec's estimates: 500 B, 200 B). Snapshot DM 184,803 B, player 136,837 B, under the ceilings (DM 1.5 MiB since #256, players 512 KiB). In the DM snapshot in place of the battle scene's tokens and props.
 
 **Fixtures** (FR-OVW-46): units `ovw-sword-coast` (shown; locked `map-large`, three styled labels, one hidden; hidden scroll, `fixtures/assets/props/scroll.svg`), `ovw-phandalin`, `ovw-crowd` (200 labels + 100 images); bundle `overview-scenes` = `scenes` + those. Party miniatures join `ovw-sword-coast` and the crowd's mix with `ovw.addParty` in the miniatures slice. Tests insert miniatures through `overview-scenes/testing.ts` until then.
+
+## 191. Send to game log (build/log-share)
+
+From [log-share](../specs/log-share.md) FR-SHARE-01–11 (#415). **Built by `build/log-share`.** No new record type: a share is a `game-log-entry` of kind `share.entry` (`game-log-entry` rules unchanged, FR-DICE-15).
+
+| Intent | Payload | Rule | Event | FR |
+|---|---|---|---|---|
+| `share.toLog` (DM, player) | `{from: "compendium", entryId}` or `{from: "sheet", creatureId, list: attacks | spells | features | items, rowId}` → `{entryId}` | Strict: no text can be sent; the server builds it. Unreadable or unknown entry → `not_found`; monster → `invalid`; another player's character → `forbidden`; other campaign, monster creature or a row that's gone → `not_found` | `LogEntryShared` | FR-SHARE-03, -10 |
+
+| Domain event | Owner | Emitted by | Payload | Changes | Undoable | Source |
+|---|---|---|---|---|---|---|
+| `LogEntryShared` | SHARE | `share.toLog` | `{entryId, from, title}` | The new `game-log-entry` upsert, stamped public; an upsert per older share folded (FR-SHARE-08) | no (the DM's Hide takes it back) | FR-SHARE-05 |
+
+- **Log kind** `share.entry`, payload `{title, line, text, cut?, folded?}`, no `dmPayload`, category `other`; registered in `src/shared/dice-roll-log/kinds.ts`.
+- **Test IDs:** `share-send` (`data-source` = `compendium` or the list, `data-record-id`), `share-confirm-dialog`, `share-confirm-send`, `share-confirm-cancel`, `share-entry-body`, `share-entry-line`, `share-entry-folded`, `share-entry-cut`.
+
+## 192. Teleport (build/token-teleport)
+
+From [scenes-map](../specs/scenes-map.md) FR-MAP-121–123 (#418). **Built by `build/token-teleport`.** No new record type or event type.
+
+| Intent | Payload | Rule | Event | FR |
+|---|---|---|---|---|
+| `map.teleportToken` (DM only) | `{tokenId, col, row}` | As `map.moveToken`'s DM path (footprint must overlap the map, guards, derive, token-changed hooks with `teleport: true`). Its own cell or off the map → `invalid`; a player → refused by role | `TokenMoved` with `teleportCue` | FR-MAP-121, -123 |
+
+- **`TokenMoved`** gains optional `teleportCue` (a fresh id, only on a teleport). Still unlogged, not undoable. Combat's hook adds no `movedFt` for it.
+- **Server signal `vfx.poof`** (server-originated, transient: no event of its own, DB row, log, snapshot or `seq`): `signal {name: "vfx.poof", data: PoofCue, from: {role: "dm"}}`, `PoofCue = {id, sceneId, side, cells: [{col, row}]}` (1–2 cells, top-left of each footprint). Per connection after commit: the DM gets both ends; a player the ends where `records.view` shows them the token (the record before the move for the cell left, after it for the cell reached); neither → no signal.
+- **Canvas tool** `teleport`: DM, `offRail` (a new optional `CanvasToolDef` field: `toolsFor` leaves it off the rail).
+- **Test IDs:** `map-token-menu-teleport`, `map-teleport-panel`, `map-teleport-cancel`; canvas `map-teleport-target` (attrs `col`, `row`), `vfx-poof` (id = cue id; `x`, `y`, `size`), `vfx-over-pass` attr `lastPoof` = cue id.

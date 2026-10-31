@@ -537,6 +537,7 @@ export const statBlockWindow = defineWindow({
   usefulSize: { w: 300, h: 360 },
   minOpenH: 360,
   defaultPosition: { anchor: "top-left", dx: 56 },
+  onClose: () => useStatBlockTarget.setState({ target: null }), // FR-SHELL-200: the creature
   defaultOpen: false,
   restoreOpen: false,
   component: StatBlockBody,

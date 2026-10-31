@@ -5,6 +5,7 @@
 import type { SpellRow } from "@shared/character-sheet/sheet";
 import type { RecordStore } from "@shared/protocol/store";
 import type { ComponentType } from "react";
+import { shareSpellAction } from "../log-share/SheetShare";
 import { vfxCastAction } from "../spell-fx/CastAction";
 import type { SheetClient, SheetCreatureKind } from "./sections";
 
@@ -30,4 +31,5 @@ export interface SpellRowAction {
 
 export const spellRowActions: readonly SpellRowAction[] = [
   vfxCastAction, // spell-fx: Cast / End (FR-VFX-06)
+  shareSpellAction, // log-share: Send to game log (FR-SHARE-02)
 ];

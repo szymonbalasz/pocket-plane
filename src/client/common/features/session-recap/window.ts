@@ -3,6 +3,7 @@
 // `main`; the picked session is view state. Useful 400 × 360: the header + the first 4 fight lines.
 import { defineWindow } from "../play-shell/registry";
 import { RECAP_WINDOW_KIND } from "./logic";
+import { recapViews } from "./open";
 import { RecapWindow } from "./RecapWindow";
 import { RecapRuntime } from "./runtime";
 
@@ -16,5 +17,7 @@ export const recapWindow = defineWindow({
   defaultPosition: { anchor: "top-left", dx: 56 },
   defaultOpen: false,
   companion: RecapRuntime,
+  // FR-SHELL-200: the picked session. The DM's Share draft stays: it is typed work (RECAP §11).
+  onClose: () => recapViews().reset(),
   component: RecapWindow,
 });

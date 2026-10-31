@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { WindowState } from "@shared/play-shell/layout";
+import type { You } from "@shared/protocol/frames";
 import { type Rect, workArea } from "./geometry";
+import type { WindowAction } from "./manager";
 import { createWindowRegistry, type WindowDef } from "./registry";
 import { createShellController } from "./shell-store";
 import { createLayoutStorage } from "./storage";
@@ -50,6 +52,74 @@ test("FR-SHELL-40 FR-SHELL-110 data-placed: the default layout's windows `zone`,
   expect(Object.fromEntries(reloaded.store.getState().placed)).toEqual({
     "a.one:main": "zone",
     "a.two:main": "zone",
+  });
+});
+
+describe("FR-SHELL-200 close resets, minimise keeps", () => {
+  const setup = (over: { onClose?: WindowDef["onClose"]; you?: You | null } = {}) => {
+    const calls: (You | null)[] = [];
+    const warnings: string[] = [];
+    const r = createWindowRegistry("dm", [
+      def("a.one", { defaultOpen: true }),
+      def("b.reset", { onClose: over.onClose ?? ((you) => void calls.push(you)) }),
+    ]);
+    const storage = createLayoutStorage(() => ({ getItem: () => null, setItem: () => {} }));
+    const c = createShellController({
+      registry: r,
+      storage,
+      viewport: () => vp,
+      you: () => over.you ?? null,
+      warn: (m) => warnings.push(m),
+    });
+    c.restore("k");
+    const kinds = new Set(["a.one", "b.reset"]);
+    const act = (action: WindowAction) => c.dispatch(action, kinds);
+    const state = () => c.store.getState().windows.find((w) => w.kind === "b.reset")?.state;
+    return { calls, warnings, act, state };
+  };
+
+  test("FR-SHELL-200 the X runs onClose once, with who this page is", () => {
+    const you = { campaignId: "c1", role: "dm", playerId: null } as You;
+    const { calls, act } = setup({ you });
+    act({ type: "open", kind: "b.reset" });
+    expect(calls).toEqual([]);
+    act({ type: "close", kind: "b.reset" });
+    expect(calls).toEqual([you]);
+    act({ type: "close", kind: "b.reset" }); // already closed: nothing to reset
+    expect(calls).toHaveLength(1);
+  });
+
+  test("FR-SHELL-200 minimise and restore run nothing; closing a minimised window does", () => {
+    const { calls, act } = setup();
+    act({ type: "open", kind: "b.reset" });
+    act({ type: "minimise", kind: "b.reset" });
+    act({ type: "open", kind: "b.reset" });
+    act({ type: "toggle", kind: "b.reset" }); // on top: minimises
+    expect(calls).toEqual([]);
+    act({ type: "close", kind: "b.reset" });
+    expect(calls).toHaveLength(1);
+  });
+
+  test("FR-SHELL-200 Reset layout putting a window away counts as a close", () => {
+    const { calls, act, state } = setup();
+    act({ type: "open", kind: "b.reset" });
+    act({ type: "reset" });
+    expect(state()).toBeUndefined(); // not part of the default layout
+    expect(calls).toHaveLength(1);
+    act({ type: "reset" }); // already gone
+    expect(calls).toHaveLength(1);
+  });
+
+  test("FR-SHELL-200 a failing onClose warns; the window still closes", () => {
+    const { warnings, act, state } = setup({
+      onClose: () => {
+        throw new Error("boom");
+      },
+    });
+    act({ type: "open", kind: "b.reset" });
+    act({ type: "close", kind: "b.reset" });
+    expect(state()).toBe("closed");
+    expect(warnings).toEqual(["play-shell: b.reset onClose failed: Error: boom"]);
   });
 });
 

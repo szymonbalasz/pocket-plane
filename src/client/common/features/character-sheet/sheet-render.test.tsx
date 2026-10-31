@@ -529,7 +529,10 @@ const controlOf = (r: TrayRequest | null) => {
 };
 
 describe("FR-CHARX-127 click stages, Alt rolls", () => {
-  afterEach(() => diceExtras.clear());
+  afterEach(() => {
+    diceExtras.clear();
+    diceExtras.failed(); // An Alt+click rolled: no pending left for the next test file.
+  });
 
   test("FR-CHARX-127 click stages, Alt rolls: click → a tray request (dice, purpose, types, label), no intent; Shift → advantage; Alt+click → one char.roll, no tray; the tray's Roll sends the staged parts", () => {
     const sent: [string, unknown][] = [];
@@ -626,7 +629,10 @@ describe("FR-CHARX-127 click stages, Alt rolls", () => {
 });
 
 describe("FR-CHARX-132 disconnect", () => {
-  afterEach(() => diceExtras.clear());
+  afterEach(() => {
+    diceExtras.clear();
+    diceExtras.failed(); // An Alt+click rolled: no pending left for the next test file.
+  });
 
   test("FR-CHARX-132 staged roll offline: not live → staging works, the tray's Roll is disabled, the request is kept; nothing sent", () => {
     const sent: [string, unknown][] = [];

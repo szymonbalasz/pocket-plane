@@ -1,7 +1,7 @@
-// The tray's attack / damage composition (FR-DICEX-97, -99, -101; ADR-0073 decision 1): the dice
-// with a damage type per die group, the parts they form and why they can't roll. Pure.
+// The tray's attack / damage composition (FR-DICEX-97, -99, -101, -105; ADR-0073 decision 1): the
+// dice with a damage type and a modifier per die group, the parts they form and why they can't
+// roll. Pure.
 import {
-  constantOf,
   type DiceTerm,
   diceCount,
   MAX_DICE,
@@ -26,8 +26,10 @@ export const PART_TYPES: readonly PartType[] = MODIFIER_DAMAGE_TYPES;
 export type TrayPurpose = "plain" | RollPurpose;
 
 /**
- * The tray's dice: `terms` with `types` parallel (a dice term's group type; a constant's part,
- * null = the base part's). Plain and attack rolls leave every type null.
+ * The tray's dice: `terms` with `types` parallel. Damage: every dice term is one **die group** (a
+ * row in the tray, FR-DICEX-105) with its type; a constant belongs to the dice before it (leading
+ * ones to the first group), its own `types` entry stays null. Plain and attack rolls leave every
+ * type null.
  */
 export interface Composition {
   terms: Term[];
@@ -47,98 +49,151 @@ const isDice = (t: Term): t is DiceTerm => t.kind === "dice";
 const joinable = (t: Term, faces: number): t is DiceTerm =>
   isDice(t) && t.faces === faces && t.keep === null && t.sign === 1;
 
-/** Dice terms first (their order kept), then the constants; one term per die size and type. */
+/** One die group (FR-DICEX-105): its dice term, its type and its own modifier. */
+export interface TrayRow {
+  term: number;
+  type: PartType | null;
+  constant: number;
+  /** The constant terms that make up `constant`. */
+  consts: number[];
+}
+
+/** FR-DICEX-105: the groups of a composition, in order. No dice → no groups. */
+export function rowsOf(c: Composition): TrayRow[] {
+  const rows: TrayRow[] = [];
+  const leading: number[] = [];
+  const own = (row: TrayRow, i: number) => {
+    const t = c.terms[i];
+    if (t?.kind !== "const") return;
+    row.constant += t.sign * t.value;
+    row.consts.push(i);
+  };
+  c.terms.forEach((t, i) => {
+    if (isDice(t)) {
+      const row: TrayRow = { term: i, type: c.types[i] ?? null, constant: 0, consts: [] };
+      if (rows.length === 0) for (const k of leading) own(row, k);
+      rows.push(row);
+      return;
+    }
+    const last = rows[rows.length - 1];
+    if (last) own(last, i);
+    else leading.push(i);
+  });
+  return rows;
+}
+
+const constTerm = (value: number): Term => ({
+  kind: "const",
+  sign: value < 0 ? -1 : 1,
+  value: Math.abs(Math.trunc(value)),
+});
+
+/**
+ * A composition as rows: each group's dice then its modifier as one term; side by side, dice of
+ * one size and type with no modifier between them are one group.
+ */
 export function normalize(c: Composition): Composition {
+  const rows = rowsOf(c);
+  if (rows.length === 0) return c;
   const terms: Term[] = [];
   const types: (PartType | null)[] = [];
-  c.terms.forEach((t, i) => {
-    if (!isDice(t)) return;
-    const type = c.types[i] ?? null;
-    const same =
-      t.keep === null && t.sign === 1
-        ? terms.findIndex((x, j) => joinable(x, t.faces) && types[j] === type)
-        : -1;
-    const x = terms[same];
-    if (x && isDice(x)) terms[same] = { ...x, count: x.count + t.count };
-    else {
+  for (const row of rows) {
+    const t = c.terms[row.term] as DiceTerm;
+    const prev = terms[terms.length - 1];
+    if (prev && joinable(t, t.faces) && joinable(prev, t.faces) && types.at(-1) === row.type) {
+      terms[terms.length - 1] = { ...prev, count: prev.count + t.count };
+    } else {
       terms.push(t);
-      types.push(type);
+      types.push(row.type);
     }
-  });
-  c.terms.forEach((t, i) => {
-    if (isDice(t)) return;
-    terms.push(t);
-    types.push(c.types[i] ?? null);
-  });
+    if (row.constant !== 0) {
+      terms.push(constTerm(row.constant));
+      types.push(null);
+    }
+  }
   return { terms, types };
 }
 
 /**
- * FR-DICEX-101 (a): a staged control's composition: each part's dice with its type (part 1 =
- * the base part, `partTypes[0]`), then the constants (the base part's untyped, an extra part's
- * with its type). Attack (and plain): the expressions' terms, no types.
+ * FR-DICEX-101 (a): a staged control's composition. Damage: each part's dice with its type and its
+ * constant after them, as rows. Attack (and plain): the expressions' terms, dice first, no types.
  */
 export function compositionOf(
   expressions: readonly string[],
   purpose: TrayPurpose,
   partTypes: readonly (PartType | null | undefined)[] = [],
 ): Composition {
-  const terms: Term[] = [];
-  const types: (PartType | null)[] = [];
-  const consts: Term[] = [];
-  const constTypes: (PartType | null)[] = [];
-  expressions.forEach((x, i) => {
+  const parsed = expressions.flatMap((x, i) => {
     const r = parseExpression(x);
-    if (!r.ok) return;
-    const type = purpose === "damage" ? (partTypes[i] ?? null) : null;
-    for (const t of r.value) {
-      if (isDice(t)) {
+    return r.ok ? [{ terms: r.value, type: partTypes[i] ?? null }] : [];
+  });
+  const diceFirst = (ts: readonly Term[]) => [
+    ...ts.filter(isDice),
+    ...ts.filter((t) => !isDice(t)),
+  ];
+  if (purpose === "damage") {
+    const terms: Term[] = [];
+    const types: (PartType | null)[] = [];
+    for (const p of parsed) {
+      for (const t of diceFirst(p.terms)) {
         terms.push(t);
-        types.push(type);
-      } else {
-        consts.push(t);
-        constTypes.push(i === 0 ? null : type);
+        types.push(isDice(t) ? p.type : null);
       }
     }
-  });
-  const c = { terms: [...terms, ...consts], types: [...types, ...constTypes] };
-  return purpose === "damage" ? normalize(c) : c;
+    return normalize({ terms, types });
+  }
+  const terms = diceFirst(parsed.flatMap((p) => p.terms));
+  return { terms, types: terms.map(() => null) };
 }
 
 /** The last die group's type (FR-DICEX-101 c), else null. */
-function lastGroupType(c: Composition): PartType | null {
+export function lastGroupType(c: Composition): PartType | null {
   for (let i = c.terms.length - 1; i >= 0; i--) {
     if (c.terms[i]?.kind === "dice") return c.types[i] ?? null;
   }
   return null;
 }
 
+/** FR-DICEX-105: a new die group after the last one, whatever is already in the roll. */
+export function startGroup(c: Composition, faces: number, type: PartType | null): Composition {
+  if (diceCount(c.terms) >= MAX_DICE) return c;
+  const die: DiceTerm = { kind: "dice", sign: 1, count: 1, faces, keep: null };
+  return { terms: [...c.terms, die], types: [...c.types, type] };
+}
+
+/** FR-DICEX-105: a group's own "+": one more die of its size. */
+export function addToGroup(c: Composition, term: number): Composition {
+  const t = c.terms[term];
+  if (!t || !isDice(t) || diceCount(c.terms) >= MAX_DICE) return c;
+  return { ...c, terms: c.terms.map((x, j) => (j === term ? { ...t, count: t.count + 1 } : x)) };
+}
+
 /**
  * Palette (FR-DICEX-97, -101 b, c). Damage: a die of a size already in the roll joins the last
- * group of that size and its type (OQ-DICEX-66 A); a new size starts a group after the last one
- * with the last group's type. Else: joins the first positive same-faces term without keep, else
- * a new term before the constants (as `addDie`).
+ * group of that size (OQ-DICEX-66 A); a new size starts a group after the last one with the last
+ * group's type. Else: joins the first positive same-faces term without keep, else a new term
+ * before the constants (as `addDie`).
  */
 export function joinDie(c: Composition, faces: number, purpose: TrayPurpose): Composition {
   if (diceCount(c.terms) >= MAX_DICE) return c;
   const idx = c.terms.map((t, i) => (joinable(t, faces) ? i : -1)).filter((i) => i >= 0);
   const at = purpose === "damage" ? idx[idx.length - 1] : idx[0];
-  if (at !== undefined) {
-    const t = c.terms[at] as DiceTerm;
-    return { ...c, terms: c.terms.map((x, j) => (j === at ? { ...t, count: t.count + 1 } : x)) };
-  }
+  if (at !== undefined) return addToGroup(c, at);
+  if (purpose === "damage") return startGroup(c, faces, lastGroupType(c));
   const die: DiceTerm = { kind: "dice", sign: 1, count: 1, faces, keep: null };
-  const type = purpose === "damage" ? lastGroupType(c) : null;
   const firstConst = c.terms.findIndex((t) => t.kind === "const");
   const pos = firstConst < 0 ? c.terms.length : firstConst;
   return {
     terms: [...c.terms.slice(0, pos), die, ...c.terms.slice(pos)],
-    types: [...c.types.slice(0, pos), type, ...c.types.slice(pos)],
+    types: [...c.types.slice(0, pos), null, ...c.types.slice(pos)],
   };
 }
 
-/** A die click removes one of its term (the term goes with its last die, and its type). */
-export function dropDie(c: Composition, term: number): Composition {
+/**
+ * A die click removes one of its term; the term goes with its last die. Damage: a group's modifier
+ * goes with it (FR-DICEX-105); a plain or attack roll keeps its constant.
+ */
+export function dropDie(c: Composition, term: number, purpose: TrayPurpose = "plain"): Composition {
   const t = c.terms[term];
   if (!t || !isDice(t)) return c;
   if (t.count > 1) {
@@ -146,15 +201,13 @@ export function dropDie(c: Composition, term: number): Composition {
     const keep = t.keep ? (t.keep.n >= count ? null : t.keep) : null;
     return { ...c, terms: c.terms.map((x, j) => (j === term ? { ...t, count, keep } : x)) };
   }
-  const type = c.types[term] ?? null;
-  const terms = c.terms.filter((_, j) => j !== term);
-  const types = c.types.filter((_, j) => j !== term);
-  // The part's own constant goes with its last die.
-  const left = terms.some((x, j) => isDice(x) && types[j] === type);
-  if (left || type === null) return { terms, types };
+  const gone = new Set([term]);
+  if (purpose === "damage") {
+    for (const k of rowsOf(c).find((r) => r.term === term)?.consts ?? []) gone.add(k);
+  }
   return {
-    terms: terms.filter((x, j) => isDice(x) || types[j] !== type),
-    types: types.filter((y, j) => isDice(terms[j] as Term) || y !== type),
+    terms: c.terms.filter((_, j) => !gone.has(j)),
+    types: c.types.filter((_, j) => !gone.has(j)),
   };
 }
 
@@ -179,96 +232,74 @@ export function lockedDie(
   return null;
 }
 
-/**
- * FR-DICEX-101: a group's type Select. Groups of one size and type merge; a part's own constant
- * follows its dice when the last group of the old type moves.
- */
+/** FR-DICEX-101: a group's type Select. FR-DICEX-105: the group stays its own row, whatever type. */
 export function setGroupType(c: Composition, term: number, type: PartType | null): Composition {
-  const old = c.types[term] ?? null;
-  if (!isDice(c.terms[term] as Term) || old === type) return c;
-  const types = c.types.map((y, j) => (j === term ? type : y));
-  const left = c.terms.some((x, j) => isDice(x) && types[j] === old);
-  const moved =
-    left || old === null
-      ? types
-      : types.map((y, j) => (!isDice(c.terms[j] as Term) && y === old ? type : y));
-  return normalize({ terms: c.terms, types: moved });
+  if (!isDice(c.terms[term] as Term)) return c;
+  return { ...c, types: c.types.map((y, j) => (j === term ? type : y)) };
 }
 
-/** One damage part (FR-DICEX-101 d): its type, its terms (indices) and its constant. */
+/** FR-DICEX-105: a group's modifier, one term right after its dice (0 → none). */
+export function setGroupConstant(c: Composition, term: number, value: number): Composition {
+  const row = rowsOf(c).find((r) => r.term === term);
+  if (!row) return c;
+  const gone = new Set(row.consts);
+  const terms: Term[] = [];
+  const types: (PartType | null)[] = [];
+  c.terms.forEach((t, i) => {
+    if (gone.has(i)) return;
+    terms.push(t);
+    types.push(c.types[i] ?? null);
+    if (i !== term || value === 0 || !Number.isFinite(value)) return;
+    terms.push(constTerm(value));
+    types.push(null);
+  });
+  return { terms, types };
+}
+
+/** One damage part (FR-DICEX-101 d): its type and the groups that form it. */
 export interface TrayPart {
   type: PartType | null;
-  /** Dice term indices, in order. */
-  dice: number[];
-  constant: number;
-  /** Its own constant terms (an extra part's: read-only in the tray). */
-  consts: number[];
+  rows: TrayRow[];
 }
 
 /**
- * FR-DICEX-101 (d), (e): groups with the same type are one part; the untyped part (if any) is
- * the base part, else the part of the first group. The base part owns the untyped constants; a
- * constant typed for a part that has no dice left is dropped.
+ * FR-DICEX-101 (d), (e): groups with the same type are one part; the untyped part (if any) is the
+ * base part, else the part of the first group.
  */
 export function partsOf(c: Composition): TrayPart[] {
   const parts: TrayPart[] = [];
-  const at = (type: PartType | null) => parts.find((p) => p.type === type);
-  c.terms.forEach((t, i) => {
-    if (!isDice(t)) return;
-    const type = c.types[i] ?? null;
-    const p = at(type);
-    if (p) p.dice.push(i);
-    else parts.push({ type, dice: [i], constant: 0, consts: [] });
-  });
+  for (const row of rowsOf(c)) {
+    const p = parts.find((x) => x.type === row.type);
+    if (p) p.rows.push(row);
+    else parts.push({ type: row.type, rows: [row] });
+  }
   const untyped = parts.findIndex((p) => p.type === null);
   if (untyped > 0) parts.unshift(...parts.splice(untyped, 1));
-  const base = parts[0];
-  c.terms.forEach((t, i) => {
-    if (isDice(t)) return;
-    const type = c.types[i] ?? null;
-    const p = type === null ? base : at(type);
-    if (!p) return;
-    p.constant += t.sign * t.value;
-    p.consts.push(i);
-  });
   return parts;
 }
 
-/** The base part's constant (the constant Input, FR-DICEX-97). */
-export const baseConstant = (c: Composition, purpose: TrayPurpose): number =>
-  purpose === "damage" ? (partsOf(c)[0]?.constant ?? 0) : constantOf(c.terms);
-
-/**
- * The constant Input: the base part's constants replaced by one (0 → none), after the dice; an
- * extra part's own constant stays.
- */
-export function setBaseConstant(c: Composition, value: number, purpose: TrayPurpose): Composition {
-  const base = purpose === "damage" ? partsOf(c)[0] : null;
-  const drop = new Set(
-    base ? base.consts : c.terms.map((t, i) => (t.kind === "const" ? i : -1)).filter((i) => i >= 0),
-  );
-  const terms = c.terms.filter((_, i) => !drop.has(i));
-  const types = c.types.filter((_, i) => !drop.has(i));
+/** The constant Input of a plain or attack roll: every constant replaced by one, after the dice. */
+export function setBaseConstant(c: Composition, value: number): Composition {
+  const terms = c.terms.filter((t) => t.kind !== "const");
+  const types = c.types.filter((_, i) => c.terms[i]?.kind !== "const");
   if (value === 0 || !Number.isFinite(value)) return { terms, types };
-  const k: Term = { kind: "const", sign: value < 0 ? -1 : 1, value: Math.abs(Math.trunc(value)) };
-  const firstConst = terms.findIndex((t) => t.kind === "const");
-  const pos = firstConst < 0 ? terms.length : firstConst;
-  return {
-    terms: [...terms.slice(0, pos), k, ...terms.slice(pos)],
-    types: [...types.slice(0, pos), null, ...types.slice(pos)],
-  };
+  return { terms: [...terms, constTerm(value)], types: [...types, null] };
 }
 
 /**
- * The expression Input (compose): a typed expression keeps each die size's type (the last group
- * of that size), a new size takes the last group's type, constants go to the base part.
+ * The expression Input (compose): a typed expression keeps each group's type (same place, same
+ * size), else the type of the last group of that size; a new size takes the last group's type.
  */
 export function retype(prev: Composition, terms: readonly Term[]): Composition {
+  const rows = rowsOf(prev);
+  let n = 0;
   const types = terms.map((t): PartType | null => {
     if (!isDice(t)) return null;
-    for (let i = prev.terms.length - 1; i >= 0; i--) {
-      const x = prev.terms[i];
-      if (x && isDice(x) && x.faces === t.faces) return prev.types[i] ?? null;
+    const row = rows[n++];
+    if (row && (prev.terms[row.term] as DiceTerm).faces === t.faces) return row.type;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i] as TrayRow;
+      if ((prev.terms[r.term] as DiceTerm).faces === t.faces) return r.type;
     }
     return lastGroupType(prev);
   });
@@ -278,14 +309,28 @@ export function retype(prev: Composition, terms: readonly Term[]): Composition {
 /** The whole composition as one expression (the expression Input, a plain roll). */
 export const notationOfComposition = (c: Composition): string => toNotation(c.terms);
 
+/** A part's terms: its groups' dice (one term per size where they can merge), then one constant. */
+function partTerms(c: Composition, p: TrayPart): Term[] {
+  const dice: DiceTerm[] = [];
+  for (const row of p.rows) {
+    const t = c.terms[row.term] as DiceTerm;
+    const same = joinable(t, t.faces) ? dice.findIndex((x) => joinable(x, t.faces)) : -1;
+    const x = dice[same];
+    if (x) dice[same] = { ...x, count: x.count + t.count };
+    else dice.push(t);
+  }
+  const constant = p.rows.reduce((n, r) => n + r.constant, 0);
+  return constant === 0 ? dice : [...dice, constTerm(constant)];
+}
+
 /**
- * ADR-0073 decision 1: the staged parts the intent sends. Attack (and plain): one part, the
- * whole expression. Damage: one per part, base first; the base part's type only when typed.
+ * ADR-0073 decision 1: the staged parts the intent sends. Attack (and plain): one part, the whole
+ * expression. Damage: one per part, base first; the base part's type only when typed.
  */
 export function stagedPartsOf(c: Composition, purpose: TrayPurpose): StagedPart[] {
   if (purpose !== "damage") return [{ expression: toNotation(c.terms) }];
   return partsOf(c).map((p) => {
-    const expression = toNotation([...p.dice, ...p.consts].map((i) => c.terms[i] as Term));
+    const expression = toNotation(partTerms(c, p));
     return p.type ? { expression, type: p.type } : { expression };
   });
 }
@@ -304,10 +349,17 @@ export function compositionIssue(c: Composition, purpose: TrayPurpose): string |
 /** FR-DICEX-101 (e): "No type" is offered only while the base part is untyped. */
 export const offersNoType = (c: Composition): boolean => partsOf(c)[0]?.type === null;
 
-/** FR-DICEX-101: a group's test record id, `<faces>:<type | none>`. */
+/**
+ * FR-DICEX-101: a group's test record id, `<faces>:<type | none>`; FR-DICEX-105: the second group
+ * of one size and type adds `:2`.
+ */
 export const groupRecordId = (c: Composition, term: number): string => {
-  const t = c.terms[term];
-  return `${t && isDice(t) ? t.faces : 0}:${c.types[term] ?? "none"}`;
+  const id = (i: number) => {
+    const t = c.terms[i];
+    return `${t && isDice(t) ? t.faces : 0}:${c.types[i] ?? "none"}`;
+  };
+  const nth = rowsOf(c).filter((r) => r.term <= term && id(r.term) === id(term)).length;
+  return nth > 1 ? `${id(term)}:${nth}` : id(term);
 };
 
 /** A type's label ("Slashing"); null → "No type". */

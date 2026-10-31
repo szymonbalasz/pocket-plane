@@ -10,7 +10,7 @@
 // the min, × 1.2 at the useful size, × 1.25 at the default); the steps stay 40 / 28 (`data-cell`).
 // Sprint 15 (#385): an editable `adjust` removes dice too (FR-DICEX-97) except a locked die (the
 // attack's d20, a damage roll's last die: a span with its Tooltip text); a damage roll shows one
-// group per die size and type, led by its type Select (FR-DICEX-101).
+// row per die group: its type Select, its dice, its "+" and modifier (FR-DICEX-101, -105).
 import type { DiceLook } from "@shared/dice-extras/looks";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -55,24 +55,54 @@ const fitsIn = (cells: number, step: StillCell, area: AreaBox, scale: number) =>
 };
 
 /**
+ * FR-DICEX-105: a group row's own controls (type 96 px, "+" 24, modifier 48, three gaps): the row's
+ * dice wrap in what is left.
+ */
+export const ROW_CHROME_PX = 180;
+
+/** FR-DICEX-105: `rows` (each row's cells) stacked, each wrapping beside its controls. */
+const rowsFitIn = (rows: readonly number[], step: StillCell, area: AreaBox, scale: number) => {
+  const size = scaledPx(step, scale);
+  const room = area.w - ROW_CHROME_PX + CELL_GAP;
+  const perRow = Math.max(1, Math.floor(room / (size + CELL_GAP)));
+  const h = rows.reduce((n, cells) => {
+    const lines = Math.max(1, Math.ceil(cells / perRow));
+    return n + lines * size + (lines - 1) * CELL_GAP;
+  }, 0);
+  return h + (rows.length - 1) * CELL_GAP <= area.h;
+};
+
+/**
  * FR-DICEX-54: the still size for `cells` cells (one per still, d100 = two, plus one per constant
  * / label) or `groupedCells` once grouped "×N". 40 while all fit; else 28; else grouped (40 or 28,
  * `grouped` = forced by room, not by > 12 dice); else grouped at 28 and the area scrolls. Each
- * step is drawn at `scale` (FR-DICEX-96: 40 → 50 px at × 1.25).
+ * step is drawn at `scale` (FR-DICEX-96: 40 → 50 px at × 1.25). FR-DICEX-105: with `rows` (each
+ * group's cells, then grouped), the groups stack instead of flowing.
  */
 export function stillSize(
-  o: { cells: number; groupedCells: number; byCount: boolean },
+  o: {
+    cells: number;
+    groupedCells: number;
+    byCount: boolean;
+    rows?: { cells: readonly number[]; groupedCells: readonly number[] };
+  },
   area: AreaBox,
   scale = 1,
 ): { cell: StillCell; grouped: boolean; scroll: boolean } {
+  const fits = (grouped: boolean, cell: StillCell) => {
+    if (o.rows) {
+      return rowsFitIn(grouped ? o.rows.groupedCells : o.rows.cells, cell, area, scale);
+    }
+    return fitsIn(grouped ? o.groupedCells : o.cells, cell, area, scale);
+  };
   if (!o.byCount) {
     for (const cell of [40, 28] as const) {
-      if (fitsIn(o.cells, cell, area, scale)) return { cell, grouped: false, scroll: false };
+      if (fits(false, cell)) return { cell, grouped: false, scroll: false };
     }
   }
   const grouped = !o.byCount;
   for (const cell of [40, 28] as const) {
-    if (fitsIn(o.groupedCells, cell, area, scale)) return { cell, grouped, scroll: false };
+    if (fits(true, cell)) return { cell, grouped, scroll: false };
   }
   return { cell: 28, grouped, scroll: true };
 }
@@ -86,8 +116,12 @@ export interface TrayGroup {
   constant: number;
   /** FR-DICE-41: the control's slot label ("Slashing"); absent / null = none. */
   label?: string | null;
-  /** FR-DICEX-101: the group's type Select, in place of the label. */
+  /** FR-DICEX-101: the group's type Select, in place of the label; the group is its own row. */
   lead?: ReactNode;
+  /** FR-DICEX-105: a row's controls after its dice ("+", the modifier). */
+  trail?: ReactNode;
+  /** FR-DICEX-105: a new group's text while it has no dice yet. */
+  hint?: string;
   /** FR-DICEX-97: the term whose die a click may not remove, and why (its Tooltip). */
   locked?: { term: number; tip: string } | null;
 }
@@ -311,20 +345,33 @@ export function TrayPreview({
     groups.reduce((n, g) => n + g.chips.length, 0) +
     extras.reduce((n, x) => n + extraChips(x.dice).length, 0);
   const byCount = count > GROUP_OVER;
+  const diceCells = (x: TrayGroup, g: boolean) =>
+    previewDice(x.chips, g).reduce((k, d) => k + (stillParts(d.faces)?.length ?? 1), 0);
+  // An extra's text ("MOD +1d4") takes about two cells.
+  const extraCells = (g: boolean) =>
+    extras.reduce((n, x) => n + x.dice.length * 2 + previewDice(extraChips(x.dice), g).length, 0);
   const cellsOf = (g: boolean) =>
     groups.reduce(
-      (n, x) =>
-        n +
-        previewDice(x.chips, g).reduce((k, d) => k + (stillParts(d.faces)?.length ?? 1), 0) +
-        (x.constant !== 0 ? 1 : 0) +
-        // A type Select (FR-DICEX-101) takes about two cells.
-        (x.lead ? 2 : x.label ? 1 : 0),
+      (n, x) => n + diceCells(x, g) + (x.constant !== 0 ? 1 : 0) + (x.label ? 1 : 0),
       0,
-    ) +
-    // An extra's text ("MOD +1d4") takes about two cells.
-    extras.reduce((n, x) => n + x.dice.length * 2 + previewDice(extraChips(x.dice), g).length, 0);
+    ) + extraCells(g);
+  // FR-DICEX-105: damage groups stack, one row each (extras on a line of their own).
+  const rowCells = (g: boolean) => [
+    ...groups.map((x) => diceCells(x, g)),
+    ...(extraCells(g) > 0 ? [extraCells(g)] : []),
+  ];
+  const stacked = groups.some((g) => g.lead);
   const fit = area
-    ? stillSize({ cells: cellsOf(byCount), groupedCells: cellsOf(true), byCount }, area, scale)
+    ? stillSize(
+        {
+          cells: cellsOf(byCount),
+          groupedCells: cellsOf(true),
+          byCount,
+          ...(stacked ? { rows: { cells: rowCells(byCount), groupedCells: rowCells(true) } } : {}),
+        },
+        area,
+        scale,
+      )
     : { cell: 40 as const, grouped: false, scroll: false };
   const grouped = byCount || fit.grouped;
   const cell = fit.cell;
@@ -332,8 +379,10 @@ export function TrayPreview({
 
   const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  // Redraw when the dice, tags, look or the area's size change; one draw each, no loop.
-  const drawKey = JSON.stringify([dice, extras, grouped, cell, scale, look]);
+  // Redraw when the dice, tags, look, what sits beside them or the area's size change (a move
+  // without a resize would leave the stills behind); one draw each, no loop.
+  const beside = groups.map((g) => [g.constant, g.label ?? null, !!g.lead, g.hint ?? null]);
+  const drawKey = JSON.stringify([dice, extras, beside, grouped, cell, scale, look]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: redraws on `drawKey`
   useLayoutEffect(() => {
     const mod = dice3d.module();
@@ -396,47 +445,72 @@ export function TrayPreview({
         aria-hidden
         className="pointer-events-none absolute inset-0 size-full"
       />
-      {groups.map((g, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: one group per expression position
-        <span key={i} className="flex flex-wrap items-center gap-1">
-          {i > 0 && <span className="px-1 text-muted-foreground">·</span>}
-          {g.lead}
-          {!g.lead && g.label && (
-            <span
-              data-testid="dicex-tray-group-label"
-              data-index={i}
-              className="relative text-xs text-muted-foreground"
-              style={scaledFont(12, scale)}
-            >
-              {g.label}
+      {groups.map((g, i) => {
+        const items = (dice[i] ?? []).map((d, j) => {
+          const tip = g.locked && g.locked.term === d.term ? g.locked.tip : undefined;
+          return (
+            <TrayDie
+              // biome-ignore lint/suspicious/noArrayIndexKey: one die per position
+              key={j}
+              die={d}
+              render={render}
+              look={look}
+              cell={cell}
+              scale={scale}
+              {...(tip ? { tip } : {})}
+              onRemove={onRemove && !d.tag && !tip ? () => onRemove(d.term) : undefined}
+            />
+          );
+        });
+        if (g.lead) {
+          // FR-DICEX-105: a group's row: type, dice (they wrap in the middle), "+", modifier. The
+          // columns stay put whatever the type's label or the dice do.
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: one row per group position
+            <span key={i} data-testid="dicex-tray-group" className="flex w-full items-center gap-1">
+              {g.lead}
+              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                {items}
+                {g.hint && (
+                  <span
+                    data-testid="dicex-tray-group-hint"
+                    className="relative truncate text-xs text-muted-foreground"
+                    style={scaledFont(12, scale)}
+                  >
+                    {g.hint}
+                  </span>
+                )}
+              </span>
+              {g.trail}
             </span>
-          )}
-          {(dice[i] ?? []).map((d, j) => {
-            const tip = g.locked && g.locked.term === d.term ? g.locked.tip : undefined;
-            return (
-              <TrayDie
-                // biome-ignore lint/suspicious/noArrayIndexKey: one die per position
-                key={j}
-                die={d}
-                render={render}
-                look={look}
-                cell={cell}
-                scale={scale}
-                {...(tip ? { tip } : {})}
-                onRemove={onRemove && !d.tag && !tip ? () => onRemove(d.term) : undefined}
-              />
-            );
-          })}
-          {g.constant !== 0 && (
-            <span
-              className="relative font-mono text-sm text-muted-foreground"
-              style={scaledFont(14, scale)}
-            >
-              {signed(g.constant)}
-            </span>
-          )}
-        </span>
-      ))}
+          );
+        }
+        return (
+          // biome-ignore lint/suspicious/noArrayIndexKey: one group per expression position
+          <span key={i} className="flex flex-wrap items-center gap-1">
+            {i > 0 && <span className="px-1 text-muted-foreground">·</span>}
+            {g.label && (
+              <span
+                data-testid="dicex-tray-group-label"
+                data-index={i}
+                className="relative text-xs text-muted-foreground"
+                style={scaledFont(12, scale)}
+              >
+                {g.label}
+              </span>
+            )}
+            {items}
+            {g.constant !== 0 && (
+              <span
+                className="relative font-mono text-sm text-muted-foreground"
+                style={scaledFont(14, scale)}
+              >
+                {signed(g.constant)}
+              </span>
+            )}
+          </span>
+        );
+      })}
       {extras.map((x) => (
         <ExtraDice
           key={x.key}

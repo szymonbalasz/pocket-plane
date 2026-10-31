@@ -12,6 +12,8 @@ import { abilityMod, CR_VALUES, xpForCr } from "@shared/entities/schemas";
 import type { SearchParams } from "./search";
 
 export const CMP_KIND = "cmp.compendium";
+/** An entry popped out of the Compendium (FR-CMP-76). */
+export const CMP_ENTRY_KIND = "cmp.entry";
 /** FR-CMP-18: the window's search waits this long after the last keystroke. */
 export const WINDOW_DEBOUNCE_MS = 200;
 

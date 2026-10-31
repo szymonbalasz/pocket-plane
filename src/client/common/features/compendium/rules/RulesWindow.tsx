@@ -25,6 +25,7 @@ import { SearchInput } from "../../../components/ui/search-input";
 import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { cn } from "../../../lib/utils";
 import { useSync } from "../../../sync/store";
+import { ShareButton } from "../../log-share/ShareButton";
 import { AboutDialog } from "../credits";
 import { MarkdownLite, type OnRef } from "../MarkdownLite";
 import {
@@ -226,6 +227,8 @@ function CardShell({
             </span>
           </button>
         </CollapsibleTrigger>
+        {/* FR-SHARE-01: a rule card, as its compendium entry; FR-SHARE-11: an unshared house rule. */}
+        <ShareButton source={{ from: "compendium", entryId: id }} confirm={dmOnly} />
         <PinButton id={id} ctx={ctx} />
       </div>
       <CollapsibleContent>{open && body()}</CollapsibleContent>

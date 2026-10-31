@@ -50,6 +50,7 @@ import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/She
 import { reportShownStack, shownStacks, subscribeShownStack } from "../play-shell/toast-region";
 import { arenaOf, DIE_WORLD } from "./arena";
 import type { Rect } from "./dice3d/index";
+import { flatGlow } from "./die-fx";
 import { FlatDie } from "./FlatDie";
 import { useAllLanded, useHolding, useLanded } from "./landing";
 import { diceLayerHost, rectOf } from "./layer-host";
@@ -248,6 +249,7 @@ function Miniature({
             value: d.value as number,
             kept: d.kept,
             look: pop.looks[d.entryId] ?? STYLE_LOOK.ivory,
+            ...(d.damage && { damage: d.damage }),
           })),
           onRest: (info) => {
             setSettled(info.settled);
@@ -341,7 +343,16 @@ function Cell({
         <span
           className={cn("transition-opacity duration-300", shown ? "opacity-100" : "opacity-0")}
         >
-          <FlatDie die={d} look={look} size="lg" scale={g.k} settled flat blank={held} />
+          <FlatDie
+            die={d}
+            look={look}
+            size="lg"
+            scale={g.k}
+            settled
+            flat
+            blank={held}
+            glow={flatGlow(d.damage)}
+          />
         </span>
       ) : (
         draw === "handoff" && <StillCanvas still={p.stills[d.key]} g={g} />

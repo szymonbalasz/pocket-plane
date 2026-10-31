@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { ATTACK_NEEDS_D20 } from "@shared/dice-roll-log/schemas";
 import {
-  baseConstant,
+  addToGroup,
   type Composition,
   compositionIssue,
   compositionOf,
@@ -11,21 +11,27 @@ import {
   groupRecordId,
   joinDie,
   lockedDie,
+  normalize,
   notationOfComposition,
   offersNoType,
   partSlotLabels,
   plainComposition,
   presetActor,
   retype,
+  rowsOf,
   setBaseConstant,
+  setGroupConstant,
   setGroupType,
   stagedPartsOf,
+  startGroup,
 } from "./tray-parts";
 
 const groups = (c: Composition) =>
   c.terms.flatMap((t, i) => (t.kind === "dice" ? [groupRecordId(c, i)] : []));
 const termOf = (c: Composition, faces: number) =>
   c.terms.findIndex((t) => t.kind === "dice" && t.faces === faces);
+/** The nth die group's dice term. */
+const rowTerm = (c: Composition, n: number) => rowsOf(c)[n]?.term ?? -1;
 
 describe("FR-DICEX-101 die groups and damage types", () => {
   test("FR-DICEX-101 join and new group", () => {
@@ -48,12 +54,12 @@ describe("FR-DICEX-101 die groups and damage types", () => {
       { expression: "2d6+5", type: "slashing" },
       { expression: "3d6", type: "fire" },
     ]);
-    // Same size and type merge into one group.
+    // Same size and type: still two rows (FR-DICEX-105), one part.
     const two = compositionOf(["1d6", "1d6"], "damage", ["slashing", "fire"]);
     expect(groups(two)).toEqual(["6:slashing", "6:fire"]);
-    const merged = setGroupType(two, 1, "slashing");
-    expect(groups(merged)).toEqual(["6:slashing"]);
-    expect(stagedPartsOf(merged, "damage")).toEqual([{ expression: "2d6", type: "slashing" }]);
+    const same = setGroupType(two, 1, "slashing");
+    expect(groups(same)).toEqual(["6:slashing", "6:slashing:2"]);
+    expect(stagedPartsOf(same, "damage")).toEqual([{ expression: "2d6", type: "slashing" }]);
   });
 
   test("FR-DICEX-101 parts from groups", () => {
@@ -63,19 +69,16 @@ describe("FR-DICEX-101 die groups and damage types", () => {
       { expression: "2d6+5", type: "slashing" },
       { expression: "2d6+2", type: "fire" },
     ]);
-    expect(baseConstant(c, "damage")).toBe(5);
-    expect(stagedPartsOf(setBaseConstant(c, 7, "damage"), "damage")).toEqual([
-      { expression: "2d6+7", type: "slashing" },
-      { expression: "2d6+2", type: "fire" },
-    ]);
+    expect(rowsOf(c).map((r) => r.constant)).toEqual([5, 2]);
     // The fire part's constant follows its dice to a new type.
-    const cold = setGroupType(c, 1, "cold");
+    const cold = setGroupType(c, rowTerm(c, 1), "cold");
     expect(stagedPartsOf(cold, "damage")).toEqual([
       { expression: "2d6+5", type: "slashing" },
       { expression: "2d6+2", type: "cold" },
     ]);
     // ... and goes with its last die.
-    const gone = dropDie(dropDie(c, 1), 1);
+    const fire = rowTerm(c, 1);
+    const gone = dropDie(dropDie(c, fire, "damage"), fire, "damage");
     expect(stagedPartsOf(gone, "damage")).toEqual([{ expression: "2d6+5", type: "slashing" }]);
     // An untyped base: "No type" offered, the base part sends no type.
     const untyped = joinDie(compositionOf(["1d8+3"], "damage", [null]), 6, "damage");
@@ -88,12 +91,24 @@ describe("FR-DICEX-101 die groups and damage types", () => {
     expect(offersNoType(compositionOf(["1d8"], "damage", ["piercing"]))).toBe(false);
     expect(partSlotLabels(typed, "damage")).toEqual(["Damage", "Fire"]);
     expect(partSlotLabels(compositionOf(["1d20+9"], "attack"), "attack")).toEqual(["To hit"]);
-    // Typing keeps each size's type; a new size takes the last group's.
+    // Typing keeps each group's type; a new size takes the last group's.
     const plain = plainComposition("2d6+1d8+1d4+3");
     if (!plain) throw new Error("parse");
     const retyped = retype(cold, plain.terms);
-    expect(retyped.types).toEqual(["cold", "cold", "cold", null]);
+    expect(retyped.types).toEqual(["slashing", "cold", "cold", null]);
     expect(notationOfComposition(retyped)).toBe("2d6+1d8+1d4+3");
+    // Two groups of one size keep their own types; moved, a size finds its last group's.
+    const lightning = compositionOf(["1d6+3", "1d6+2"], "damage", ["piercing", "lightning"]);
+    const typedAgain = plainComposition("1d6+4+1d6+2");
+    const reordered = plainComposition("1d4+1d6");
+    if (!typedAgain || !reordered) throw new Error("parse");
+    expect(retype(lightning, typedAgain.terms).types).toEqual([
+      "piercing",
+      null,
+      "lightning",
+      null,
+    ]);
+    expect(retype(lightning, reordered.terms).types).toEqual(["lightning", "lightning"]);
   });
 
   test("FR-DICEX-101 limits", () => {
@@ -108,6 +123,85 @@ describe("FR-DICEX-101 die groups and damage types", () => {
     many = joinDie(many, 6, "damage");
     expect(compositionIssue(many, "damage")).toBe("At most 20 damage dice");
     expect(compositionIssue({ terms: [], types: [] }, "damage")).toBe(DAMAGE_DIE_TIP);
+  });
+});
+
+describe("FR-DICEX-105 a row and a modifier per die group", () => {
+  test("FR-DICEX-105 each group its own modifier", () => {
+    // 1d6+3 shortsword with 1d4+2 lightning.
+    let c = compositionOf(["1d6"], "damage", ["piercing"]);
+    c = setGroupConstant(c, 0, 3);
+    c = joinDie(c, 4, "damage");
+    c = setGroupType(c, rowTerm(c, 1), "lightning");
+    c = setGroupConstant(c, rowTerm(c, 1), 2);
+    expect(notationOfComposition(c)).toBe("1d6+3+1d4+2");
+    expect(stagedPartsOf(c, "damage")).toEqual([
+      { expression: "1d6+3", type: "piercing" },
+      { expression: "1d4+2", type: "lightning" },
+    ]);
+    // A negative one, and back to none.
+    const minus = setGroupConstant(c, rowTerm(c, 1), -1);
+    expect(notationOfComposition(minus)).toBe("1d6+3+1d4-1");
+    expect(notationOfComposition(setGroupConstant(minus, 0, 0))).toBe("1d6+1d4-1");
+    // A leading constant is the first group's; the expression Input can write it so.
+    const lead = plainComposition("5+1d6+1d4");
+    if (!lead) throw new Error("parse");
+    expect(rowsOf(lead).map((r) => r.constant)).toEqual([5, 0]);
+    expect(notationOfComposition(setGroupConstant(lead, 1, 2))).toBe("1d6+2+1d4");
+  });
+
+  test("FR-DICEX-105 same-type groups are one part, modifiers added", () => {
+    let c = compositionOf(["1d6+3"], "damage", ["fire"]);
+    c = setGroupConstant(startGroup(c, 6, "fire"), 2, 1);
+    expect(rowsOf(c)).toHaveLength(2);
+    expect(stagedPartsOf(c, "damage")).toEqual([{ expression: "2d6+4", type: "fire" }]);
+    const mixed = startGroup(compositionOf(["1d8+2"], "damage", ["fire"]), 4, "fire");
+    expect(stagedPartsOf(mixed, "damage")).toEqual([{ expression: "1d8+1d4+2", type: "fire" }]);
+    // They don't count as extra parts against the limit.
+    expect(compositionIssue(c, "damage")).toBeNull();
+  });
+
+  test("FR-DICEX-105 one size in two groups", () => {
+    // 1d6 piercing, "+ Group" → 1d6 lightning: never joins the first.
+    let c = compositionOf(["1d6"], "damage", ["piercing"]);
+    c = startGroup(c, 6, "lightning");
+    expect(groups(c)).toEqual(["6:piercing", "6:lightning"]);
+    expect(stagedPartsOf(c, "damage")).toEqual([
+      { expression: "1d6", type: "piercing" },
+      { expression: "1d6", type: "lightning" },
+    ]);
+    // A group's own "+" goes to that group; the palette to the last of the size.
+    const first = addToGroup(c, 0);
+    expect(stagedPartsOf(first, "damage")[0]?.expression).toBe("2d6");
+    expect(stagedPartsOf(joinDie(c, 6, "damage"), "damage")[1]?.expression).toBe("2d6");
+    // Same type too: two groups, unique record ids.
+    const twin = startGroup(compositionOf(["1d6"], "damage", ["fire"]), 6, "fire");
+    expect(groups(twin)).toEqual(["6:fire", "6:fire:2"]);
+    // A row keeps its place when its type changes.
+    expect(groups(setGroupType(twin, 0, "cold"))).toEqual(["6:cold", "6:fire"]);
+  });
+
+  test("FR-DICEX-105 a group's modifier goes with its last die, a plain roll's stays", () => {
+    const c = compositionOf(["1d6+3", "1d4+2"], "damage", ["piercing", "fire"]);
+    const gone = dropDie(c, rowTerm(c, 0), "damage");
+    expect(stagedPartsOf(gone, "damage")).toEqual([{ expression: "1d4+2", type: "fire" }]);
+    const plain = plainComposition("1d6+3");
+    if (!plain) throw new Error("parse");
+    expect(notationOfComposition(dropDie(plain, 0))).toBe("3");
+    expect(notationOfComposition(setBaseConstant(plain, 7))).toBe("1d6+7");
+  });
+
+  test("FR-DICEX-105 normalize keeps rows", () => {
+    const of = (x: string) => {
+      const p = plainComposition(x);
+      if (!p) throw new Error("parse");
+      return notationOfComposition(normalize(p));
+    };
+    expect(of("1d6+1d6+5")).toBe("2d6+5");
+    expect(of("1d6+3+1d6+2")).toBe("1d6+3+1d6+2");
+    expect(of("5+1d6+1d4")).toBe("1d6+5+1d4");
+    expect(of("1d6+2+3")).toBe("1d6+5");
+    expect(of("7")).toBe("7");
   });
 });
 

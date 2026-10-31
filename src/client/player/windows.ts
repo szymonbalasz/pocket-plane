@@ -10,7 +10,10 @@ import { strongholdWindow } from "@ui/features/strongholds/window";
 import { playerCompanionWindow } from "./features/character-sheet/companion-window";
 import { playerCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { playerInitiativeWindow } from "./features/combat-tracker/initiative-window";
-import { playerCompendiumWindow } from "./features/compendium/compendium-window";
+import {
+  playerCompendiumEntryWindow,
+  playerCompendiumWindow,
+} from "./features/compendium/compendium-window";
 import { playerRulesWindow } from "./features/compendium/rules-window";
 import { playerTrayWindow } from "./features/dice-extras/tray-window";
 import { playerDiceDetailsWindow } from "./features/dice-roll-log/details-window";
@@ -38,6 +41,7 @@ const windows: WindowDef[] = [
   playerRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
   recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
   playerDiceDetailsWindow, // dice.details, no launcher (dice-roll-log, FR-DICE-106)
+  playerCompendiumEntryWindow, // cmp.entry, no launcher, one per popped-out entry (compendium, FR-CMP-76)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);

@@ -329,3 +329,42 @@ describe("BL-162 the caption names the roller once", () => {
     expect(named("Goblin Boss — Bite")).toBe("Goblin Boss — Bite");
   });
 });
+
+describe("FR-DICEX-106 damage dice carry their type", () => {
+  const base = { dice: [{ faces: 6, value: 4, kept: true }], constant: 3, total: 7 };
+  const damageOf = (payload: unknown[]) =>
+    throwDice([entry(1, payload)])?.dice.map((d) => d.damage ?? null);
+
+  test("FR-DICEX-106 each part's dice carry its own type", () => {
+    expect(
+      damageOf([
+        item({ ...base, purpose: "damage", part: { type: "piercing", extra: false } }),
+        item({
+          ...base,
+          purpose: "damage",
+          dice: [{ faces: 4, value: 2, kept: true }],
+          part: { type: "lightning", extra: true },
+        }),
+      ]),
+    ).toEqual(["piercing", "lightning"]);
+  });
+
+  test("FR-DICEX-106 untyped, plain and MOD dice carry none", () => {
+    expect(damageOf([item({ ...base, part: { type: null, extra: false } })])).toEqual([null]);
+    expect(damageOf([item()])).toEqual([null]);
+    const withMod = item({
+      ...base,
+      part: { type: "fire", extra: false },
+      mods: [{ label: "Bless", value: 2, expression: "1d4", dice: [2] }],
+    });
+    expect(damageOf([withMod])).toEqual(["fire", null]);
+  });
+
+  test("FR-DICEX-106 a d100 keeps it on both its parts", () => {
+    const d100 = item({
+      dice: [{ faces: 100, value: 42, kept: true }],
+      part: { type: "cold", extra: false },
+    });
+    expect(damageOf([d100])).toEqual(["cold", "cold"]);
+  });
+});

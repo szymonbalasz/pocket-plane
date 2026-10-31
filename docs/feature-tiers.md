@@ -84,7 +84,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Wikilinks between notes + backlinks | A, **next big feature** (#413) | [world-builder](specs/post-mvp/world-builder.md) | Informs [ADR-0011](architecture/adr/0011-cross-references.md) |
 | Party inventory with transfer to characters | A | [party-board](specs/post-mvp/party-board.md) | Grows from [party-loot](specs/party-loot.md) |
 | Gold ledger with split-among-party | A (wallets + moves: S, #150) | [party-board](specs/post-mvp/party-board.md) | Grows from [party-loot](specs/party-loot.md) |
-| NPC directory players build as they meet people | A | [world-builder](specs/post-mvp/world-builder.md) | Player-authored notes on revealed NPCs |
+| NPC directory players build as they meet people | A | [world-builder](specs/post-mvp/world-builder.md) | Player-authored notes on revealed NPCs. After the session timeline ([priority list](roadmap.md#priority-build-list-2026-10-31), #416) |
 | Search / command palette (Obsidian / VS Code style) | A–B | [play-shell](specs/play-shell.md) | Search + commands in one palette |
 | Journal entries with DM-only / player-visible sections | B | [world-builder](specs/post-mvp/world-builder.md) | |
 | Map pins linked to notes/locations | B | [scene-tools](specs/scene-tools.md) | |
@@ -93,7 +93,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Quest log with status | A, right after linked notes (#413) | [world-builder](specs/post-mvp/world-builder.md) | |
 | In-game calendar / time tracking | A, right after linked notes (#413) | [campaign-manager](specs/post-mvp/campaign-manager.md) | |
 | Session timeline | A, right after linked notes (#413) | [campaign-manager](specs/post-mvp/campaign-manager.md) | [ADR-0013](architecture/adr/0013-session-journal-scope.md) has no session entity: settle how they fit in the spec phase |
-| Text chat | C–D | [dice-roll-log](specs/dice-roll-log.md) | Only as part of the game log (Roll20-style): text and pasted descriptions alongside rolls. No separate chat. |
+| Text chat | C–D | [dice-roll-log](specs/dice-roll-log.md) | Only as part of the game log (Roll20-style): text and pasted descriptions alongside rolls. No separate chat. Sending an entry or sheet row's text is built: [log-share](specs/log-share.md) (#415). |
 | Random tables | D | — | |
 
 ## 5. DM tools

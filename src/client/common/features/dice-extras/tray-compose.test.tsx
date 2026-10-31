@@ -131,12 +131,15 @@ describe("FR-DICEX-97 editable adjust", () => {
       mode: "advantage",
       parts: [{ expression: "5d6", type: "radiant" }],
     });
-    // The tray shows it editable: the palette, die buttons, a type per group, the constant.
+    // The tray shows it editable: the palette, die buttons, a type and a modifier per group, the
+    // "+ Group" button (FR-DICEX-105).
     diceExtras.stage(request);
     const html = render(<TrayWindow />);
     expect(html).toContain('data-testid="dicex-tray-state" data-value="adjust"');
     expect(html).toContain('data-testid="dicex-tray-palette"');
-    expect(html).toContain('data-testid="dicex-tray-constant"');
+    expect(html).toContain('data-testid="dicex-tray-add-group"');
+    expect(html).toMatch(/data-testid="dicex-tray-group-constant"[^>]*data-record-id="6:radiant"/);
+    expect(html).not.toContain('data-testid="dicex-tray-constant"');
     expect(html).not.toContain('data-testid="dicex-tray-expression"');
     expect(html).toMatch(/data-testid="dicex-tray-group-type"[^>]*data-record-id="6:radiant"/);
     expect(html.match(/<button[^>]*data-testid="dicex-tray-die"/g)).toHaveLength(5);

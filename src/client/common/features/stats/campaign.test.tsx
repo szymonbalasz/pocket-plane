@@ -15,14 +15,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { CampaignView } from "./Campaign";
-import {
-  awardsWonText,
-  campaignHeaderText,
-  closedNow,
-  DEFAULT_TAB,
-  refreshes,
-  STATS_TABS,
-} from "./logic";
+import { awardsWonText, campaignHeaderText, DEFAULT_TAB, refreshes, STATS_TABS } from "./logic";
 import type { QueryStatus } from "./refresh";
 import { DEFAULT_VIEW } from "./view";
 
@@ -303,16 +296,6 @@ describe("FR-STATS-85 tab order and default", () => {
     expect(STATS_TABS[0]).toBe("campaign");
     expect(DEFAULT_TAB).toBe("campaign");
     expect(DEFAULT_VIEW.tab).toBe("campaign");
-  });
-
-  test("FR-STATS-85 a close (not a minimise or put-away) sends the tab back to Campaign", () => {
-    expect(closedNow("open", "closed")).toBe(true);
-    expect(closedNow("minimised", "closed")).toBe(true);
-    expect(closedNow("open", undefined)).toBe(true);
-    expect(closedNow("open", "minimised")).toBe(false);
-    expect(closedNow("minimised", "open")).toBe(false);
-    expect(closedNow("closed", "open")).toBe(false);
-    expect(closedNow(undefined, "open")).toBe(false);
   });
 
   test("FR-STATS-87 live refresh: any game-log upsert re-queries the Campaign tab; other frames don't", () => {

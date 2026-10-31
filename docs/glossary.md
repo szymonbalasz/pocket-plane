@@ -184,6 +184,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Rule hook** | A combat rule (expiry, concentration, death failures) run inside the causing command's transaction through `hpRules` / the `combatRuleHooks` registry ([ADR-0035](architecture/adr/0035-combat-rule-hooks.md)). Not a rule trigger. | Listener; Rule trigger |
 | **Roll** | A dice expression evaluated server-side, with result. | — |
 | **Game log** | Player-facing, BG2-style log window of rolls and combat outcomes (later also text). Each entry public or DM-only. Formerly "roll log". | Event log (internal) |
+| **Share** (game log) | Posting an entry's or a sheet row's full text to the game log for everyone, with Send to game log ([log-share](specs/log-share.md)). Distinct from sharing a handout or homebrew entry, which makes it readable. | Chat |
 | **Roll category** | Kind of roll: attack, damage, saving throw, ability check, skill check, contested, initiative, healing, other. | — |
 | **Public log settings** | DM's per-category tickboxes deciding which DM rolls appear in players' game log. Changeable live. | Visibility filter (the mechanism that applies them) |
 | **Whisper** | A roll visible only to the roller and DM (or DM-to-player). | — |
@@ -213,7 +214,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Physical-dice mode** | Per-browser toggle: every roll through the roll control asks for manual entry. | Manual roll |
 | **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
 | **Dice tray** | Window to compose, adjust or edit a roll before rolling it (sheet Attack / Damage open it pre-filled, [ADR-0073](architecture/adr/0073-tray-attacks.md)); staged rolls and clicked notation land here ([dice-extras](specs/dice-extras.md)). | Roll control |
-| **Die group** | Dice of one size and one damage type in the Dice tray (e.g. 8d6 fire); an added die joins the last group of its size ([ADR-0073](architecture/adr/0073-tray-attacks.md)). | Dice tray, Roll purpose |
+| **Die group** | One row of a damage roll in the Dice tray: dice of one size, a damage type and its own modifier (e.g. 1d6+3 piercing); two groups may share a size or a type, and an added die joins the last group of its size unless **+ Group** opens a new one ([ADR-0073](architecture/adr/0073-tray-attacks.md), [#419](decisions-log.md)). | Dice tray, Roll purpose |
 | **Throw** | The animation of one received `roll` entry (or all entries of one frame), on the dice layer, in the zone or in a popup, settling on the server's faces; cosmetic only ([ADR-0044](architecture/adr/0044-3d-dice.md), [ADR-0048](architecture/adr/0048-dice-display.md)). | Roll |
 | **Dice layer** | The full-screen, topmost canvas the dice fly on; takes no input ([ADR-0048](architecture/adr/0048-dice-display.md)). | Canvas layer |
 | **Roll popup** | The card in the toast region that shows a received roll with its dice ([ADR-0048](architecture/adr/0048-dice-display.md)). | Toast |

@@ -15,6 +15,6 @@ phase: post-mvp
 - **Open:**
   - Bundling `sharp` native binaries.
   - Bundling/launching cloudflared.
-  - Migration on upgrade (`drizzle-kit generate` output at release).
+  - Migration on upgrade (`drizzle-kit generate` output at release; "release" = someone else runs the app, [#416](../../decisions-log.md)). `drizzle-kit` is a dev dependency that `src/server/db/push.ts` runs in production today, so a packaged build needs these migrations first.
 
 > TODO (spec phase): expand from [_template.md](../_template.md) after MVP.

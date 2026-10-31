@@ -39,6 +39,8 @@ export function createViewState() {
       const { views } = state.getState();
       state.setState({ views: { ...views, [key]: { ...(views[key] ?? DEFAULT_VIEW), ...patch } } });
     },
+    /** FR-SHELL-200, FR-STATS-85: the window closed; the next open starts on the default view. */
+    reset: () => state.setState({ views: {} }),
   };
 }
 

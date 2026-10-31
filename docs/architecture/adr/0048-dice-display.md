@@ -25,7 +25,7 @@
 
 | Rule | Detail | Source |
 |---|---|---|
-| Where | `screen` (default): one fixed full-viewport canvas portalled to `body`, topmost, `pointer-events: none`; arena = the viewport, walls on its edges. `zone` (option, "Tray throw"): ADR-0044's zone, now an arena of the same canvas. `flat` / `off`: chips only | #243 [10, 12]; seams S7 |
+| Where | `screen` (default): one fixed full-viewport canvas portalled to `body`, topmost, `pointer-events: none`; arena = the viewport, walls on its edges (*amended #417: walls on a centred box at least 20 % in from every edge; the canvas stays full-viewport*). `zone` (option, "Tray throw"): ADR-0044's zone, now an arena of the same canvas. `flat` / `off`: chips only | #243 [10, 12]; seams S7 |
 | Which rolls | Every public roll; one frame = one throw; ≤ 20 3D dice, the rest as chips | #245 G21 |
 | Popup: who | Every live `roll` entry a client receives, the roller included | #245 G24 |
 | Popup: where | That client's toast region (players bottom-right, DM top-centre, clear of Initiative), a third stack, ≤ 3, 6 s after rest, hover pauses | #245 G24; stack order seams S7, keep-out box ruling A11 |

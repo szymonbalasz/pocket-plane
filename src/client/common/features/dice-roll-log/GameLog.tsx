@@ -32,6 +32,7 @@ import {
   rowAction,
   rowBadges,
   rowResults,
+  shareOf,
 } from "@shared/dice-roll-log/row";
 import {
   CATEGORY_LABEL,
@@ -44,6 +45,8 @@ import {
   type RollMode,
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
+import { FOLDED_TEXT } from "@shared/log-share/kind";
+import { LOG_KIND_SHARE, type SharePayload } from "@shared/log-share/schemas";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
 import {
   ChevronDownIcon,
@@ -95,6 +98,7 @@ import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
 import { colorHex } from "../campaign-management/colors";
 import { useDefinitions } from "../compendium/definitions";
+import { MarkdownLite } from "../compendium/MarkdownLite";
 import { DieShape } from "../dice-extras/DieShape";
 import { useLanded, useLandingFade } from "../dice-extras/landing";
 import { stageTray, type TrayRequest } from "../dice-extras/store";
@@ -123,6 +127,7 @@ import {
   rowTime,
   type ShownSegment,
   sortEntries,
+  tallRowTop,
 } from "./logic";
 import { rollerAttr, rollerColorKey, useColorKeyOf } from "./name-color";
 import { usePhysicalDice, useRollBarActor, useRollOptionsOpen } from "./physical";
@@ -340,6 +345,40 @@ function MoreResults({ rest, landed }: { rest: readonly RowResult[]; landed: boo
   );
 }
 
+/**
+ * FR-SHARE-05: a share's full text under its row's head: its summary, the text as the compendium
+ * renders it (a notation in it rolls, FR-CMP-26), or the fold note (FR-SHARE-08).
+ */
+function ShareBody({ share }: { share: SharePayload }) {
+  return (
+    <div
+      data-testid="share-entry-body"
+      data-share-body
+      className="col-span-full min-w-0 space-y-1 pb-1.5 pl-1 break-words"
+    >
+      {share.line && (
+        <p data-testid="share-entry-line" className="text-xs text-muted-foreground">
+          {share.line}
+        </p>
+      )}
+      {share.folded ? (
+        <p data-testid="share-entry-folded" className="text-xs text-muted-foreground italic">
+          {FOLDED_TEXT}
+        </p>
+      ) : (
+        share.text && (
+          <MarkdownLite text={share.text} context={{ kind: "plain", label: share.title }} />
+        )
+      )}
+      {share.cut && !share.folded && (
+        <p data-testid="share-entry-cut" className="text-xs text-muted-foreground italic">
+          Cut to fit the log.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** What a double-click on a row leaves to itself (the row's controls, an open confirm). */
 const ROW_CONTROL = "button, a, input, [role='button'], [data-testid='dice-log-action-confirm']";
 const onRowControl = (ev: ReactMouseEvent) =>
@@ -405,6 +444,8 @@ function Entry({
   const { segments } = useMemo(() => formatEntry(e), [e]);
   const row = useMemo(() => rowAction(e), [e]);
   const results = useMemo(() => rowResults(e), [e]);
+  // FR-SHARE-05: taller than the 40-px row; no Tooltip or details: the row shows it all.
+  const share = useMemo(() => shareOf(e), [e]);
   // FR-DICE-40: only entries this client's live-throw path holds (FR-DICEX-49) wait.
   const landed = useLanded(e.id);
   const shown = useMemo(() => (landed ? segments : heldSegments(segments)), [segments, landed]);
@@ -422,6 +463,31 @@ function Entry({
   // menu closed, so its confirm opens on the row and the menu's focus return can't touch it.
   const pendingAction = useRef<string | null>(null);
   const [actionRequest, setActionRequest] = useState<string | null>(null);
+  // FR-KIT-42: "Name · action" on one line; screen readers read the full line (`data-line`). A
+  // share's head wraps, and is read here: its `data-line` is for copying.
+  const what = (
+    <span
+      data-testid="dice-log-entry-text"
+      data-slot="log-what"
+      aria-hidden={share ? undefined : true}
+      // The kit's 15 px (`.what`) in the 40-px row (K12).
+      className={cn("min-w-0 flex-1 text-[15px]", share ? "break-words" : "truncate", struck)}
+    >
+      {row.actor !== null && (
+        <>
+          <strong
+            data-testid="dice-log-entry-actor"
+            className="font-semibold"
+            style={nameColor ? { color: nameColor } : undefined}
+          >
+            {row.actor}
+          </strong>
+          <span className="text-muted-foreground"> · </span>
+        </>
+      )}
+      <span className="text-muted-foreground">{row.text}</span>
+    </span>
+  );
   const rowEl = (
     // biome-ignore lint/a11y/useKeyWithClickEvents: only drops a mouse click's focus; nothing for a keyboard to do
     <li
@@ -438,17 +504,18 @@ function Entry({
       data-landed={landed}
       aria-busy={landed ? undefined : true}
       // FR-DICE-106: a double-click opens the details and selects no text.
+      // FR-SHARE-07: not on a share: a double-click selects a word of its text.
       onMouseDown={(ev) => {
-        if (ev.detail > 1 && !onRowControl(ev)) ev.preventDefault();
+        if (!share && ev.detail > 1 && !onRowControl(ev)) ev.preventDefault();
       }}
       onDoubleClick={(ev) => {
-        if (!onRowControl(ev)) openRollDetails(e.id);
+        if (!share && !onRowControl(ev)) openRollDetails(e.id);
       }}
       // FR-DICE-106: a mouse click leaves no focus on the row's text (its ring would stay, or come
       // back with the browser window); a keyboard's focus never gets here (`detail` 0).
       onClick={(ev) => {
         const focused = document.activeElement;
-        if (ev.detail > 0 && !onRowControl(ev) && focused instanceof HTMLElement) {
+        if (!share && ev.detail > 0 && !onRowControl(ev) && focused instanceof HTMLElement) {
           if (ev.currentTarget.contains(focused)) focused.blur();
         }
       }}
@@ -456,14 +523,16 @@ function Entry({
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
       // FR-DICE-37: a focused entry gets the accent ring for 2 s.
       className={cn(
-        "group/entry relative grid h-10 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-sm border-b border-border/60 px-1 text-sm transition-shadow",
+        "group/entry relative grid shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 rounded-sm border-b border-border/60 px-1 text-sm transition-shadow",
+        share ? "min-h-10 pt-1.5" : "h-10",
         hidden && "text-visibility-hidden",
         focused && "ring-2 ring-ring",
       )}
     >
       {/* FR-KIT-46: the full line (held: as shown), read aloud first and copied per row; out of
           the grid (absolute), first so the row's text reads it whole. */}
-      <span data-line className="sr-only">
+      {/* FR-SHARE-05: a share's text is real text below, so this copy of it is for copying only. */}
+      <span data-line aria-hidden={share ? true : undefined} className="sr-only">
         {copyText(shown)}
       </span>
       {/* FR-KIT-41: the actor's portrait, else its initial on its name colour (FR-DICE-60),
@@ -481,30 +550,7 @@ function Entry({
             className="size-3.5 shrink-0 text-visibility-hidden"
           />
         )}
-        <Tooltip content={details}>
-          {/* FR-KIT-42: "Name · action" on one line; screen readers read the full line below. */}
-          <span
-            data-testid="dice-log-entry-text"
-            data-slot="log-what"
-            aria-hidden
-            // The kit's 15 px (`.what`) in the 40-px row (K12).
-            className={cn("min-w-0 flex-1 truncate text-[15px]", struck)}
-          >
-            {row.actor !== null && (
-              <>
-                <strong
-                  data-testid="dice-log-entry-actor"
-                  className="font-semibold"
-                  style={nameColor ? { color: nameColor } : undefined}
-                >
-                  {row.actor}
-                </strong>
-                <span className="text-muted-foreground"> · </span>
-              </>
-            )}
-            <span className="text-muted-foreground">{row.text}</span>
-          </span>
-        </Tooltip>
+        {share ? what : <Tooltip content={details}>{what}</Tooltip>}
       </div>
       {/* K12 (round-2 gap 1): time, boxes and chips sit in one fixed right column on every row.
           The actions lead the group (they show on some rows only); the box and chip slots keep
@@ -602,6 +648,7 @@ function Entry({
           )}
         </FixedSlot>
       </div>
+      {share && <ShareBody share={share} />}
     </li>
   );
   return (
@@ -680,11 +727,14 @@ function RevealGuardDialog({ entryId, onClose }: { entryId: string | null; onClo
  */
 function EntryList({
   entries,
+  arrived,
   isDm,
   actions,
   openCreature,
 }: {
   entries: GameLogEntryView[];
+  /** The log was seen empty while live: these entries came in just now. */
+  arrived: boolean;
   isDm: boolean;
   actions: readonly EntryAction[];
   openCreature: ((creature: ActorCreature) => void) | undefined;
@@ -706,6 +756,9 @@ function EntryList({
   const [unseen, setUnseen] = useState(0);
   const [guarded, setGuarded] = useState<string | null>(null);
   const lastN = entries.at(-1)?.n ?? 0;
+  // FR-SHARE-12: starts at the log's newest line: a reload or a reopened window stays pinned. A
+  // list that appears for the log's first entry, live (`arrived`), lands on it like any other.
+  const landedN = useRef(arrived ? 0 : lastN);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -714,6 +767,18 @@ function EntryList({
       el.scrollTop = el.scrollHeight;
       seen.current = lastN;
       setUnseen(0);
+      // FR-SHARE-12: a new share taller than the list lands at its head and unpins, so what follows
+      // shows as "N new" while the reader reads.
+      const last = listRef.current?.lastElementChild;
+      const isShare = entries.at(-1)?.kind === LOG_KIND_SHARE;
+      if (isShare && lastN !== landedN.current && last instanceof HTMLElement) {
+        const top = tallRowTop(last.offsetTop, last.offsetHeight, el.clientHeight);
+        if (top !== null) {
+          el.scrollTop = top;
+          stick.scrolled(el);
+        }
+      }
+      landedN.current = lastN;
     } else {
       setUnseen(entries.filter((x) => x.n > seen.current).length);
     }
@@ -743,6 +808,11 @@ function EntryList({
   const copyLines = (ev: ClipboardEvent<HTMLDivElement>) => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
+    // FR-SHARE-07: a selection inside one share's text copies just those words.
+    const body = (n: Node | null) =>
+      (n instanceof Element ? n : n?.parentElement)?.closest("[data-share-body]") ?? null;
+    const inBody = body(sel.anchorNode);
+    if (inBody && inBody === body(sel.focusNode)) return;
     const rows = ev.currentTarget.querySelectorAll<HTMLElement>('[data-testid="dice-log-entry"]');
     const ranges = Array.from({ length: sel.rangeCount }, (_, i) => sel.getRangeAt(i));
     // A row the selection overlaps (its end after the row's start, its start before the row's
@@ -1237,6 +1307,8 @@ export function GameLog({
   const everLive = useSync((s) => s.everLive);
   const isDm = useSync((s) => s.store.you?.role === "dm");
   const entries = useMemo(() => sortEntries(records), [records]);
+  const emptyWhileLive = useRef(false);
+  if (everLive && entries.length === 0) emptyWhileLive.current = true;
   return (
     <section
       data-testid="dice-log"
@@ -1261,7 +1333,13 @@ export function GameLog({
           No rolls yet
         </p>
       ) : (
-        <EntryList entries={entries} isDm={isDm} actions={actions} openCreature={openCreature} />
+        <EntryList
+          entries={entries}
+          arrived={emptyWhileLive.current}
+          isDm={isDm}
+          actions={actions}
+          openCreature={openCreature}
+        />
       )}
       <RollBar dmTools={isDm ? dmTools : undefined} />
     </section>

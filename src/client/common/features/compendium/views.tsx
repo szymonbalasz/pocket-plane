@@ -27,6 +27,7 @@ import { type ReactNode, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/primitives";
 import { Tip } from "../../components/ui/tip";
+import { ShareButton } from "../log-share/ShareButton";
 import { AddToSheet } from "./AddToSheet";
 import { AboutDialog } from "./credits";
 import { EntryGallery } from "./gallery";
@@ -485,6 +486,9 @@ export function EntryView({
   const drag = viewer === "dm" && e.kind === "monster" && data.definition;
   const sheetable = isSheetable(e.kind);
   const rule = e.kind === "rule";
+  // FR-SHARE-01: everything but a monster's stat block. FR-SHARE-11: homebrew players can't open.
+  const shareable = e.kind !== "monster";
+  const unshared = viewer === "dm" && e.campaignId !== null && !e.shared;
   return (
     <article
       data-testid="cmp-entry"
@@ -492,12 +496,19 @@ export function EntryView({
       data-value={e.kind}
       className="space-y-2"
     >
-      {(drag || sheetable || rule || actions) && (
+      {(drag || sheetable || rule || shareable || actions) && (
         <div
           className="flex flex-wrap items-center justify-end gap-1"
           data-testid="cmp-entry-actions"
         >
           {actions}
+          {shareable && (
+            <ShareButton
+              source={{ from: "compendium", entryId: e.id }}
+              labelled
+              confirm={unshared}
+            />
+          )}
           {rule && <OpenInRules entryId={e.id} />}
           {sheetable && <AddToSheet entryId={e.id} />}
           {drag && data.definition && (

@@ -42,6 +42,7 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["vfx-over", 43],
       ["labels", 45],
       ["scn-edit", 48],
+      ["teleport-pick", 49],
       ["pointers", 50],
     ]);
     expect(LAYER_ORDER.fog).toBeGreaterThan(LAYER_ORDER.scnStructure);
@@ -61,6 +62,7 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["vfx-over"],
       ["labels"],
       ["scn-edit"],
+      ["teleport-pick"],
       ["pointers"],
     ]);
     expect(dm[2]?.group).toBe("scn-objects");
@@ -78,7 +80,7 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],
       ["map-layer-fog", ["fog"]],
       ["map-layer-objects", ["scn-templates", "vfx-under", "tokens", "vfx-over", "labels"]],
-      ["map-layer-top", ["scn-edit", "pointers"]],
+      ["map-layer-top", ["scn-edit", "teleport-pick", "pointers"]],
     ]);
     expect(named("player")).toEqual([
       ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],

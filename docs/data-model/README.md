@@ -1545,7 +1545,7 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-15, -17, -32�
 
 - **Browser storage:** `pp.dicex.v2.<campaignId>.<dm | playerId>` = `{display, others, popup}` (Not in the DB table above; v1 migrated once on read).
 - **Client memory only:** the running / leaving throw `{t, seq, plan {arena: screen | zone, draw: 3d | flat, caption, handoff}, phase: moving | rest | handoff | fading, looks}`; timeline constants in `dice-extras/timing.ts` (settle ≤ 2.5 s, rest 1 s / 1.5 s with popups off, hand-off 0.4 s, fade 0.3 s). Gone on reload.
-- **Derived (never stored):** the big throw = the frame's `public` entries (and only own ones with "Show others' rolls" off); `seedId` = first public entry id (else the first); arena from the rect rounded to 50 px (`dice-extras/arena.ts`: die size 7 % of the viewport's short side, 40–96 px); effective display (reduced motion / no WebGL → `flat`).
+- **Derived (never stored):** the big throw = the frame's `public` entries (and only own ones with "Show others' rolls" off); `seedId` = first public entry id (else the first); arena from the rect rounded to 50 px, `screen` from the box 20 % in from every viewport edge (#417) (`dice-extras/arena.ts`: die size 7 % of the viewport's short side, 40–96 px); effective display (reduced motion / no WebGL → `flat`).
 - **CON-44:** 0 B; no new record shape, no wire field (throws read the `roll` entries already sent).
 
 ## 51. Sprint 4: rules core (S4-0)
@@ -2737,6 +2737,7 @@ From [spell-fx §8](../specs/spell-fx.md#8-data-model) and [ADR-0071](../archite
 | `effect` | `fx` *(new column, push-safe `ADD COLUMN`)* | **JSON leaf** `{preset, params, spellId?}` \| null, ≤ 200 B (zod `FxRecord`) | null | Rides the effect's rule (FR-CBTX-31): DM full; players on every effect they receive (the redaction gains `fx`) | FR-VFX-03, -07, -09 |
 | `creature-sheet` | `spells[].fx` *(inside the existing JSON leaf)* | `{preset, params}` optional, ≤ 200 B (zod `SpellRowFxRecord`; `char.putRow` takes `SpellRowFx`: catalogue presets, params defaults filled) | absent | As the sheet (DM + owner) | FR-VFX-05 |
 | Hit cue | — | transient server signal `vfx.hit` (`HitCue`) | — | Per connection, protocol §179 | FR-VFX-21 |
+| Teleport smoke cue | — | transient server signal `vfx.poof` (`PoofCue`) | — | Per connection, protocol §192 | FR-MAP-122 |
 
 - **Relations:** `fx.spellId` → a spell row id in the target creature's sheet (soft: a deleted row leaves the effect running).
 - **Derived (pure, `@shared/spell-fx`):** `suggestPreset(name)` (FR-VFX-04), `hitLooks(cue)` (FR-VFX-19, -20), `emanationCells(footprint, radiusFt, map)` (FR-VFX-24: FR-MAP-22 distance from the nearest footprint cell ≤ radius; footprint and off-map cells excluded).
@@ -2876,3 +2877,12 @@ Indexes: `overview_item_overview`, `overview_item_campaign`, `overview_item_asse
 - **Visibility-relevant:** `overview.active` (scene gate through the resolver), `overview_item.hidden`. `locked` and the timestamps never reach a player.
 - **Derived (never stored):** a label's box and the party's missing list (clients and the miniatures slice).
 - **Not stored:** selection, last label style, Add hidden, camera, drag previews.
+
+## 151. Send to game log (build/log-share)
+
+From [log-share](../specs/log-share.md#8-data-model) (#415). **No new table, column or record type.** Protocol side: [protocol §191](../protocol/README.md#191-send-to-game-log-buildlog-share).
+
+- **`game_log_entry.payload`, kind `share.entry`:** `{title 1–80, line 0–120, text 0–16,000 (markdown-lite), cut?: true, folded?: true}`; `rollIds` empty, `category` `other`, `public` true at creation. The text is a copy: the entry or row isn't referenced.
+- **Fold (FR-SHARE-08):** the window's shares keep ≤ 64,000 chars of text, newest first; an older one gets `text: ""`, `folded: true` in the same transaction.
+- **Fixtures:** `share-mira-rows` (Mira: Fireball, Hedge Whisper, Moonblade Shard); bundle `log-share`.
+- **Snapshot size** (CON-44, `FR-SHARE-08 CON-44`): 100 shares of the longest text: at most +109,235 B per viewer on `log-share`, about 45 KB of it the rows themselves. 0 B while no share exists.
