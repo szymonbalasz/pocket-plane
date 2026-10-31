@@ -6,7 +6,8 @@
 // (FR-CBT-75). Placed once per
 // open; then the DM may drag it (FR-CBT-76), always clamped into the work area. `popupPlacement`,
 // `placementTiers`, `clampIntoWorkArea` and `dragPopup` are pure; `measurePlacement` reads the
-// live screen.
+// live screen. FR-NOTE-81 (BL-175): off the PC tokens too, after the rows and the likely targets
+// and with room for a target row added after it opens.
 import { sideOf } from "@shared/combat-tracker/rules";
 import type { CombatantKind, Side } from "@shared/combat-tracker/schemas";
 import { INITIATIVE_KIND } from "@ui/features/combat-tracker/window";
@@ -20,7 +21,7 @@ import {
   workArea,
 } from "@ui/features/play-shell/geometry";
 import { windowId } from "@ui/features/play-shell/manager";
-import { RAIL_CLEAR } from "@ui/features/play-shell/placement";
+import { PC_MARGIN, RAIL_CLEAR } from "@ui/features/play-shell/placement";
 import { coveredArea, type TokenBox, tokenScreenBoxes } from "@ui/features/play-shell/token-boxes";
 import type { TargetCandidate } from "./targets";
 
@@ -92,12 +93,33 @@ export function placementTiers<
 /** Popup width, px (the panel is `min(440px, 100vw - 2rem)`). */
 export const POPUP_W = 440;
 
+/**
+ * FR-NOTE-81 (BL-175, sim-17 v12): the height a popup may still grow by after it opens: the DM picks
+ * its target on the map and the panel, placed once, gains a row (name line + one damage line). The
+ * popup opened at 68, 60 clear of Mira and grew onto her. Counted for the PCs only.
+ */
+export const TARGET_ROW_GROW = 84;
+
+/**
+ * FR-NOTE-84 (sim-17 walkthrough, DM 1280×720): the gap the popup keeps to Initiative when its 12 px
+ * is what leaves it on a PC: the frame's retry gap (ADR-0060, FR-SHELL-98). Never on Initiative.
+ */
+export const INITIATIVE_MIN_GAP = 4;
+
 export interface PlacementInput {
   viewport: { w: number; h: number };
   /** On-screen boxes of the tokens the popup must not cover (FR-CBT-55/56). */
   tokens: readonly TokenBox[];
-  /** Lower tiers (`placementTiers`): compared only when the tiers before tie. */
+  /**
+   * Lower tiers (`placementTiers`): compared only when the tiers before tie. The first is the
+   * likely targets the popup must clear as well; the rest only break ties.
+   */
   others?: readonly (readonly TokenBox[])[];
+  /**
+   * FR-NOTE-81: the PC tokens' boxes (footprint + 4 px): after the first two tiers, before the
+   * others, and a spot counts as free only off them, with `TARGET_ROW_GROW` under the panel.
+   */
+  pcs?: readonly TokenBox[];
   /** Screen rect of the DM's open Initiative window, if any. */
   initiative: { x: number; w: number } | null;
   width: number;
@@ -150,10 +172,16 @@ export function popupPlacement(i: PlacementInput): Placement {
   const right = Math.max(left, edge - i.width);
   const clamp = (x: number) => Math.min(right, Math.max(left, x));
   const tiers = [i.tokens, ...(i.others ?? [])];
-  const all = tiers.flat();
+  const pcs = i.pcs ?? [];
+  const all = [...tiers.flat(), ...pcs];
   const h = i.height === undefined ? bottom - top : Math.min(i.height, bottom - top);
   const clampY = (y: number) => Math.min(bottom - h, Math.max(top, y));
-  const score = (x: number, y: number) => tiers.map((t) => coveredArea({ x, y, w: i.width, h }, t));
+  // FR-NOTE-81: [rows or likely targets, likely targets, PCs (with the row to come), the rest].
+  const score = (x: number, y: number) => {
+    const covers = tiers.map((t) => coveredArea({ x, y, w: i.width, h }, t));
+    const onPc = coveredArea({ x, y, w: i.width, h: h + TARGET_ROW_GROW }, pcs);
+    return [covers[0] ?? 0, covers[1] ?? 0, onPc, ...covers.slice(2)];
+  };
   const n = i.tokens.length;
   const mean = n > 0 ? i.tokens.reduce((s, t) => s + t.x + t.w / 2, 0) / n : null;
   // Tokens right of centre → the popup goes left, and vice versa; no token → left.
@@ -174,8 +202,8 @@ export function popupPlacement(i: PlacementInput): Placement {
     bottom,
   });
   const free = (x: number, y: number) => {
-    const [t0 = 0, t1 = 0] = score(x, y);
-    return t0 === 0 && t1 === 0;
+    const [t0 = 0, t1 = 0, onPc = 0] = score(x, y);
+    return t0 === 0 && t1 === 0 && onPc === 0;
   };
   if (i.prefer && free(i.prefer.x, i.prefer.y)) return result(i.prefer.x, i.prefer.y, true);
   const xs = [
@@ -194,6 +222,7 @@ export function popupPlacement(i: PlacementInput): Placement {
           bottom - h,
           ...(i.prefer ? [clampY(i.prefer.y)] : []),
           ...all.flatMap((t) => [clampY(t.y + t.h + EDGE_GAP), clampY(t.y - EDGE_GAP - h)]),
+          ...pcs.map((t) => clampY(t.y - EDGE_GAP - h - TARGET_ROW_GROW)),
         ];
   // FR-CBT-75 (sim-6 N8): its notification's spot covers a likely target → the free spot (clear
   // of the first two tiers, as the origin must be) nearest the origin; lower tiers break ties.
@@ -224,17 +253,37 @@ export function popupPlacement(i: PlacementInput): Placement {
       }
     }
   }
+  // FR-NOTE-84: still on a PC, and Initiative's 12-px gap is what stops it: the gap gives way down
+  // to `INITIATIVE_MIN_GAP`, only if that clears the PCs' footprints and no target pays for it.
+  const [bestT0 = 0, bestT1 = 0, bestPc = 0] = bestScore;
+  if (bestPc > 0 && i.initiative) {
+    const tight = Math.max(left, i.initiative.x - INITIATIVE_MIN_GAP - i.width);
+    const bare = pcs.map((p) => ({
+      x: p.x + PC_MARGIN,
+      y: p.y + PC_MARGIN,
+      w: p.w - 2 * PC_MARGIN,
+      h: p.h - 2 * PC_MARGIN,
+    }));
+    const clears = (y: number) => {
+      const [t0 = 0, t1 = 0] = score(tight, y);
+      if (t0 > bestT0 || t1 > bestT1) return false;
+      return coveredArea({ x: tight, y, w: i.width, h: h + TARGET_ROW_GROW }, bare) === 0;
+    };
+    const y = tight > right ? ys.find(clears) : undefined;
+    if (y !== undefined) return result(tight, y);
+  }
   return result(best.x, best.y);
 }
 
 /**
  * The live placement: token boxes per tier from the map canvas, the open Initiative window, the
- * panel's measured size and (FR-CBT-75) its notification's top-left.
+ * panel's measured size, (FR-CBT-75) its notification's top-left and (FR-NOTE-81) the PC boxes.
  */
 export function measurePlacement(
   tiers: readonly (readonly string[])[],
   size?: { w: number; h: number },
   origin?: { x: number; y: number } | null,
+  pcs: readonly TokenBox[] = [],
 ): Placement {
   const viewport = { w: window.innerWidth, h: window.innerHeight };
   const win = document.querySelector<HTMLElement>(
@@ -246,6 +295,7 @@ export function measurePlacement(
     viewport,
     tokens: first,
     others: rest,
+    pcs,
     initiative: r && r.width > 0 ? { x: r.left, w: r.width } : null,
     width: size?.w ?? Math.min(POPUP_W, viewport.w - 32),
     height: size?.h,

@@ -6,6 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Rect } from "../play-shell/geometry";
 import {
+  columnPlanH,
   dmColumnTop,
   dmPopupAt,
   dmPopupClear,
@@ -36,6 +37,150 @@ const LOG = { x: 68, y: 608, w: 1150, h: 280 };
 const HOME = { left: 496, top: 100 };
 /** The Game log's first entry row ends 62 px under its top. */
 const LOG_ROW = { x: 68, y: 608, bottom: 670 };
+
+describe("FR-NOTE-82 the DM's roll popups keep off the PCs where a clear spot exists", () => {
+  // Sim-17 b02 (1440×900): Party Manager 580, 148, Dice tray 618, 560, Game log 70, 690, Initiative
+  // 1030, 62; the toasts left of Party Manager. Tokens from the DM's captured records at b02's
+  // camera (40-px cells; FE2 at 280, 438), PCs footprint + 4 px.
+  const init = { x: 1030, y: 62, w: 398, h: 825 };
+  const pm = { x: 580, y: 148, w: 435, h: 395 };
+  const tray = { x: 618, y: 560, w: 370, h: 327 };
+  const log = { x: 70, y: 690, w: 457, h: 197 };
+  const toasts = { x: 247, y: 100, w: 320, h: 208 };
+  const mira = { x: 316, y: 312, w: 48, h: 48 };
+  const brakka = { x: 316, y: 394, w: 48, h: 48 };
+  const thorn = { x: 556, y: 551, w: 48, h: 48 };
+  const windows = [pm, tray, log];
+  const heads = windowHeads(windows, []);
+  const clear = dmPopupClear(init, [], [], new Map([["note.toasts", toasts]]), "dicex.popups");
+  const start = dmColumnTop(toasts.h);
+
+  test("FR-NOTE-82 sim-17 b02: before, the column left of Party Manager on Mira + Brakka for its ~6 s; now off them, off every window and off the toasts, the size unchanged (#348)", () => {
+    const size = { w: W, h: CARD_H };
+    expect(W).toBe(448);
+    const before = dmPopupAt(vp, start, size, clear, windows, heads);
+    expect(before).toEqual({ left: 120, top: start });
+    expect(hit(column(before, CARD_H), mira)).toBe(true);
+    const at = dmPopupAt(vp, start, size, clear, windows, heads, [mira, brakka, thorn]);
+    for (const p of [mira, brakka, thorn]) expect(hit(column(at, CARD_H), p)).toBe(false);
+    for (const w of [...windows, init, toasts]) expect(hit(column(at, CARD_H), w)).toBe(false);
+    expect(at.left).toBeGreaterThanOrEqual(68);
+    // No window head below it stops the card (FR-DICEX-47's count holds).
+    expect(popupRoom(vp.h, at, W, heads, { left: 496, top: start })).toBeGreaterThanOrEqual(CARD_H);
+  });
+
+  test("FR-NOTE-82 BL-118 x1 (a card leaves, the toasts settle): the showing column holds its spot while that stays clear of the rects and the PCs, and moves when a PC or a window reaches it", () => {
+    const pcs = [mira, brakka, thorn];
+    const size = { w: W, h: CARD_H };
+    const first = dmPopupAt(vp, start, size, clear, windows, heads, pcs);
+    // Shorter (a card left), the toasts' start elsewhere: same spot.
+    const shorter = { w: W, h: CARD_H - 40 };
+    expect(dmPopupAt(vp, start - 60, shorter, clear, windows, heads, pcs, first)).toEqual(first);
+    // A PC walks under it: it moves off.
+    const onIt = { x: first.left + 10, y: first.top + 10, w: 48, h: 48 };
+    const moved = dmPopupAt(vp, start, size, clear, windows, heads, [...pcs, onIt], first);
+    expect(moved).not.toEqual(first);
+    expect(hit(column(moved, CARD_H), onIt)).toBe(false);
+    // No PCs: no hold, the rules as they were.
+    expect(dmPopupAt(vp, start, size, clear, windows, heads, [], first)).toEqual(
+      dmPopupAt(vp, start, size, clear, windows, heads),
+    );
+  });
+
+  test("FR-NOTE-85 walkthrough step B (one card up, stack 248, 100 h140): the rolling card first shows where it will stay: before, 120, 248 h59 then 496, 312; now 496, 312 from the first frame, and it holds at rest", () => {
+    const stack = { x: 248, y: 100, w: 320, h: 140 };
+    const board = { x: 580, y: 148, w: 472, h: 536 };
+    const trayB = { x: 618, y: 560, w: 360, h: 316 };
+    const logB = { x: 68, y: 608, w: 1150, h: 280 };
+    const initB = { x: 1028, y: 60, w: 400, h: 512 };
+    const mid = { x: 336, y: 334, w: 53, h: 53 };
+    const bra = { x: 246, y: 424, w: 53, h: 53 };
+    const tho = { x: 291, y: 514, w: 53, h: 53 };
+    const pcsB = [mid, bra, tho];
+    const winsB = [board, trayB, logB];
+    const headsB = windowHeads(winsB, [{ x: 580, y: 148, bottom: 300 }]);
+    const clearB = dmPopupClear(initB, [], [], new Map([["note.toasts", stack]]), "dicex.popups");
+    const startB = dmColumnTop(stack.h);
+    expect(startB).toBe(248);
+    const place = (h: number, held: { left: number; top: number } | null = null) =>
+      dmPopupAt(vp, startB, { w: W, h }, clearB, winsB, headsB, pcsB, held);
+    const rolling = popupHeight(1, 0, POPUP_BIG);
+    expect(rolling).toBe(59);
+    // Before: placed at the rolling card's height, then the rest card's.
+    expect(place(rolling)).toEqual({ left: 120, top: 248 });
+    const rest = place(CARD_H);
+    expect(rest).toEqual({ left: 496, top: 312 });
+    // Now: from the first render (nothing measured) and the first measure, then at rest.
+    expect(place(columnPlanH(0, true, POPUP_BIG))).toEqual(rest);
+    expect(place(columnPlanH(rolling, true, POPUP_BIG))).toEqual(rest);
+    expect(place(columnPlanH(CARD_H, false, POPUP_BIG), rest)).toEqual(rest);
+  });
+
+  test("FR-NOTE-85 columnPlanH: only an own roll in flight counts as a card; other cards as drawn", () => {
+    const rolling = popupHeight(1, 0, POPUP_BIG);
+    expect(columnPlanH(CARD_H, false, POPUP_BIG)).toBe(CARD_H);
+    expect(columnPlanH(0, false, POPUP_BIG)).toBe(0);
+    expect(columnPlanH(0, true, POPUP_BIG)).toBe(CARD_H);
+    expect(columnPlanH(CARD_H + 8 + rolling, true, POPUP_BIG)).toBe(2 * CARD_H + 8);
+  });
+
+  test("FR-NOTE-82 BL-132 a home spot already off the PCs doesn't move: default layout, up to 3 cards", () => {
+    const three = 3 * CARD_H + 2 * 8;
+    const initD = { x: 1028, y: 60, w: 400, h: 512 };
+    const c = dmPopupClear(initD, [], [], new Map(), "dicex.popups");
+    const h = windowHeads([LOG], [LOG_ROW]);
+    const pcs = [{ x: 200, y: 300, w: 44, h: 44 }];
+    expect(dmPopupAt(vp, dmColumnTop(0), { w: W, h: three }, c, [LOG], h, pcs)).toEqual({
+      left: 496,
+      top: 100,
+    });
+  });
+
+  test("FR-NOTE-82 a PC under the home column: the nearest spot off it", () => {
+    const initD = { x: 1028, y: 60, w: 400, h: 512 };
+    const c = dmPopupClear(initD, [], [], new Map(), "dicex.popups");
+    const h = windowHeads([LOG], [LOG_ROW]);
+    const pc = { x: 700, y: 150, w: 44, h: 44 };
+    const at = dmPopupAt(vp, dmColumnTop(0), { w: W, h: CARD_H }, c, [LOG], h, [pc]);
+    expect(hit(column(at, CARD_H), pc)).toBe(false);
+    for (const r of [initD, LOG]) expect(hit(column(at, CARD_H), r)).toBe(false);
+  });
+
+  test("FR-NOTE-82 no clear spot (PCs everywhere the column can go): the rules before stand", () => {
+    const initD = { x: 1028, y: 60, w: 400, h: 512 };
+    const c = dmPopupClear(initD, [], [], new Map(), "dicex.popups");
+    const h = windowHeads([LOG], [LOG_ROW]);
+    const wall = [{ x: 0, y: 0, w: vp.w, h: vp.h }];
+    expect(dmPopupAt(vp, dmColumnTop(0), { w: W, h: CARD_H }, c, [LOG], h, wall)).toEqual(
+      dmPopupAt(vp, dmColumnTop(0), { w: W, h: CARD_H }, c, [LOG], h),
+    );
+  });
+
+  test("FR-NOTE-82 round trip: 1280×720 (a toast up) and 1600×900 with a PC under the column", () => {
+    for (const [v, initR, logR] of [
+      [
+        { w: 1280, h: 720 },
+        { x: 868, y: 60, w: 400, h: 500 },
+        { x: 68, y: 508, w: 690, h: 200 },
+      ],
+      [
+        { w: 1600, h: 900 },
+        { x: 1188, y: 60, w: 400, h: 512 },
+        { x: 68, y: 608, w: 1150, h: 280 },
+      ],
+    ] as const) {
+      const toast = { x: Math.round((v.w - 320) / 2), y: 100, w: 320, h: 46 };
+      const c = dmPopupClear(initR, [], [], new Map([["note.toasts", toast]]), "dicex.popups");
+      const h = windowHeads([logR], []);
+      const top = dmColumnTop(toast.h);
+      const pc = { x: Math.round(v.w / 2) - 22, y: top + 40, w: 44, h: 44 };
+      const at = dmPopupAt(v, top, { w: W, h: CARD_H }, c, [logR], h, [pc]);
+      const r = column(at, CARD_H);
+      expect(hit(r, pc)).toBe(false);
+      for (const b of [initR, logR, toast]) expect(hit(r, b)).toBe(false);
+    }
+  });
+});
 
 describe("BL-132 the DM's roll popups keep off window heads where a clear spot is", () => {
   test("FR-DICEX-55 BL-132 windowHeads: title bar + tabs + first record from the frame's report, 72..152 px deep", () => {

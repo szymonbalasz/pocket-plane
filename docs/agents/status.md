@@ -9,10 +9,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Track | Branch | Agent | Worktree | State |
 |---|---|---|---|---|
 | Upgrade guards | `fix/upgrade-guards` | — | — | **merged** (#424) |
-| Play fixes: toasts | `fix/s15-toasts` | `build-s15-toasts`, `test-s15-toasts` | `fix-s15-toasts` (slot 4) | built, CI green; walkthrough next |
+| Play fixes: toasts | `fix/s15-toasts` | — | — | **merged** (#437) |
 | Play fixes: frame and map | `fix/s15-frame` | — | — | **merged** (#432) |
-| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | **DM reframed at the gate** (player notes, private and shared; no reveal, no world builder): waits on live co-writing level and DM access to private notes; then the spec is rewritten |
-| Window position memory | `fix/window-memory` | `build-window-memory` | `fix-window-memory` | building |
+| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | **DM reframed at the gate** (player notes, private and shared; no reveal, no world builder; handouts separate; a token and a note may share a name, no link between them; the DM doesn't see private notes): waits on how live shared notes are; then the spec is rewritten |
+| Window position memory | `fix/window-memory` | `build-window-memory`, `test-window-memory` | `fix-window-memory` (slot 3) | built, CI green; walkthrough running on port 4133 |
 | Linked notes build | split by the spec | — | — | upgrade guards are in; waits for the DM's gate |
 
 **Memory (2026-10-31):** ran low once with 13 agents across sessions; the DM freed some and said carry on. Watch it before starting more.

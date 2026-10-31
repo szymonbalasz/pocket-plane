@@ -89,6 +89,7 @@ import {
   intentForRoll,
   type UseRollType,
 } from "@ui/features/combat-tracker/use-roll-action";
+import { pcScreenBoxes, pcTokenIds } from "@ui/features/notifications/pc-boxes";
 import { hideToast } from "@ui/features/notifications/toasts";
 import {
   EDGE_GAP,
@@ -98,9 +99,17 @@ import {
 } from "@ui/features/play-shell/geometry";
 import { cn } from "@ui/lib/utils";
 import { IntentRejected } from "@ui/sync/connection";
-import { useRecords, useSync } from "@ui/sync/store";
+import { SyncContext, useRecords, useSync } from "@ui/sync/store";
 import { EyeOffIcon, PlusIcon, XIcon } from "lucide-react";
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LinkHintNote } from "../combat-extras/link-hint";
 import {
   AcCell,
@@ -1424,6 +1433,7 @@ function PopupFrame({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const sync = useContext(SyncContext);
   // Top-left once placed (FR-CBT-55/56, over its notification FR-CBT-75) or dragged (FR-CBT-76);
   // null before the first layout. Client memory until the popup closes.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -1441,7 +1451,9 @@ function PopupFrame({
       const r = el.getBoundingClientRect();
       return { w: r.width, h: r.height };
     };
-    const at = measurePlacement(tiers, size(), origin);
+    // FR-NOTE-81: off the PCs, read at open like the tiers.
+    const store = sync?.getState().store;
+    const at = measurePlacement(tiers, size(), origin, pcScreenBoxes(pcTokenIds(store), store));
     setSide(at.side);
     setPos({ x: at.x, y: at.y ?? at.top });
     const reclamp = () => {
