@@ -132,6 +132,9 @@ test("SP1 player 1: Ctrl+K 'goblin' lists no monster; '@' only Mira's own rows; 
   expect(groups).toEqual(["Characters"]);
   await expect(rows.filter({ hasText: "Thorn" })).toHaveCount(0);
   await expect(rows.filter({ hasText: /^Mira/ })).toHaveCount(1);
+  // FR-KIT-109: the first Esc clears the typed text, the second closes.
+  await p1.keyboard.press("Escape");
+  await expect(p1.getByTestId("ui-palette-input")).toHaveValue("");
   await p1.keyboard.press("Escape");
   await expect(palette).toBeHidden();
 });

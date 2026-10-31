@@ -519,10 +519,6 @@ export function CreatureLookup({
               e.preventDefault();
               const r = shown[at];
               if (r) pick(r.id);
-            } else if (e.key === "Escape") {
-              if (q !== "") e.stopPropagation();
-              setQ("");
-              setActive(0);
             }
           }}
         />

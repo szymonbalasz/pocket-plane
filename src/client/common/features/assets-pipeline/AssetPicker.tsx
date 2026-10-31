@@ -113,7 +113,6 @@ export function AssetPicker({
   const [upload, setUpload] = useState<Upload>({ phase: "idle" });
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const search = useRef<HTMLInputElement | null>(null);
   const uploader = useAttachUploader();
   const canUpload = live && uploader !== null;
   const busy = upload.phase === "sending" || upload.phase === "processing";
@@ -135,20 +134,6 @@ export function AssetPicker({
       setPending(null);
     }
   }, [pending, assets]);
-
-  // FR-ASSET-45: Esc in a non-empty search clears it and nothing else (a second Esc closes the
-  // host Dialog). Window capture runs before the Dialog's own Esc listener on the document.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const el = search.current;
-      if (e.key !== "Escape" || !el || e.target !== el || el.value === "") return;
-      e.stopPropagation();
-      e.preventDefault();
-      setQuery("");
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
 
   async function send(file: File) {
     if (!uploader || !live || busy) return;
@@ -176,12 +161,6 @@ export function AssetPicker({
   const onFiles = (files: FileList | null) => {
     const f = files?.[0];
     if (f) void send(f);
-  };
-
-  const setSearchEl = (el: HTMLInputElement | null) => {
-    search.current = el;
-    if (typeof searchRef === "function") searchRef(el);
-    else if (searchRef) searchRef.current = el;
   };
 
   return (
@@ -265,7 +244,7 @@ export function AssetPicker({
         <div className="relative flex-1">
           <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <SearchInput
-            ref={setSearchEl}
+            ref={searchRef}
             aria-label="Search images"
             placeholder="Search images"
             data-testid="asset-picker-search"

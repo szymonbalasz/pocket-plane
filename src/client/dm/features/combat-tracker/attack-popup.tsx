@@ -404,6 +404,7 @@ function AddTarget({
           onClear={() => setQ("")}
           onKeyDown={(e) => {
             if (e.key === "Enter" && shown[0]) pick(shown[0]);
+            // With text, Esc clears first (FR-KIT-109) and doesn't get here.
             if (e.key === "Escape" && open) {
               e.stopPropagation();
               close();
@@ -416,6 +417,8 @@ function AddTarget({
         className="max-h-56 w-[var(--radix-popover-trigger-width)] overflow-auto p-1"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        // The field closes the list on Esc: closed here first, the Esc would go on to the popup.
+        onEscapeKeyDown={(e) => e.preventDefault()}
         onInteractOutside={(e) => {
           // A click in the field or on its × keeps the list (and, in the field, the typed text).
           const el = e.target as HTMLElement | null;
