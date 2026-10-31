@@ -96,7 +96,7 @@ const inGrey = { strongholdId: "grey" };
 const ITEMS = [
   item("potion", "Potion of healing", 2, { seq: 1 }),
   item("rope", "Rope", 2, { seq: 2, ...inGrey }),
-  item("arrows", "Arrows", 40, { seq: 3, ...inGrey }),
+  item("arrows", "Arrows", 40, { seq: 3, ...inGrey, notes: "Silvered, kept in the vault." }),
   item("gem", "HOLD-SECRET-GEM", 1, { seq: 4, ...inGrey, dmOnly: true }),
   item("secret", "HOLD-SECRET-ITEM", 1, { seq: 5, strongholdId: "tower", storesHidden: true }),
 ];
@@ -314,6 +314,17 @@ describe("Log names (FR-LOOT-35)", () => {
 });
 
 describe("Stores items (FR-LOOT-36, -37, FR-PARTY-77)", () => {
+  test("FR-PARTY-77 full text: an item's long name wraps and its notes show whole on their own line", () => {
+    const html = render(<StoresTab parts={greyParts(true)} />, DM);
+    const name = /<span data-testid="party-item-name"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(name).toContain("break-words");
+    expect(name).not.toContain("truncate");
+    const notes = /<p data-testid="party-item-notes"[^>]*>([^<]*)<\/p>/.exec(html);
+    expect(notes?.[1]).toBe("Silvered, kept in the vault.");
+    expect(notes?.[0]).toContain("whitespace-pre-wrap");
+    expect(html).not.toContain("max-w-[30%]");
+  });
+
   test("FR-PARTY-77 inventory without Stores rows: the party list skips every row with a strongholdId; a Stores lists its own", () => {
     expect(holderRows(ITEMS, null).map((i) => i.id)).toEqual(["potion"]);
     expect(holderRows(ITEMS, stores("grey")).map((i) => i.id)).toEqual(["rope", "arrows", "gem"]);

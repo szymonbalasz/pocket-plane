@@ -151,6 +151,9 @@ describe("FR-CMP-66 FR-CMP-74 window body", () => {
     };
     const closed = wrap(<RuleCard card={card} ctx={ctx()} />);
     expect(closed).toContain('data-testid="cmp-rules-card"');
+    // Full text: a long rule name and its section wrap, never cut.
+    expect(closed).not.toContain("truncate");
+    expect(closed).toContain("min-w-0 break-words text-sm font-medium");
     expect(closed).toContain('data-record-id="r-cover"');
     expect(closed).toContain('data-state="closed"');
     expect(closed).toMatch(/data-testid="cmp-rules-pin" data-record-id="r-cover" data-state="off"/);

@@ -244,6 +244,12 @@ describe("FR-KIT-102 reused", () => {
 });
 
 describe("FR-KIT-103 card", () => {
+  test("FR-KIT-103 full text: a long creature name wraps in the heading, never cut", () => {
+    const name = /<h2[^>]*data-testid="ent-statblock-name"[^>]*>/.exec(card({}))?.[0] ?? "";
+    expect(name).toContain("break-words");
+    expect(name).not.toContain("truncate");
+  });
+
   test("FR-KIT-103 card: name, type line, AC · HP (max + formula) · Speed, six abilities with Check / Save buttons, attack rows with three buttons, no combat chip unbound", () => {
     const html = card({});
     expect(html).toContain('data-slot="statblock"');

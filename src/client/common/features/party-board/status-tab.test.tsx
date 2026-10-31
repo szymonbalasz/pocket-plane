@@ -363,6 +363,8 @@ describe("Party status (FR-PARTY-51–56)", () => {
     // Static render, DM: rows by name, companions under Mira; Thorn hidden from players → eye-off.
     const html = render(DM, inputs.dm);
     expect(ids(html, "party-summary-row")).toEqual(["brakka", "mira", "thorn"]);
+    // Full text: the summary line under the name wraps, never cut.
+    expect(html).toContain('data-testid="party-summary-line" class="break-words');
     expect(ids(html, "party-companion-group")).toEqual(["brakka", "mira", "thorn"]);
     expect(ids(html, "party-companion-row")).toEqual(["c-fe", "owl"]);
     expect(html.match(/data-testid="party-summary-hidden"/g)).toHaveLength(1);

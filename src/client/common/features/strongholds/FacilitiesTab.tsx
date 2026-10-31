@@ -74,31 +74,6 @@ export function IncomeButton({ f }: { f: FacilityView & { incomeDice: string } }
   );
 }
 
-function Effect({ text }: { text: string }) {
-  const [more, setMore] = useState(false);
-  const long = text.length > 160 || text.split("\n").length > 3;
-  return (
-    <div className="text-xs">
-      <p
-        data-testid="hold-facility-effect"
-        className={`whitespace-pre-wrap break-words ${more ? "" : "line-clamp-3"}`}
-      >
-        {text}
-      </p>
-      {long && (
-        <button
-          type="button"
-          className="text-xs text-muted-foreground underline"
-          data-testid="hold-facility-effect-more"
-          onClick={() => setMore((m) => !m)}
-        >
-          {more ? "Less" : "More"}
-        </button>
-      )}
-    </div>
-  );
-}
-
 function FacilityRow({
   f,
   index,
@@ -230,7 +205,11 @@ function FacilityRow({
           Order: {f.order}
         </p>
       )}
-      {f.effect !== "" && <Effect text={f.effect} />}
+      {f.effect !== "" && (
+        <p data-testid="hold-facility-effect" className="text-xs break-words whitespace-pre-wrap">
+          {f.effect}
+        </p>
+      )}
       {(replaces || replacer) && (
         <p className="text-xs text-muted-foreground" data-testid="hold-facility-replaces">
           {[replaces && `Replaces ${replaces}`, replacer && `Replaced by ${replacer}`]

@@ -144,7 +144,7 @@ function TriggerRow({
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1">
-          <span className="min-w-0 truncate">{t.name}</span>
+          <span className="min-w-0 break-words">{t.name}</span>
           {badge && (
             <Tooltip content={triggerSentence(t.rule, cx)}>
               <Badge

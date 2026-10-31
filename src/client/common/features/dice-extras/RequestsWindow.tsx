@@ -287,7 +287,7 @@ function RequestCard({ r }: { r: RollRequestRecord }) {
       data-state={r.state}
       className={cn("flex flex-col gap-1 rounded-md border p-2", !open && "text-muted-foreground")}
     >
-      <p className="truncate text-sm font-medium">
+      <p className="break-words text-sm font-medium">
         {r.label}
         {r.dc !== null && (
           <span className="text-xs text-muted-foreground">

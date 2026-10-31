@@ -905,7 +905,7 @@ function MoreChip({
           const label = (
             <>
               <Icon className="size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">{chipText(e, round)}</span>
+              <span className="min-w-0 break-words">{chipText(e, round)}</span>
               {e.secret && <EyeOffIcon className="size-3.5" aria-label="Hidden from players" />}
             </>
           );
@@ -930,7 +930,7 @@ function MoreChip({
             data-kind="trigger"
           >
             <ZapIcon className="size-3.5 shrink-0" aria-hidden />
-            <span className="truncate">{triggerLine(t)}</span>
+            <span className="min-w-0 break-words">{triggerLine(t)}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

@@ -320,7 +320,7 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
           <h2
             data-testid="ent-statblock-name"
             data-slot="statblock-name"
-            className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight text-primary"
+            className="min-w-0 flex-1 break-words text-lg font-semibold leading-tight text-primary"
           >
             {combatant?.name ?? def.name}
           </h2>

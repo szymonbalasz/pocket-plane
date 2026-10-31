@@ -157,7 +157,7 @@ function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: stri
             <Turn on={r.turn} />
             {r.hidden && <Hidden testId="party-summary-hidden" />}
           </span>
-          <span data-testid="party-summary-line" className="truncate text-muted-foreground">
+          <span data-testid="party-summary-line" className="break-words text-muted-foreground">
             {r.line}
           </span>
         </span>

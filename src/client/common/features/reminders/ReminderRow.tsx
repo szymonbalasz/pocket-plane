@@ -59,11 +59,11 @@ function RollChip({
       data-actor={actor ?? ""}
       size="sm"
       variant="outline"
-      className="h-7 max-w-full gap-1 px-2"
+      className="h-auto min-h-7 max-w-full gap-1 whitespace-normal px-2 py-0.5 text-left"
       disabled={block !== null}
       data-reason={block ?? undefined}
     >
-      <span className="truncate">{roll.label}</span>
+      <span className="min-w-0 break-words">{roll.label}</span>
       <span className="shrink-0 font-mono text-xs text-muted-foreground">{roll.expression}</span>
     </RollButton>
   );

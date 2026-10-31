@@ -134,7 +134,7 @@ function ModifiersDialog({ token, close }: TokenMenuDialogProps) {
                   className="flex items-center gap-2 text-sm"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate">{effectName(e)}</div>
+                    <div className="break-words">{effectName(e)}</div>
                     <div data-testid="mod-active-parts" className="text-xs text-muted-foreground">
                       {modifiersText(e.modifiers) || "No modifiers"}
                     </div>

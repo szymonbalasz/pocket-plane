@@ -511,7 +511,7 @@ function GivePanel({
                 )}
               >
                 <span className="text-muted-foreground">{s.character.name}:</span>
-                <span className="min-w-0 flex-1 truncate">{s.row.name}</span>
+                <span className="min-w-0 flex-1 break-words">{s.row.name}</span>
                 <span className="tabular-nums text-muted-foreground">×{s.row.qty}</span>
               </button>
             </li>
@@ -626,17 +626,12 @@ export function InventoryTab({
                   data-testid="party-item-dm-only"
                 />
               )}
-              <span data-testid="party-item-name" className="min-w-0 flex-1 truncate">
+              <span data-testid="party-item-name" className="min-w-0 flex-1 break-words">
                 {i.name}
               </span>
               <span data-testid="party-item-count" className="tabular-nums text-muted-foreground">
                 ×{i.qty}
               </span>
-              {i.notes && (
-                <span className="max-w-[30%] truncate text-xs text-muted-foreground">
-                  {i.notes}
-                </span>
-              )}
               {movable && (
                 <Button
                   size="sm"
@@ -674,6 +669,15 @@ export function InventoryTab({
                 </>
               )}
             </div>
+            {i.notes && (
+              <p
+                data-testid="party-item-notes"
+                data-record-id={i.id}
+                className="pb-1.5 text-xs break-words whitespace-pre-wrap text-muted-foreground"
+              >
+                {i.notes}
+              </p>
+            )}
             {isOpen("take", i.id) && (
               <TakeForm
                 item={i}

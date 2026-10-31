@@ -172,6 +172,8 @@ describe("FR-MOD-26 sheet section", () => {
     const html = render({ role: "player", ragedOn: true });
     expect(html).toContain('data-testid="mod-section"');
     expect(ids(html, "mod-active")).toEqual(["c1", "p1", "b1", "r1"]);
+    // Full text: effect, toggle and preset names wrap, never cut.
+    expect(html).not.toContain("truncate");
     expect(html).toContain('data-value="concentration"');
     expect(html).toContain('data-value="prone"');
     expect(html).toContain("+1d4 attack rolls, saving throws");

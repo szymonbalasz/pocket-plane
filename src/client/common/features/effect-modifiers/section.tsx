@@ -132,7 +132,7 @@ function ActiveRow({
     >
       <Icon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
       <div className="min-w-0 flex-1">
-        <div className="truncate">
+        <div className="break-words">
           {effectName(e)}
           {left && <span className="text-muted-foreground"> · {left}</span>}
         </div>
@@ -239,7 +239,7 @@ function ToggleRow({
         switchEl
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate">
+        <div className="break-words">
           {p.name}
           {uses?.state === "ok" && (
             // FR-MOD-68: the count shows the minus once; no overspent Badge beside it.
@@ -373,7 +373,7 @@ export function ActiveEffectsSection({
               data-record-id={p.id}
               className="flex items-center gap-1 text-sm"
             >
-              <span className="min-w-0 flex-1 truncate">{p.name}</span>
+              <span className="min-w-0 flex-1 break-words">{p.name}</span>
               {mayEditPresets && (
                 <>
                   <Tip content={`Edit ${p.name}`}>

@@ -209,7 +209,7 @@ function CardShell({
             )}
             <span className="min-w-0 flex-1">
               <span className="flex min-w-0 items-center gap-1.5">
-                <span className="truncate text-sm font-medium">{name}</span>
+                <span className="min-w-0 break-words text-sm font-medium">{name}</span>
                 {dmOnly && (
                   <Badge
                     variant="secondary"
@@ -220,7 +220,7 @@ function CardShell({
                   </Badge>
                 )}
               </span>
-              <span className="block truncate text-xs text-muted-foreground">
+              <span className="block break-words text-xs text-muted-foreground">
                 {house && section === "" ? "House rule" : section}
               </span>
             </span>

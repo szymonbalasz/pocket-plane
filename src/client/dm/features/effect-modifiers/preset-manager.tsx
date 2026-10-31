@@ -50,11 +50,11 @@ function Row({ c, onEdit }: { c: PresetChoice; onEdit(): void }) {
       className="flex items-center gap-2 text-sm"
     >
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1 truncate">
-          {c.preset.name}
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="min-w-0 break-words">{c.preset.name}</span>
           {c.source === "customised" && <Badge variant="secondary">Customised</Badge>}
         </div>
-        <div className="truncate text-xs text-muted-foreground">
+        <div className="text-xs break-words whitespace-pre-wrap text-muted-foreground">
           {modifiersText(c.preset.modifiers)}
           {c.preset.note ? ` · ${c.preset.note}` : ""}
         </div>

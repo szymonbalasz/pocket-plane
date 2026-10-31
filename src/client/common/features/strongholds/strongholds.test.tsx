@@ -344,6 +344,17 @@ describe("Stronghold window (FR-HOLD-23–34)", () => {
     expect(failed).toContain('data-testid="hold-retry"');
   });
 
+  test("FR-HOLD-25 full text: a facility's effect shows whole, wrapped, line breaks kept; no clamp, no More", () => {
+    select(DM, "grey");
+    const html = render(<StrongholdWindow kind={HOLD_WINDOW_KIND} instance="main" />, { you: DM });
+    const effect = /<p data-testid="hold-facility-effect"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(effect).toContain("whitespace-pre-wrap");
+    expect(effect).toContain("break-words");
+    expect(effect).not.toContain("line-clamp");
+    expect(html).not.toContain("hold-facility-effect-more");
+    expect(html).toContain("HOLD-SECRET-VAULT keeps the old ledger.");
+  });
+
   test("FR-HOLD-24 FR-HOLD-25 DM view: header (Shown switch, Defenders, menu, All strongholds), five tabs (RS3's Stores third), six facilities in the DM's order with states, figures, Income, order, replaces / replaced by, staff, eye-off on the vault; totals incl. DM only", () => {
     select(DM, "grey");
     const html = render(<StrongholdWindow kind={HOLD_WINDOW_KIND} instance="main" />, { you: DM });
