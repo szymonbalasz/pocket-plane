@@ -45,6 +45,16 @@ describe("launcher fit (FR-SHELL-43)", () => {
     }
   });
 
+  test("FR-SHELL-43 a closed window with a count badge leaves after the other closed ones, before open or minimised ones", () => {
+    // n9 and n8 would leave first by order; n9 has a badge, n1 is open.
+    const list = items(10, [1]).map((i) => (i.kind === "k.n9" ? { ...i, keepInBar: true } : i));
+    expect(fitLauncher(list, 505, m).overflow).toEqual(["k.n8"]);
+    // Room for 1 button: every plain closed one is gone, then the badged one; the open one stays.
+    const tight = fitLauncher(list, 120, m);
+    expect(tight.bar).toEqual(["k.n1"]);
+    expect(tight.overflow).toContain("k.n9");
+  });
+
   test("FR-SHELL-43 closed windows leave the bar before open or minimised ones, highest order first", () => {
     const list = items(10, [9, 7], [8]);
     // Room for 5 buttons: 10 + 5 × 44 + 40 = 270 → 286 wide.

@@ -16,6 +16,7 @@ import { Launcher, sansFamily, textWidth } from "./Launcher";
 import { LAUNCHER_MIN_ZONE } from "./launcher-fit";
 import { mountedWindows, topWindow, type WindowAction } from "./manager";
 import { OverlayLayer } from "./OverlayLayer";
+import logoUrl from "./pocket-plane-logo.svg";
 import type { ShellClient } from "./registry";
 import {
   useAlertState,
@@ -109,6 +110,12 @@ function useLauncherRoom(centreRef: React.RefObject<HTMLElement | null>): number
 
 /** The title zone's widest share of the top bar, so the launcher keeps room (FR-KIT-10). */
 export const TOP_TITLE_MAX = "30%";
+
+/** The logo's size in the 48-px top bar, px. It sits in the title zone; the title gets the rest. */
+const TOP_LOGO_H = 40;
+const TOP_LOGO_W = 78;
+/** Centred in the bar, this bottom margin lifts the logo 2 px, clear of the bar's bottom rule. */
+const TOP_LOGO_LIFT = 4;
 
 export function PlayFrame({ client, topLeft, topStatus, topEnd, base, toolRail }: PlayFrameProps) {
   const registry = useRegistry();
@@ -205,6 +212,15 @@ export function PlayFrame({ client, topLeft, topStatus, topEnd, base, toolRail }
           className="flex min-w-0 shrink items-center gap-2 overflow-hidden whitespace-nowrap *:min-w-0 *:truncate"
           style={{ maxWidth: TOP_TITLE_MAX }}
         >
+          {/* The logo, then the title. Fixed size so the launcher's room doesn't jump on load. */}
+          <img
+            data-testid="ui-topbar-logo"
+            src={logoUrl}
+            alt="Pocket Plane"
+            draggable={false}
+            className="pointer-events-none shrink-0 select-none"
+            style={{ width: TOP_LOGO_W, height: TOP_LOGO_H, marginBottom: TOP_LOGO_LIFT }}
+          />
           {topLeft}
         </div>
         <div

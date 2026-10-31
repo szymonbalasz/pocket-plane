@@ -259,6 +259,19 @@ describe("kit-parity top bar", () => {
   };
   const at = (html: string, testId: string) => html.indexOf(`data-testid="${testId}"`);
 
+  test("top bar logo: first in the left zone, before the title, fixed size; same in both clients", () => {
+    for (const client of ["dm", "player"] as const) {
+      const html = bar(client);
+      const logo = tagOf(html, "ui-topbar-logo");
+      expect(at(html, "ui-topbar-left")).toBeLessThan(at(html, "ui-topbar-logo"));
+      expect(html.indexOf("ui-topbar-logo")).toBeLessThan(html.indexOf("<span>title</span>"));
+      expect(logo).toContain('alt="Pocket Plane"');
+      expect(logo).toContain("pocket-plane-logo");
+      expect(logo).toContain("shrink-0");
+      expect(logo).toContain("height:40px");
+    }
+  });
+
   test("FR-KIT-10 bar zones: left = the title, centre = the launcher, right = status, items, chip (order kept); same in both clients", () => {
     for (const client of ["dm", "player"] as const) {
       const html = bar(client);
