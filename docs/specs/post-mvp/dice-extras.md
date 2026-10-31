@@ -8,6 +8,8 @@ phase: post-mvp-8
 
 # Dice extras (post-MVP stub)
 
+> **2026-10-31 (DM, [#413](../../decisions-log.md)): player whispers moved to tier F and removed, so this stub has no remaining scope. [dice-extras](../dice-extras.md) holds everything built.**
+
 > **[dice-extras](../dice-extras.md) is the source of truth.** Sprint 3 took 3D dice, tray, notation and looks (#203); sprint 8 took macros (FR-DICEX-64–72) and DM roll requests (FR-DICEX-73–93) (#334). Only **player whispers** (tier C) stay here.
 
 | Tier | Feature | Where |

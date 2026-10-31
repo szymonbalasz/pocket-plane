@@ -2,76 +2,25 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**5etools import (#395–#397, #400, #401): DONE 2026-10-30.** Spec + ADR-0074; core, adapter, panel, token art merged; walkthroughs 27/31 → re-test, 14/14; README how-to. Follow-ups BL-160–163. Sprint 15 planning after (candidates: BL-146 with BL-143–145, BL-124 / BL-152, BL-151, BL-125–127, BL-149 / BL-150, BL-153, BL-154, BL-123, BL-142).
+## Now (2026-10-31)
 
-**Overview scenes (#398, 2026-10-30): all five slices merged (#406), no locks held.** Evidence `.verify/overview/walkthroughs/` in the main checkout. Follow-ups BL-164, BL-165, BL-166.
+**State:** no sprint running. Sprint 14 closed (#381); since then the DM's asks were built one by one on `main` with no sprint plan: the `play` command, tray attacks, Assets window, 5etools import, overview scenes, scenes list drag and folders, doors replacing walls, fog edges, exact explored memory, search clear, game log menu (#382–#412). The DM's real campaign runs from `bun run play`: never touch `%LOCALAPPDATA%/PocketPlane`, its backups or port 4090.
 
-**Shared-file locks (5etools):** none (all released).
+**Next:** session-sim-17's findings if any are serious, then **linked notes with backlinks** (next big feature, #413), then the quest log, in-game calendar and session timeline.
 
-**Briefs:** `%TEMP%/pocket-plane/briefs/{build,test}-cmpx-*.md`.
+**Session-sim-17:** in progress on `fix/housekeeping-sim` (the first full run since sim-16 on 2026-10-26).
 
-**Gates on `main`:** GitHub CI (#368). After each merge: push `main`, `bun run ci:watch` in the background; red `main` is fixed first. (`gates-main` removed.)
+**Backlog candidates still open:** window frame BL-146 (approved, unbuilt) with BL-143–145; BL-124 / BL-152; toasts BL-151; kit look BL-149 / BL-150; AoE label BL-153; CI flakes BL-154 / BL-158 / BL-159; slow commands BL-142; small BL-123, BL-155–157, BL-164–171. **Waiting on the DM's call on migrations:** BL-172 (schema push crash), BL-173 (upgrade check).
 
-**Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
+**Shared-file locks:** none.
 
-| Task | Branch / worktree | Agent | State | Next |
-|---|---|---|---|---|
-| Sprint 9 (RS0–3, PM1–2, FX1–3, SP1–3) | all merged | — | done | — |
-| Sprint 10 H1 combat + dice | merged cf97ba09 | — | **merged** (walkthrough 7/8 → re-test 5/5; branch check 5557 / e2e 231); evidence `.verify/sprint10/walkthroughs/20261024-h1{,r}/`; main gates green (5557 / 231) | — |
-| Sprint 10 H2 window frame + Party Manager | merged 47409405 | — | **merged** (walkthrough 5/6 → re-test 5/5; branch check 5565 / e2e 235); evidence `.verify/sprint10/walkthroughs/20261024-h2{,r}/`; main gates green (5565 / 235) | — |
-| Sprint 10 H3 toasts | merged 8b279504 | — | **merged** (walkthrough 5/8 → re-tests 7/8, 9/10, 12/12; branch check 5587 / e2e 237 + known combat2-polish FR-CBT-75 flake, 3 × 8/8 alone); evidence `.verify/sprint10/walkthroughs/20261024-h3*/` ; main gates green (5587 / 238), bench 41 / 41 | — |
-| Sprint 10 H4 rules, recap, strongholds, misc | merged cf9e0fbe | — | **merged** (walkthrough 11/11, branch check 5545 / e2e 229); evidence `.verify/sprint10/walkthroughs/20261024-h4/`; main gates green (5545 / 229) | — |
-| Sprint gate | final main 8b279504 | — | **session-sim-14 13 / 13 PASS** (leak scan clean; hard kill byte-identical); glitches → BL-107–BL-114 | DM recap |
-| Sprint 10 T1 Dice tray +40 % (#343) | merged 4c356249 | — | **merged** (walkthrough 18/18; branch check 5602 / e2e 241 + FR-CBT-75 toast flake → BL-115); evidence `.verify/sprint10/walkthroughs/20261024-t1/` ; main gates (T1 + T3): check 5626 green, e2e 241 + 2 load flakes (colour-picker-2, prefs-window: 1 s expect timeouts; 2 × 3/3 alone → T4) | — |
-| Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | merged ef4835d1 | — | **merged** (walkthrough 11/11; branch check 5593 / e2e 240); evidence `.verify/sprint10/walkthroughs/20261024-t2/`; main gates green (5593 / 240) | — |
-| Sprint 10 T3 Stats Campaign tab (#344) | merged 9cceead1 | — | **merged** (walkthrough 7/7; branch check 5617 / e2e 241); main gates skipped (tree = tested branch, #345); evidence `.verify/sprint10/walkthroughs/20261024-t3/` | — |
-| Sprint 10 T4 faster test loop (#345) | merged aa9ddba0 | — | **merged** (branch check:full 5634 / e2e 243 at 4 workers, 752 s wall for the whole gate); main gates skipped (same code) | — |
-| Sprint 10 T5 dice visuals (#347, #348) | merged bfdc44a9 | — | **merged** (visual walkthrough PASS; branch check:full 5635, e2e 242 + weapon-rows load flake 2/2 alone); main gates skipped (same code) | — |
-| Sprint 11 F1 frame + camera | merged 0b628f94 | — | **merged** (re-test 6/6; branch check:full 5651 / e2e 250/250); main gates skipped (same code) | — |
-| Sprint 11 F2 toasts | merged 9da2b751 | — | **merged** (re-test 8/8; branch check:full 5667 / e2e 253/253; import sort after merge) | — |
-| Sprint 11 F3 combat + dice | merged 878b2549 | — | **merged** (walkthrough 16/16; branch check:full + e2e green bar load flakes pause / popup-line → BL-116); main gates skipped (same code) | — |
-| Sprint 11 art track (DM) | merged f118e724 (theme-system), 56347ecf (charx print sheet) | — | **merged** (#351; ADR-0069); #352: theme-system complete, OQ-CHARX-47–50 all A | art build in sprint 12 |
-| Sprint 11 gate | final main 9da2b751 | — | **session-sim-15 10 / 11 PASS** (leak scan clean; hard kill byte-identical); FAIL c → BL-118; glitches → BL-119–BL-123 | DM recap |
-| Sprint 12 T0 theme tokens | merged 2c5a379f | — | **merged** (Default pixel-identical walkthrough PASS, `.verify/sprint12/walkthroughs/20261025-th0-default-identical/`; check:full 5767, e2e 252 + gems-reroll load flake 1/1 alone); main gates skipped (docs-only since tested) | — |
-| Sprint 12 CS printed sheet | merged f4b51d8e | — | **merged** (walkthrough 18/19 → re-test 24/24; check:full 5788 + shutdown load flake, e2e 254 + weapon-rows load flake, both pass alone) | — |
-| Sprint 12 X1 toasts (BL-118–120) | merged b46c010b | — | **merged** (walkthrough 2/5 → re-test 5/5; check:full 5807, e2e 261/261) | — |
-| Sprint 12 X2 stats + skip toast + flakes (BL-121, -122, -116) | merged beacd9e6 | — | **merged** (walkthrough 4/4; check:full 5797, e2e 256/256) | — |
-| Sprint 12 T1 theme switch | merged a15785ed | — | **merged** (walkthrough PASS; check:full 5835 + no-copy load timeout, e2e 259 + 3 load flakes: cb-party, dice-extras, popup-line (popup-line again after BL-116), all pass alone) | — |
-| Sprint 12 T3 default theme (#355) | merged fac01c26 | — | **merged** (walkthrough PASS; check:full 5856, e2e 264/264) | — |
-| Sprint 12 T2 Gilt & Stone | merged 1873122d | — | **merged** (walkthrough 11/12 → re-test 13/13; check:full 5852, e2e 264/264) | — |
-| Sprint 14 F1 frame | merged 2c493f7a | — | **merged** (walkthrough 4/6 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f1{,r}/`; check 1030 targeted, replay 418/418, CI green; player-gilt.png refreshed; tool-bar return after a grow fixed, pre-existing) | — |
-| Sprint 14 F2 toasts | merged 6ce69034 | — | **merged** (walkthrough 9/9 `.verify/sprint14/walkthroughs/20261028-s14f2/`; check 763 targeted, area e2e 19/19, branch + main CI green) | — |
-| Sprint 14 F4 roll guard | merged aa53fa6f | — | **merged** (walkthrough 7/8 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f4{,r}/`; fog-for-one-player leak via the combatant path fixed; CI green after flake re-runs → BL-147, BL-148) | — |
-| Sprint 14 F3 kit nits | merged 9801a94f | — | **merged** (walkthrough 5/6 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f3{,r}/`; 4 baselines refreshed on purpose; protocol §180) | — |
-| Spell FX core (#374) | merged a09fef12 | — | **merged** (raw-intent walkthrough 8/9: cue size → budget 480 B worst case, typical 307 B; CI green; registries recorded in AGENTS §9.9) | — |
-| Spell FX build (#374) | merged 450f4df2 | — | **merged** (§13 walkthrough 12/12 `.verify/sprint14/walkthroughs/20261028-vfx/`; frame median 1.3 ms at 11 tokens; baselines refreshed; BL-151 toast over the sheet's End button) | — |
-| AoE cell origin (#375, #377) | merged | — | **merged** (walkthrough 9/9 `.verify/sprint15/walkthroughs/20261028-aoecell/`; +14 B per snapped sphere; schema + protocol lock released) | — |
-| Agent / MCP API spec (#378, #379) | merged | — | **complete** (DM gate #379: SDK yes, ADR-0072 accepted, paste-JSON importer dropped) | — |
-| Agent API slice 1: core + read tools + `plan_check` frame + `mcp:call` + bundle `agent-api` | merged f7b9382c | — | **merged** (FR-AGENT-01–19 tested, targeted check 113 green, branch CI green; SDK 1.32.1; AGENTS §9.1 / §9.4 rows added; tooling lock released) | DM: `claude mcp add --scope local pocket-plane -- bun run mcp` in the main checkout |
-| Agent API slice 2: custom creature tools (+ crash slow tests) | merged 467db37a | — | **merged** (walkthrough B 15/15 `.verify/agent-api/walkthroughs/20261029-agent-b/`; check 69 targeted green, branch CI green) | — |
-| Agent API slice 3: homebrew tools | merged f0d6cd3b | — | **merged** (FR-AGENT-25/26, 10 tests, check green; homebrew monsters refused up front → creature tools; patch merges facets / body, null removes) | — |
-| Agent API slice 4: character sheet tools + e2e `agent-api` | merged 748ded0a | — | **merged** (walkthrough A 8/8 `.verify/agent-api/walkthroughs/20261029-agent-a/`: player-1 live ~0.4 s, player-2 whitelist only, pet keeps owner; `creature_put_row` listed as a flat object + a guard that no tool schema has a top-level oneOf / anyOf (Anthropic tool rule)) | — |
-| Agent API slice 5: skill `.claude/skills/pocket-plane-content/` | merged c30abd1d | — | **merged** (example plans tested; every named tool registered) | DM: register the MCP server once (#380) |
-| Tray attacks spec (#385) | merged f1629f45 | — | **merged** (ADR-0073; CHARX / DICEX / DICE / CBT amended, CBT §14.8 split; OQ-CBT-104–106, OQ-DICEX-65/66, OQ-CHARX-51 picks A as integrator rulings) | — |
-| Tray S1 server core | merged 6ee01a82 | — | **merged** (R1 9/9; check + branch CI green; #388) | — |
-| Tray S2 tray compose | merged e051c827 | — | **merged** (T1–T4 4/4; CI green; #390) | — |
-| Tray S3 two buttons everywhere | merged (#391) | — | **merged** (T5–T9, T14 PASS + re-test 4/4; CI 19/19) | — |
-| Tray S4 Use as from the log | merged a0f776fc | — | **merged** (T10–T13 PASS; CI 19/19; #389) | — |
-| Map effects default Full (#376) | merged | — | **merged** (check + spell-fx / prefs-window e2e green; CI green after a BL-147 re-run) | — |
-| 5etools spec (#395) | merged | — | **complete** (ADR-0074; OQ-CMPX-01–08 all A) | — |
-| CMPX core: config, schema, replaced entries, presets, bench | merged | — | **merged** (#396) | — |
-| CMPX adapter: 5etools reader + mapping + fixtures `5etools-mini` + probe | merged | — | **merged** (#397; probe: 106 books) | — |
-| CMPX panel: import wiring, panel, bundle `cmpx-5etools`, e2e, README | merged | — | **merged** (#400; walkthrough 27/31 → re-test 6/7 accepted) | — |
-| CMPX art: token art on first placement | merged | — | **merged** (#401; walkthrough 14/14) | — |
+**Briefs:** `%TEMP%/pocket-plane/briefs/`.
 
-Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
+**Gates on `main`:** GitHub CI (#368). After each merge: push `main`, `bun run ci:watch` in the background; red `main` is fixed first.
+
+**Herdr:** agents `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 **Resource rule (#354, #368):** heavy test runs happen in CI only; locally targeted `check` / single specs. One heavy local job at a time still holds for walkthrough servers and session-sims; `PP_TEST_SHARDS=3` in every worktree `.env`.
-
-## Shared-file locks
-
-
-- `styles.css`, both `index.html`, the dice tray's `data-slot` → `data-die-slot` rename (`roll-control.tsx` attribute lines + 3 tests): **T1** (T0 merged). 
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 
@@ -127,7 +76,8 @@ Sprint 10:
 
 
 
-- Default theme decided (#355: Gilt & Stone; old look = Simple Dark). Kit-parity spec: review its open questions when it's in review.
+- Migrations: BL-172 and BL-173 wait on the DM's call.
+- Session timeline (tier A, #413) vs ADR-0013's "no session entity": settle in the spec phase.
 
 ## Resolved locally (report at gate)
 

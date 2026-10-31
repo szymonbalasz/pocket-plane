@@ -8,6 +8,8 @@ phase: post-mvp-9
 
 # Campaign manager (post-MVP stub)
 
+> **2026-10-31 (DM, [#413](../../decisions-log.md)): the in-game calendar and session timeline move from tier C to A and follow right after linked notes ([world-builder](world-builder.md)). [ADR-0013](../../architecture/adr/0013-session-journal-scope.md) has no session entity: settle how the timeline fits in the spec phase.**
+
 - **What:** Sessions, timeline, quest board, prep notes. Absorbs the DM's Obsidian session/prep notes.
 - **Tiered**: ~~session recap (B)~~, in-game calendar/time (C) ([feature tiers](../../feature-tiers.md#4-notes-handouts-world-and-party)).
 - **Session recap → promoted** (sprint 9, track SP, DM [#338](../../decisions-log.md)): now its own spec, [session-recap](../session-recap.md) (prefix RECAP): a computed, shareable summary of one derived session (fights, loot, notable rolls, awards). Sessions stay derived ([ADR-0013](../../architecture/adr/0013-session-journal-scope.md)); story notes stay with [world-builder](world-builder.md). What remains here: timeline, quest board, prep notes, calendar.
