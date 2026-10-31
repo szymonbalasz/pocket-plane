@@ -27,6 +27,7 @@ import { sessionRecap } from "./session-recap";
 import { spellFx } from "./spell-fx";
 import { stats } from "./stats";
 import { strongholds } from "./strongholds";
+import { tokenMirrors } from "./token-mirrors";
 
 export const features: readonly Feature[] = [
   campaignManagement,
@@ -49,6 +50,8 @@ export const features: readonly Feature[] = [
   diceExtras,
   gems,
   stats,
+  // Battlemap levels (build/token-mirrors)
+  tokenMirrors,
   // Sprint 8 track CB (fix/cb-core)
   combatPolish,
   // Sprint 9 track RS (fix/rs-core)

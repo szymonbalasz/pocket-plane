@@ -41,7 +41,7 @@ const NO_DOT_ALEGREYA = {
 
 /**
  * FR-OVW-46 `ovw-sword-coast`, **shown** (takes the active scene off): a locked map from
- * `map-large` (display 4096 × 2731), three styled labels (Cragmaw Castle hidden), a hidden scroll
+ * `map-large` (drawn at 4096 × 2731), three styled labels (Cragmaw Castle hidden), a hidden scroll
  * and the party's miniatures (Mira: `player-1`, Thorn: `player-2`), off to the south-east so a press
  * on the middle of the map still lands on the map.
  */

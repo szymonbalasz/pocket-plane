@@ -58,7 +58,7 @@ describe("asset fixtures (FR-ASSET-18)", () => {
 
     const large = by("map-large");
     expect([large?.width, large?.height]).toEqual([6000, 4000]);
-    expect([large?.displayWidth, large?.displayHeight]).toEqual([4096, 2731]);
+    expect([large?.displayWidth, large?.displayHeight]).toEqual([6000, 4000]);
     const thumb = await sharp(r.files(large?.hash as string, "thumb.webp")).metadata();
     expect([thumb.width, thumb.height]).toEqual([512, 341]);
 

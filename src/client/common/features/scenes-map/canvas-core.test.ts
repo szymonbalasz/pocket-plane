@@ -38,6 +38,7 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["fog", 30],
       ["scn-templates", 35],
       ["vfx-under", 38],
+      ["mirrors", 39],
       ["tokens", 40],
       ["vfx-over", 43],
       ["labels", 45],
@@ -59,6 +60,7 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["fog"],
       ["scn-templates"],
       ["vfx-under"],
+      ["mirrors"],
       ["tokens"],
       ["vfx-over"],
       ["labels"],
@@ -81,13 +83,19 @@ describe("FR-SCN-02/03 canvas layers", () => {
     expect(named("dm")).toEqual([
       ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],
       ["map-layer-fog", ["fog"]],
-      ["map-layer-objects", ["scn-templates", "vfx-under", "tokens", "vfx-over", "labels"]],
+      [
+        "map-layer-objects",
+        ["scn-templates", "vfx-under", "mirrors", "tokens", "vfx-over", "labels"],
+      ],
       ["map-layer-top", ["scn-template-labels", "scn-edit", "teleport-pick", "pointers"]],
     ]);
     expect(named("player")).toEqual([
       ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],
       ["map-layer-fog", ["fog"]],
-      ["map-layer-objects", ["scn-templates", "vfx-under", "tokens", "vfx-over", "labels"]],
+      [
+        "map-layer-objects",
+        ["scn-templates", "vfx-under", "mirrors", "tokens", "vfx-over", "labels"],
+      ],
       // FR-SCN-59: the templates' label pills, over the tokens and their labels.
       ["map-layer-top", ["scn-template-labels", "pointers"]],
     ]);

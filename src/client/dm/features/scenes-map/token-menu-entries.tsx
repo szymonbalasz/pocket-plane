@@ -20,12 +20,13 @@ import {
 import { AssetPickerDialog } from "@ui/features/assets-pipeline/AssetPicker";
 import { useDefinitions } from "@ui/features/compendium/definitions";
 import { toastReject, useMapIntent } from "@ui/features/scenes-map/intents";
-import { startTeleport } from "@ui/features/scenes-map/teleport-tool";
+import { startMirrorPick, startTeleport } from "@ui/features/scenes-map/teleport-tool";
 import { useRecords } from "@ui/sync/store";
 import {
   CopyIcon,
   EyeIcon,
   EyeOffIcon,
+  FlipHorizontal2Icon,
   ImageIcon,
   PencilIcon,
   ScalingIcon,
@@ -249,6 +250,15 @@ export const scenesMapTokenMenu: readonly TokenMenuEntry[] = [
     Item: ({ token }: TokenMenuItemProps) => (
       <DropdownMenuItem data-testid="map-token-menu-teleport" onSelect={() => startTeleport(token)}>
         <WandSparklesIcon /> Teleport
+      </DropdownMenuItem>
+    ),
+  },
+  {
+    id: "mir.create",
+    order: 48,
+    Item: ({ token }: TokenMenuItemProps) => (
+      <DropdownMenuItem data-testid="mir-token-menu-create" onSelect={() => startMirrorPick(token)}>
+        <FlipHorizontal2Icon /> Mirror
       </DropdownMenuItem>
     ),
   },

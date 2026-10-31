@@ -2899,3 +2899,12 @@ No new table or column.
 | Field | Change | Rule | FR |
 |---|---|---|---|
 | `notification.payload` (kind `damage-card`) | + optional `damageCleared: true` | Set by `cbt.clearDamage` with `damage: null` (`unusedRolls`, `diceMaxed` removed); removed when new damage attaches | FR-CBT-178 |
+
+## Token mirrors (build/token-mirrors)
+
+New table `token_mirror` ([token-mirrors §8](../specs/token-mirrors.md#8-data-model)): `id`, `campaign_id`, `scene_id` (cascade), `token_id` (cascade), `seq`, `col`, `row`, `mode`, copies `name`, `image_asset_id`, `creature_type`, `size`, `shape`, derived `suppressed`, `fogged`, `seen_by`, `created_at`, `updated_at`. No existing table changes.
+
+| Derived | Rule | FR |
+|---|---|---|
+| `suppressed` | Token `hidden` or `invisible`, or no cell of the footprint on the map | FR-MIR-09 |
+| `fogged`, `seenBy` | Fog subject at the mirror's own cells; never the token's copies | FR-MIR-06 |

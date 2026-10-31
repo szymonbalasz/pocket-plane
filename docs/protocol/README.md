@@ -4463,7 +4463,7 @@ From [scenes-map](../specs/scenes-map.md) FR-MAP-121–123 (#418). **Built by `b
 |---|---|---|---|---|
 | `map.teleportToken` (DM only) | `{tokenId, col, row}` | As `map.moveToken`'s DM path (footprint must overlap the map, guards, derive, token-changed hooks with `teleport: true`). Its own cell or off the map → `invalid`; a player → refused by role | `TokenMoved` with `teleportCue` | FR-MAP-121, -123 |
 
-- **`TokenMoved`** gains optional `teleportCue` (a fresh id, only on a teleport). Still unlogged, not undoable. Combat's hook adds no `movedFt` for it.
+- **`TokenMoved`** gains optional `teleportCue` (a fresh id, only on a teleport). Still unlogged, not undoable. Combat's hook adds no `movedFt` for it, and clears the token's trail instead of adding to it (FR-MAP-123; `token.trail` → null in the same event).
 - **Server signal `vfx.poof`** (server-originated, transient: no event of its own, DB row, log, snapshot or `seq`): `signal {name: "vfx.poof", data: PoofCue, from: {role: "dm"}}`, `PoofCue = {id, sceneId, side, cells: [{col, row}]}` (1–2 cells, top-left of each footprint). Per connection after commit: the DM gets both ends; a player the ends where `records.view` shows them the token (the record before the move for the cell left, after it for the cell reached); neither → no signal.
 - **Canvas tool** `teleport`: DM, `offRail` (a new optional `CanvasToolDef` field: `toolsFor` leaves it off the rail).
 - **Test IDs:** `map-token-menu-teleport`, `map-teleport-panel`, `map-teleport-cancel`; canvas `map-teleport-target` (attrs `col`, `row`), `vfx-poof` (id = cue id; `x`, `y`, `size`), `vfx-over-pass` attr `lastPoof` = cue id.
@@ -4490,3 +4490,21 @@ From [combat-tracker](../specs/combat-tracker.md#68-sprint-15-attacks-through-th
 | `cbt.rollDamage`, `cbt.useRoll` | unchanged | Attach to a cleared card before a newer to-hit-only card; attaching removes `damageCleared` | FR-CBT-178 |
 
 - **Test ID:** `cbt-popup-damage-clear`.
+
+## 195. Token mirrors (build/token-mirrors)
+
+From [token-mirrors](../specs/token-mirrors.md) ([ADR-0077](../architecture/adr/0077-token-mirrors.md)). **Built by `build/token-mirrors`.** New record type `token-mirror`, four intents, four events; one new line each in `tokenChangedHooks`, the features list, the bundle and fixture registries and the canvas layers; fog's scene re-derive gains the subject.
+
+| Intent (DM only) | Payload | Rule | Event | FR |
+|---|---|---|---|---|
+| `mir.create` | `{tokenId, col, row, mode?}` → `{mirrorId}` | Token's scene; footprint overlaps the map; caps 200 / 2,000 → `conflict`; default `visible` | `MirrorCreated` | FR-MIR-01 – -05 |
+| `mir.move` | `{mirrorId, col, row}` | Footprint overlaps the map; same cell → no event | `MirrorMoved` | FR-MIR-12 |
+| `mir.setMode` | `{mirrorId, mode}` | `hidden` \| `visible` \| `transparent` \| `shadow`; same → no event | `MirrorModeSet` | FR-MIR-06 |
+| `mir.delete` | `{mirrorId}` | | `MirrorDeleted` | FR-MIR-13 |
+
+- **Visibility:** scope `scene`, `dmWindow: "active-scene"`. DM: all but `seenBy`. Player: hidden if `mode` is `hidden` or `suppressed`; `visible` also needs `seenBy` to hold them (fog's `hides`); `transparent` and `shadow` reach every player.
+- **Player wire:** `{id, sceneId, col, row, mode, size, shape}`, + `{name, imageAssetId, creatureType}` unless `shadow`.
+- **Following:** token-changed hook `token-mirrors.follow`: a move steps each mirror by the same amount; a teleport (`env.teleport`) sets `mode: hidden` and doesn't step; delete removes them; the rows join the token's event. `fog.setInvisible` and the definition refresh call the same sync.
+- **Sight:** `rederiveScene` re-derives each mirror as a fog subject at its own cells, and `suppressed` from its token and the map rectangle.
+- **Test IDs:** `mir-token-menu-create`, `mir-pick-panel`, `mir-pick-cancel`, `mir-menu` (`data-record-id`), `mir-menu-mode-<mode>` (`data-current`), `mir-menu-delete`; canvas `mir-mirror` (id = mirror id; attrs `mode`, `off`), `mir-label` (attr `text`), `mir-outline`.
+- **Assets:** `MAX_UPLOAD_BYTES` 100 MB, `MAX_PIXELS` 100 MP, `DISPLAY_EDGE` 8192.

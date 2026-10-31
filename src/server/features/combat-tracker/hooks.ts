@@ -67,7 +67,7 @@ export function combatantTokenHook(
   const out: RecordChange[] = [];
   // FR-SCN-30: the campaign's diagonal rule (`map-settings`, no row = 5/10/5). A move refused by a
   // move guard (FR-SCN-11) never reaches the hooks, so it adds nothing.
-  // FR-MAP-123: a teleport isn't walked; its jump still goes on the trail (`trailHook`).
+  // FR-MAP-123: a teleport isn't walked, and leaves no line (`trailHook`).
   const ft = env.teleport
     ? 0
     : distanceFt(before, after, diagonalRuleOf(env.tx, before.campaignId));
@@ -103,11 +103,17 @@ export function combatantTokenHook(
 /**
  * FR-CBT-97 (sprint 5): a committed move of any token on the started encounter's scene (bound
  * or not, any mover) appends to its trail, not while it is hidden (FR-MAP-66); its reveal resets
- * the trail. The caller's token upsert is read after the hooks, so this returns nothing.
+ * the trail. A teleport clears the trail instead (FR-MAP-123): one list of cells draws one line,
+ * so a trail kept across the jump would join its old end to the landing cell at the next step.
+ * The caller's token upsert is read after the hooks, so this returns nothing.
  */
 function trailHook(env: TokenHookEnv, before: TokenRecord, after: TokenRecord): void {
   if (before.hidden && !after.hidden && after.trail) resetTrail(env, after);
   if (before.col === after.col && before.row === after.row) return;
+  if (env.teleport) {
+    if (after.trail) resetTrail(env, after);
+    return;
+  }
   const enc = startedEncounter(env.tx, after.campaignId);
   if (enc?.sceneId !== after.sceneId) return;
   appendTrail(env, after, { col: before.col, row: before.row }, { col: after.col, row: after.row });

@@ -24,9 +24,9 @@ export type UploadOutcome =
 /** Inline error text naming the cause (ASSET §7). */
 export function uploadErrorMessage(status: number, body: unknown): string {
   const parsed = RestError.safeParse(body);
-  if (status === 413) return "File over 25 MB";
+  if (status === 413) return "File over 100 MB";
   if (status === 415) return "Unsupported file type";
-  if (status === 422) return parsed.success ? parsed.data.message : "Image over 50 megapixels";
+  if (status === 422) return parsed.success ? parsed.data.message : "Image over 100 megapixels";
   return "Upload failed, try again";
 }
 
