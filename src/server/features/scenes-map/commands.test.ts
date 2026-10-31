@@ -259,7 +259,7 @@ describe("scenes-map commands", () => {
     );
   });
 
-  test("FR-MAP-18 update: rename, image, owner reassignment; never size", () => {
+  test("FR-MAP-18 update: rename, image, owner reassignment", () => {
     const t = setup();
     const s = t.newScene();
     const thorn = t.place(s.id, t.thornId, 4, 5);
@@ -281,13 +281,89 @@ describe("scenes-map commands", () => {
     expect(
       t.err(() => t.run(I.updateToken, { tokenId: thorn.id, imageAssetId: "art-other" })).code,
     ).toBe("not_found");
-    expect(t.err(() => t.run(I.updateToken, { tokenId: thorn.id, size: "huge" })).code).toBe(
-      "invalid",
-    );
     // Another campaign's DM can't reach it.
     expect(
       t.err(() => t.run(I.updateToken, { tokenId: thorn.id, name: "x" }, t.h.dmSecond)).code,
     ).toBe("not_found");
+  });
+
+  test("FR-MAP-150 token menu size: this token only, keeps its cell, logged; DM only", () => {
+    const t = setup();
+    const s = t.newScene();
+    const a = t.place(s.id, t.h.goblinId, 3, 3);
+    const b = t.place(s.id, t.h.goblinId, 8, 3);
+    const n = readEventLog(t.s.db).length;
+    t.run(I.updateToken, { tokenId: a.id, size: "large" });
+    expect(t.tokenRow(a.id)).toMatchObject({ size: "large", sizeOverridden: true, col: 3, row: 3 });
+    expect(t.tokenRow(b.id)).toMatchObject({ size: b.size, sizeOverridden: false });
+    expect(t.lastEvent()?.type).toBe("TokenUpdated");
+    expect(readEventLog(t.s.db).length).toBe(n + 1);
+    expect(
+      t.err(() => t.run(I.updateToken, { tokenId: b.id, size: "huge" }, t.player(t.h.p1))).code,
+    ).toBe("forbidden");
+  });
+
+  test("FR-MAP-150 the creature's own size puts the token back on the creature", () => {
+    const t = setup();
+    const s = t.newScene();
+    const ogre = t.run<EntityRecord>(createEntity.name, {
+      kind: "monster",
+      name: "Cave Ogre",
+      statBlock: { ...goblinBlock, size: "large" },
+    });
+    const a = t.place(s.id, ogre.id, 3, 3);
+    t.run(I.updateToken, { tokenId: a.id, size: "huge" });
+    t.run(I.updateToken, { tokenId: a.id, size: "large" });
+    expect(t.tokenRow(a.id)).toMatchObject({ size: "large", sizeOverridden: false });
+    t.run(UPDATE, {
+      id: ogre.id,
+      name: "Cave Ogre",
+      statBlock: { ...goblinBlock, size: "medium" },
+    });
+    expect(t.tokenRow(a.id).size).toBe("medium");
+  });
+
+  test("FR-MAP-150 / FR-MAP-20 a creature edit leaves a DM-set size; reaching it ends the override", () => {
+    const t = setup();
+    const s = t.newScene();
+    const ogre = t.run<EntityRecord>(createEntity.name, {
+      kind: "monster",
+      name: "Cave Ogre",
+      statBlock: { ...goblinBlock, size: "large" },
+    });
+    const a = t.place(s.id, ogre.id, 3, 3);
+    const b = t.place(s.id, ogre.id, 8, 3);
+    t.run(I.updateToken, { tokenId: a.id, size: "huge" });
+    const edit = (size: "medium" | "huge") =>
+      t.run(UPDATE, { id: ogre.id, name: "Cave Ogre", statBlock: { ...goblinBlock, size } });
+    edit("medium");
+    expect(t.tokenRow(a.id)).toMatchObject({ size: "huge", sizeOverridden: true });
+    expect(t.tokenRow(b.id).size).toBe("medium");
+    edit("huge");
+    expect(t.tokenRow(a.id)).toMatchObject({ size: "huge", sizeOverridden: false });
+    edit("medium");
+    expect(t.tokenRow(a.id).size).toBe("medium");
+  });
+
+  test("FR-MAP-150 / FR-MAP-17 a copy keeps the DM-set size", () => {
+    const t = setup();
+    const s = t.newScene();
+    const a = t.place(s.id, t.h.goblinId, 3, 3);
+    t.run(I.updateToken, { tokenId: a.id, size: "huge" });
+    const { tokenId } = t.run<{ tokenId: string }>(I.duplicateToken, { tokenId: a.id });
+    expect(t.tokenRow(tokenId)).toMatchObject({ size: "huge", sizeOverridden: true });
+  });
+
+  test("FR-MAP-150 / FR-MAP-14 a smaller footprint must still overlap the map", () => {
+    const t = setup();
+    const s = t.newScene();
+    const a = t.place(s.id, t.h.goblinId, 0, 0);
+    t.run(I.updateToken, { tokenId: a.id, size: "huge" });
+    t.run(I.moveToken, { tokenId: a.id, col: -2, row: 0 });
+    expect(t.err(() => t.run(I.updateToken, { tokenId: a.id, size: "medium" })).code).toBe(
+      "invalid",
+    );
+    expect(t.tokenRow(a.id)).toMatchObject({ size: "huge", col: -2 });
   });
 
   test("FR-MAP-19 hide / reveal events; unchanged → no event", () => {

@@ -37,7 +37,10 @@ async function templates(page: Page): Promise<TemplateNode[]> {
       cells: String(n.getAttr("cells") ?? ""),
       origin: String(n.getAttr("origin") ?? ""),
       angle: Number(n.getAttr("angle")),
-      text: n.findOne(".scn-template-label-text")?.text() ?? null,
+      text: (() => {
+        const label = K?.stages[0]?.find(".scn-template-label").find((l) => l.id() === n.id());
+        return label?.findOne(".scn-template-label-text")?.text() ?? null;
+      })(),
     }));
   });
 }

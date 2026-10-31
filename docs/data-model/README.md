@@ -416,7 +416,8 @@ An instance of a creature definition: own name, read-only display copies, play s
 | definitionId | ID → Entity | Via `resolveDefinition`: global or same campaign. **Never sent to players** | [FR-MAP-13](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-26](../specs/scenes-map.md#6-functional-requirements) |
 | name | text 1–40 | **Token-owned** instance state; numbered `B <N>` on place/duplicate; never changed by a definition edit | [FR-MAP-16](../specs/scenes-map.md#6-functional-requirements), #126 |
 | imageAssetId | ID → Asset \| null | **Display copy**: portrait at place; refreshed by the hook only while it equals the old portrait (#127); DM may set custom art | FR-MAP-13, [FR-MAP-18](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-20](../specs/scenes-map.md#6-functional-requirements) |
-| size | `tiny`…`gargantuan` | **Display copy** of `statBlock.size`; never per-token editable; refreshed by the hook | FR-MAP-13, FR-MAP-20, #120 |
+| size | `tiny`…`gargantuan` | **Display copy** of `statBlock.size`, refreshed by the hook, unless the DM set this token's size (`sizeOverridden`) | FR-MAP-13, FR-MAP-20, #120, FR-MAP-150 |
+| sizeOverridden *(#429)* | bool | Column `size_overridden` not null default false. The DM set `size` from the token menu; the hook leaves it. Copied by token and scene duplicate. Server only: on no wire | [FR-MAP-150](../specs/scenes-map.md#6-functional-requirements) |
 | col, row | int | Top-left cell; footprint must overlap the map | [FR-MAP-14](../specs/scenes-map.md#6-functional-requirements) |
 | ownerPlayerId | ID → Player \| null | One owner; defaults from the character's owner; DM reassigns | FR-MAP-13, FR-MAP-18, #124 |
 | hidden | bool | Visibility flag on the record | [FR-MAP-19](../specs/scenes-map.md#6-functional-requirements) |
@@ -2886,3 +2887,15 @@ From [log-share](../specs/log-share.md#8-data-model) (#415). **No new table, col
 - **Fold (FR-SHARE-08):** the window's shares keep ≤ 64,000 chars of text, newest first; an older one gets `text: ""`, `folded: true` in the same transaction.
 - **Fixtures:** `share-mira-rows` (Mira: Fireball, Hedge Whisper, Moonblade Shard); bundle `log-share`.
 - **Snapshot size** (CON-44, `FR-SHARE-08 CON-44`): 100 shares of the longest text: at most +109,235 B per viewer on `log-share`, about 45 KB of it the rows themselves. 0 B while no share exists.
+
+## 152. AoE tool polish (fix/aoe-template-polish)
+
+From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57–60 ([#427](../decisions-log.md)). **No new table, column or record type.** `aoe_template.shape` keeps `cylinder` as a valid value: rows kept earlier stay as they are, the AoE tool just no longer places new ones. Protocol side: [protocol §193](../protocol/README.md#193-aoe-tool-polish-fixaoe-template-polish).
+
+## 153. Clear damage (build/cbt-clear-damage)
+
+No new table or column.
+
+| Field | Change | Rule | FR |
+|---|---|---|---|
+| `notification.payload` (kind `damage-card`) | + optional `damageCleared: true` | Set by `cbt.clearDamage` with `damage: null` (`unusedRolls`, `diceMaxed` removed); removed when new damage attaches | FR-CBT-178 |

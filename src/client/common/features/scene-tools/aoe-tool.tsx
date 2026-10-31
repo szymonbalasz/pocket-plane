@@ -1,12 +1,12 @@
-// AoE tool (FR-SCN-22–26, -43–45; SCN §7), both clients: a drawing tool in the canvas tool
-// registry. Press and drag: the direction (cone, line, cube diagonal) or the radius (sphere,
-// cylinder); release → this connection's ephemeral template (a new one replaces it; Clear or Esc
-// removes it). Snapped unless Ctrl (FR-SCN-43, #375: cell centre, a big token's centre for a
-// sphere / cylinder, a vertex for a cube; 15°; the origin cells highlighted while placing): Ctrl
+// AoE tool (FR-SCN-22–26, -43–45, -57; SCN §7), both clients: a drawing tool in the canvas tool
+// registry. Press and drag: the direction (cone, line, cube diagonal) or the radius (sphere);
+// release → this connection's ephemeral template (a new one replaces it; Clear, Esc or a right
+// click on it removes it, FR-SCN-58). Snapped unless Ctrl (FR-SCN-43, #375: cell centre, a big token's centre for a
+// sphere, a vertex for a cube; 15°; the origin cells highlighted while placing): Ctrl
 // frees the origin to 0.01 cell and the angle to 0.1°, read on every move, with the "Free" chip
 // at the cursor. Pressing an editable kept
 // template's origin selects it and drags it; the selected one's end handle re-aims it (cone,
-// line, cube) or resizes it (sphere, cylinder); release sends one `scn.updateTemplate`
+// line, cube) or resizes it (sphere; a cylinder kept before FR-SCN-57 too); release sends one `scn.updateTemplate`
 // (FR-SCN-45). The panel: shape, size / width with ±5 nudges, label, Keep, Clear; for a selected
 // kept template: resize, rotate, Delete and (DM) Hide / Reveal; DM: DM-only and "Clear templates
 // on this scene" (confirm + scope, FR-SCN-44).
@@ -16,7 +16,6 @@ import {
   SCN_INTENTS as S,
   TEMPLATE_ANGLE,
   TEMPLATE_LABEL_MAX,
-  TEMPLATE_SHAPES,
   TEMPLATE_SIZE,
   TEMPLATE_WIDTH,
   type TemplateRecordView,
@@ -24,7 +23,6 @@ import {
 } from "@shared/scene-tools/schemas";
 import {
   CircleIcon,
-  CylinderIcon,
   EyeIcon,
   EyeOffIcon,
   MinusIcon,
@@ -59,6 +57,7 @@ import { type AoeOrigin, aoeOrigin, footprintOf, mapCells, type SnapOptions } fr
 import { bindAoe, cancelAoe, editTemplate, endOwn, keepOwn, showOwn, useAoe } from "./aoe-store";
 import { FreeChip } from "./free-chip";
 import {
+  AOE_TOOL_SHAPES,
   type AoeSettings,
   clearConfirmEnabled,
   clearCounts,
@@ -79,10 +78,9 @@ import {
   templateUpdate,
 } from "./templates";
 
-const SHAPE_ICONS: Record<TemplateShape, typeof CircleIcon> = {
+const SHAPE_ICONS: Record<(typeof AOE_TOOL_SHAPES)[number], typeof CircleIcon> = {
   cone: TriangleIcon,
   sphere: CircleIcon,
-  cylinder: CylinderIcon,
   cube: SquareIcon,
   line: SlashIcon,
 };
@@ -350,7 +348,7 @@ export function AoePanel() {
         onValueChange={(v) => v && applySettings({ shape: v as TemplateShape })}
         aria-label="Shape"
       >
-        {TEMPLATE_SHAPES.map((s) => {
+        {AOE_TOOL_SHAPES.map((s) => {
           const Icon = SHAPE_ICONS[s];
           return (
             <ToggleTip key={s} content={`${s[0]?.toUpperCase()}${s.slice(1)}`}>
@@ -497,6 +495,9 @@ export function AoePanel() {
       </p>
       <p data-testid="scn-aoe-hint" className="text-muted-foreground text-xs">
         Ctrl: free placement
+      </p>
+      <p data-testid="scn-aoe-hint-clear" className="text-muted-foreground text-xs">
+        Right-click a template to remove it
       </p>
       <FreeChip enabled onCtrl={aoeCtrl} />
     </div>

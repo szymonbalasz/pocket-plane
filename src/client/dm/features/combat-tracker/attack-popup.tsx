@@ -20,7 +20,8 @@
 // AC chip, Hit, multiplier, preview; Remove on hover), footer Dismiss · card actions · Apply.
 // Sprint 15 (FR-CBT-174, -176; #385): the "Use roll" step before a card made from a logged roll
 // (Attacker, a Type per untyped damage roll, Make card / Cancel), in the same panel; a crit card
-// completed from a logged roll says its dice weren't doubled (OQ-CBT-104 A).
+// completed from a logged roll says its dice weren't doubled (OQ-CBT-104 A). FR-CBT-178 (#428):
+// Clear on the damage line takes a card's damage off; the next roll fills the emptied fields.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
@@ -28,6 +29,7 @@ import {
   APPLY_TARGETS_MAX,
   type CardPartRef,
   CBT_INTENTS,
+  type ClearDamageResult,
   type CombatantView,
   CRIT_CHANGED_TEXT,
   critChanged,
@@ -124,6 +126,7 @@ import {
 import { useDefinitions } from "./data";
 import {
   blurField,
+  clearShown,
   FIELD_EMPTY,
   type FieldDraft,
   fieldValue,
@@ -850,6 +853,19 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
       setApplying(false);
     }
   };
+  // FR-CBT-178 (#428): off the card (a typed total alone needs no intent), then every damage field
+  // and the old roll's trigger picks are the DM's no longer, so the next roll fills them.
+  const clearDamage = async () => {
+    if (disabled) return;
+    if (p.damage) {
+      const r = await send<ClearDamageResult>(CBT_INTENTS.clearDamage, {
+        cardId: card.id,
+        damageRollId: p.damage.rollId,
+      });
+      if (r === undefined) return;
+    }
+    edit(() => ({ damage: FIELD_EMPTY, extra: [], parts: {} }));
+  };
   const dismiss = async () => {
     const r = await send("note.dismiss", { id: card.id });
     if (r !== undefined) {
@@ -1014,6 +1030,20 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
               placeholder={p.damage ? undefined : "Total"}
               onEdit={(next) => edit(() => ({ damage: next }))}
             />
+            {clearShown(p, isTyped(draft.damage)) && (
+              <Tooltip content="Clear the damage: the next roll fills it">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-1.5 text-xs"
+                  data-testid="cbt-popup-damage-clear"
+                  disabled={disabled}
+                  onClick={clearDamage}
+                >
+                  Clear
+                </Button>
+              </Tooltip>
+            )}
           </div>
         </div>
         {extraParts.map((x, i) => (
