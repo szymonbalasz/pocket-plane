@@ -2,7 +2,16 @@
 // renderer): every seeded throw rests or snaps within 150 steps and shows the server value.
 import { describe, expect, test } from "bun:test";
 import { type DieShape, throwDice } from "@shared/dice-extras/throw";
-import { type Arena, arenaOf, dieSizePx, pixelRatioOf, screenArena, shadowsFor } from "../arena";
+import {
+  type Arena,
+  arenaOf,
+  DIE_WORLD,
+  dieSizePx,
+  pixelRatioOf,
+  screenArena,
+  screenView,
+  shadowsFor,
+} from "../arena";
 import {
   cross,
   defaultLabels,
@@ -231,6 +240,7 @@ const ARENAS: [string, Arena][] = [
   ["1440×900", screenArena({ w: 1440, h: 900 })],
   ["1920×1080", screenArena({ w: 1920, h: 1080 })],
   ["390×844", screenArena({ w: 390, h: 844 })],
+  ["360×640", screenArena({ w: 360, h: 640 })],
   ["popup line 284×140", arenaOf({ w: 284, h: 140 }, 44)],
 ];
 const TYPES: [DieShape, LabelKind][] = [
@@ -310,6 +320,57 @@ describe("FR-DICEX-34 animation lands on the server's faces", () => {
     for (const sim of [one, other]) {
       const [labels] = settleLabels(sim, [17]);
       expect(upFace(g, labels as number[], sim.final[0] as Quat)).toBe(17);
+    }
+  });
+});
+
+describe("FR-DICEX-33 screen arena box", () => {
+  const VIEWPORTS: [number, number][] = [
+    [1280, 720],
+    [1440, 900],
+    [1920, 1080],
+    [2560, 1440],
+    [390, 844],
+    [360, 640],
+  ];
+  /** CSS px per world unit at a viewport's die size. */
+  const perUnit = (v: { w: number; h: number }) => dieSizePx(v) / DIE_WORLD;
+
+  test.each(VIEWPORTS)("%d×%d: the walls leave a margin of at least 20 % on every side", (w, h) => {
+    const v = { w, h };
+    const a = screenArena(v);
+    const k = perUnit(v);
+    expect(w / 2 - a.x * k).toBeGreaterThanOrEqual(0.2 * w);
+    expect(h / 2 - a.z * k).toBeGreaterThanOrEqual(0.2 * h);
+  });
+
+  test("1440×900: the box's walls, in px from the centre", () => {
+    const v = { w: 1440, h: 900 };
+    const a = screenArena(v);
+    expect(a.x * perUnit(v)).toBeCloseTo(425);
+    expect(a.z * perUnit(v)).toBeCloseTo(250);
+  });
+
+  test.each(VIEWPORTS)("%d×%d: the camera shows the whole viewport at die scale", (w, h) => {
+    const v = { w, h };
+    const view = screenView(v);
+    const k = perUnit(v);
+    expect(view.x * k * 2).toBeCloseTo(w);
+    expect(view.z * k * 2).toBeCloseTo(h);
+  });
+
+  test.each(VIEWPORTS)("%d×%d: 20 dice stay inside the box in every frame", (w, h) => {
+    const a = screenArena({ w, h });
+    const dice = Array.from({ length: 20 }, (_, i) => {
+      const s = SHAPES[i % SHAPES.length] as DieShape;
+      return { shape: s, kind: s };
+    });
+    for (let k = 0; k < 3; k++) {
+      const sim = simulate(dice, seedOf(`box-${k}`), a);
+      for (let i = 0; i < sim.frames.length; i += POSE) {
+        expect(Math.abs(sim.frames[i] as number)).toBeLessThanOrEqual(a.x);
+        expect(Math.abs(sim.frames[i + 2] as number)).toBeLessThanOrEqual(a.z);
+      }
     }
   });
 });
