@@ -501,6 +501,12 @@ const causeGrown = (cause: string): Viewport | null => {
   return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
 };
 
+/** Parses a `zone:<w>×<h>` cause: a protected window's round trip (FR-SHELL-220, BL-146). */
+const causeZone = (cause: string): Viewport | null => {
+  const m = /^zone:(\d+)×(\d+)$/.exec(cause);
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
+};
+
 /**
  * One settle (FR-SHELL-95): `ws` = the windows before the trigger. Returns the plan: the next
  * windows (same array when nothing changed), the displacement memory, and what it did.
@@ -669,7 +675,9 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const old = memory.get(id);
     const waits =
       old?.shrunk === true ||
-      (old !== undefined && causeGrown(old.cause) !== null && /^(toolbar|window):/.test(cause));
+      (old !== undefined &&
+        (causeGrown(old.cause) !== null || causeZone(old.cause) !== null) &&
+        /^(toolbar|window):/.test(cause));
     const under = old && waits && old.cause !== cause ? old : undefined;
     const prior = under ? undefined : old;
     memory.set(
@@ -1292,6 +1300,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const w = get(id);
     // FR-SHELL-145, -149: a remembered protected window keeps its rect and makes no room.
     if (!w || !isShown(w, ctx.available) || isRemembered(w)) return;
+    if (tripBack(id, w)) {
+      if (displace) displaceFrom(id, cause);
+      return;
+    }
     const full = zoneOf(w);
     const def = defOf(w);
     // A squeeze whose cause goes on stays squeezed in the zone (a viewport change). After a
@@ -1341,6 +1353,28 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       }
     }
     if (displace) displaceFrom(id, cause);
+  };
+
+  /**
+   * FR-SHELL-220, -221 (BL-146): a protected window a resize down moved off the spot it held comes
+   * back to that spot once the screen is that big again, where the spot still holds (on screen,
+   * clear of the protected windows and hard keep-outs, PC-clear). The trip ends here either way;
+   * no longer there, the zone rule places it.
+   */
+  const tripBack = (id: string, w: WindowState): boolean => {
+    const d = memory.get(id);
+    if (!d || !causeZone(d.cause) || !ended(d)) return false;
+    memory.delete(id);
+    if (!sameRect(w, d.at) || !inside(d.rect)) return false;
+    const atSpot = { ...w, ...d.rect };
+    const at = shownRects(
+      out.map((x) => (idOf(x) === id ? atSpot : x)),
+      ctx,
+    );
+    const r = at.get(atSpot) ?? shownRect(out, atSpot, ctx);
+    if (!pcFree(r) || !clearOfProtected(r, id, at)) return false;
+    write(id, d.rect, "returned", { rung: "trip" });
+    return true;
   };
 
   /** Launcher windows over protected window `id` move out (FR-SHELL-99), highest z first. */
@@ -1436,6 +1470,20 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       .flatMap((d) => out.filter((w) => w.kind === d.kind && isShown(w, ctx.available)))
       .map(idOf);
 
+  /**
+   * The shown untouched protected windows off their zone at `size` (the viewport a resize leaves)
+   * with no memory of their own: the spots a resize down can take from them (FR-SHELL-220).
+   */
+  const offZone = (size: Viewport): WindowState[] => {
+    const zones = defaultLayout(registry, size, [], keepOuts(registry.client, size, new Map()));
+    return protectedIds().flatMap((id) => {
+      const w = get(id);
+      if (!w || isRemembered(w) || memory.has(id)) return [];
+      const zone = zones.find((z) => z.kind === w.kind);
+      return sameRect(w, zone) ? [] : [w];
+    });
+  };
+
   /** A memory entry whose cause ended (FR-SHELL-102). */
   const ended = (d: Displacement) => {
     if (d.cause.startsWith("toolbar:")) {
@@ -1446,6 +1494,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     if (v) return vp.w >= v.w && vp.h >= v.h;
     const g = causeGrown(d.cause);
     if (g) return vp.w <= g.w && vp.h <= g.h;
+    const z = causeZone(d.cause);
+    if (z) return vp.w >= z.w && vp.h >= z.h;
     if (d.cause.startsWith("window:")) {
       // The kind closes, is minimised by the user or ends; one the shell put away for a transient
       // cause comes back (one put away for an open hands its squeezes on, `putAwayWin`).
@@ -1469,7 +1519,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
    */
   const returns = (only?: (d: Displacement) => boolean) => {
     const due = [...memory.values()]
-      .filter((d) => ended(d) && (!only || only(d)))
+      // A round trip ends in the zone pass (`tripBack`), not here.
+      .filter((d) => !causeZone(d.cause) && ended(d) && (!only || only(d)))
       .map((d) => ({ d, w: find(out, d.kind, d.instance) }))
       .filter((e): e is { d: Displacement; w: WindowState } => e.w !== undefined)
       .sort((a, b) => a.w.z - b.w.z);
@@ -1483,6 +1534,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const untouched = d.at === null ? w.state === "minimised" : sameRect(w, d.at);
       if (!untouched || (d.at !== null && w.state !== "open")) continue;
       if (isProt(w) && d.cause.startsWith("window:") && !d.userSpot && !d.userSize) {
+        // A round trip the squeeze waited on goes on (FR-SHELL-221).
+        if (d.under && causeZone(d.under.cause)) {
+          memory.set(id, { ...d.under, at: plainRect(w) });
+        }
         zoneBack(id, d);
         continue;
       }
@@ -1696,12 +1751,33 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     case "viewport": {
       const shrank = vp.w < from.w || vp.h < from.h;
       const cause = shrank ? `viewport:${from.w}×${from.h}` : undefined;
+      const spots = shrank ? offZone(from) : [];
       // Zones first (the frame the rest fits around); a protected window's squeeze ends with them.
       zonePass(cause);
       for (const id of protectedIds()) {
         const p = get(id);
-        if (p && placed.get(id) === "zone" && !squeezedNow(p)) memory.delete(id);
-        else if (p && squeezedNow(p)) remember(p, "", plainRect(p));
+        const m = memory.get(id);
+        if (m && causeZone(m.cause)) continue;
+        if (p && placed.get(id) === "zone" && !squeezedNow(p)) {
+          memory.delete(id);
+          if (m?.under && causeZone(m.under.cause)) {
+            memory.set(id, { ...m.under, at: plainRect(p) });
+          }
+        } else if (p && squeezedNow(p)) remember(p, "", plainRect(p));
+      }
+      // FR-SHELL-220: what this resize moved off its spot remembers it for the way back up.
+      for (const before of spots) {
+        const id = idOf(before);
+        const now = get(id);
+        if (!now || sameRect(now, before) || memory.has(id)) continue;
+        memory.set(id, {
+          kind: before.kind,
+          instance: before.instance,
+          rect: plainRect(before),
+          ...(before.area && { area: before.area }),
+          cause: `zone:${from.w}×${from.h}`,
+          at: plainRect(now),
+        });
       }
       returns();
       for (const id of launchersByZ()) keepOrPlace(id, cause);
