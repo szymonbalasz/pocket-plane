@@ -66,9 +66,10 @@ test("FR-ASSET-69 FR-ASSET-70 FR-ASSET-67 Assets window: Images used-in and prev
   await expect(chime.getByTestId("asset-lib-sound-used")).toContainText("Pause");
   await chime.getByTestId("asset-delete").click();
   const manage = dm.getByTestId("asset-manage-dialog");
-  await manage.getByTestId("asset-manage-confirm").click();
-  await expect(manage.getByTestId("asset-manage-error")).toContainText("Pause (alert sound)");
-  await dm.keyboard.press("Escape");
+  // BL-177: refused up front, in the "Used in" wording, no confirm.
+  await expect(manage.getByTestId("asset-delete-used")).toContainText("Pause (alert sound)");
+  await expect(manage.getByTestId("asset-manage-confirm")).toHaveCount(0);
+  await manage.getByTestId("asset-manage-close").click();
   await expect(chime).toHaveCount(1);
 
   // Upload a sound → rename it → delete it.

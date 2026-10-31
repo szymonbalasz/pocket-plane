@@ -1,7 +1,8 @@
 // e2e-bundle: image-manage-e2e
 // Rename / delete an image (ASSET §13.1 E2E, FR-ASSET-62–66, #386): in the New scene picker,
-// rename Misc Sketch, delete it (the tile goes), and try to delete the Town map: refused, the
-// reject names the scene. Rules and every kind of use: bun test (manage*.test.ts).
+// rename Misc Sketch, delete it (the tile goes), and try to delete the Town map: refused up front
+// with its "Used in" line, no confirm (BL-177). Rules and every kind of use: bun test
+// (manage*.test.ts).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -10,7 +11,7 @@ async function live(page: Page) {
   await expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
 }
 
-test("FR-ASSET-66 FR-ASSET-62 FR-ASSET-63 FR-ASSET-64 rename and delete an unused image; an image in use is refused with its uses named", async ({
+test("FR-ASSET-66 FR-ASSET-62 FR-ASSET-63 FR-ASSET-64 BL-177 rename and delete an unused image; an image in use is refused up front with its uses named", async ({
   browser,
 }) => {
   const { secret, recordId } = e2eEnv();
@@ -57,9 +58,9 @@ test("FR-ASSET-66 FR-ASSET-62 FR-ASSET-63 FR-ASSET-64 rename and delete an unuse
   await picker.getByTestId("asset-picker-search").fill("town");
   await item(town).click();
   await picker.locator(`[data-testid="asset-delete"][data-record-id="${town}"]`).click();
-  await manage.getByTestId("asset-manage-confirm").click();
-  await expect(manage.getByTestId("asset-manage-error")).toContainText("Town (scene map)");
-  await dm.keyboard.press("Escape");
+  await expect(manage.getByTestId("asset-delete-used")).toContainText("Used in: Town (scene map)");
+  await expect(manage.getByTestId("asset-manage-confirm")).toHaveCount(0);
+  await manage.getByTestId("asset-manage-close").click();
   await expect(manage).toHaveCount(0);
   await expect(item(town)).toHaveCount(1);
 });

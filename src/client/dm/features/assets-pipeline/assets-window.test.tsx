@@ -2,6 +2,7 @@
 // without Select, the "Used in" text and the Sounds rows' helpers (FR-ASSET-70). Tabs, preview,
 // a sound's rename / delete: e2e/assets-window.e2e.ts.
 import { describe, expect, mock, test } from "bun:test";
+import { usedInText } from "@shared/assets-pipeline/manage";
 import { sampleLibrary, sampleNamed } from "@shared/assets-pipeline/sample-library";
 import { AssetPicker } from "@ui/features/assets-pipeline/AssetPicker";
 import {
@@ -9,7 +10,7 @@ import {
   stubImageForFile,
   tagOf,
 } from "@ui/features/assets-pipeline/picker-test-kit";
-import { ASSETS_KIND, seconds, soundUsedBy, usedInText } from "./assets-window";
+import { ASSETS_KIND, seconds, soundUsedBy } from "./assets-window";
 
 mock.module("../campaign-management/PlayersPanel", () => ({ PlayersPanel: () => null }));
 const { dmWindows } = await import("../../windows");
