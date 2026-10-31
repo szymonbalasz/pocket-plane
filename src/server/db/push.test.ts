@@ -2,10 +2,18 @@
 // additive, no data loss, defaults filled in.
 import { Database } from "bun:sqlite";
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { applyStatements, createSchema, dropDuplicateIndexCreates, pushSchema } from "./push";
+import {
+  applyStatements,
+  createSchema,
+  dropDuplicateIndexCreates,
+  pushSchema,
+  SchemaPushError,
+  withoutPrompts,
+} from "./push";
+import { schema } from "./schema";
 
 const AT = "2026-01-01T00:00:00.000Z";
 
@@ -190,4 +198,134 @@ test("FR-SCN-46 push drops drizzle-kit's repeated CREATE INDEX after a table reb
     "CREATE INDEX `t_scene` ON `t` (`scene_id`);",
   ];
   expect(dropDuplicateIndexCreates(stmts)).toEqual(stmts.slice(0, 7));
+});
+
+// ---------- BL-172: what drizzle-kit would ask about becomes a refusal, in any terminal ----------
+
+/** One of today's tables under another name: the schema gains a table and the DB has an extra one. */
+const tableSwapped = (db: Database) => db.run("ALTER TABLE sync_probe RENAME TO sync_probe_old");
+/** `name` now `name_old` in the DB: the schema gains a column and the DB has an extra one. */
+const columnRenamed = (db: Database) => db.run("ALTER TABLE token RENAME COLUMN name TO name_old");
+
+/** Runs `fn` with this process claiming the given terminal state, as a real pane would show it. */
+async function withTty<T>(isTty: boolean, fn: () => Promise<T>): Promise<T> {
+  const streams = [process.stdin, process.stdout];
+  const before = streams.map((s) => Object.getOwnPropertyDescriptor(s, "isTTY"));
+  for (const s of streams) Object.defineProperty(s, "isTTY", { value: isTty, configurable: true });
+  try {
+    return await fn();
+  } finally {
+    streams.forEach((s, i) => {
+      const b = before[i];
+      if (b) Object.defineProperty(s, "isTTY", b);
+      else delete (s as { isTTY?: boolean }).isTTY;
+    });
+  }
+}
+
+const refusal = async (db: Database) => {
+  const err = await pushSchema(db).then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(SchemaPushError);
+  return (err as Error).message;
+};
+
+for (const isTty of [false, true]) {
+  const where = isTty ? "a terminal" : "no terminal";
+
+  test(`BL-172 a table gaining one column and losing another is refused, nothing applied (${where})`, async () => {
+    const db = await oldDb();
+    columnRenamed(db);
+    const message = await withTty(isTty, () => refusal(db));
+    expect(message).toContain("nothing was changed");
+    expect(message).toContain("table token: new column(s)");
+    expect(message).toContain("old column(s) name_old");
+    expect(message).toContain("copy at boot (ADR-0076)");
+    expect(columns(db, "token")).toContain("name_old");
+    expect(columns(db, "token")).not.toContain("shape");
+    db.close();
+  });
+
+  test(`BL-172 a table swapped for another is refused, nothing applied (${where})`, async () => {
+    const db = await oldDb();
+    tableSwapped(db);
+    const before = tables(db);
+    const message = await withTty(isTty, () => refusal(db));
+    expect(message).toContain("new table(s) sync_probe; old table(s) sync_probe_old");
+    expect(message).toContain("add the new one and copy at boot (ADR-0076)");
+    expect(tables(db)).toEqual(before);
+    db.close();
+  });
+
+  test(`BL-172 a plain added column still applies (${where})`, async () => {
+    const db = await oldDb();
+    const { applied } = await withTty(isTty, () => pushSchema(db));
+    expect(applied).toBeGreaterThan(0);
+    expect(columns(db, "token")).toContain("shape");
+    db.close();
+  });
+}
+
+test("BL-172 a refused file DB gets no backup: nothing to restore from it, nothing written", async () => {
+  const db = await fileDb();
+  columnRenamed(db);
+  const stem = path.basename(db.filename);
+  await refusal(db);
+  expect(readdirSync(tmp).filter((f) => f.startsWith(`${stem}.pre-push-`))).toEqual([]);
+  db.close();
+});
+
+test("BL-172 drizzle-kit's own prompt rejects instead of waiting, in a terminal (the safety net)", async () => {
+  const db = await oldDb();
+  columnRenamed(db);
+  const api = await import("drizzle-kit/api");
+  const { drizzle } = await import("drizzle-orm/bun-sqlite");
+  // Hide the spinner, as pushSchema does.
+  const write = process.stdout.write;
+  process.stdout.write = (() => true) as typeof write;
+  const err = await withTty(true, () =>
+    withoutPrompts(() => api.pushSQLiteSchema(schema, drizzle(db) as never)).then(
+      () => null,
+      (e: unknown) => e,
+    ),
+  ).finally(() => {
+    process.stdout.write = write;
+  });
+  expect(String(err)).toContain("Interactive prompts require a TTY terminal");
+  db.close();
+});
+
+test("BL-172 the terminal check is restored after a push, refused or not", async () => {
+  await withTty(true, async () => {
+    await withoutPrompts(async () => expect(process.stdout.isTTY).toBe(false));
+    expect(process.stdout.isTTY).toBe(true);
+    await withoutPrompts(() => Promise.reject(new Error("x"))).catch(() => {});
+    expect(process.stdout.isTTY).toBe(true);
+  });
+});
+
+test("BL-172 the data-loss refusal says what to do on real data, in plain text", async () => {
+  const db = await oldDb();
+  db.run("ALTER TABLE combatant DROP COLUMN position");
+  const message = await refusal(db);
+  expect(message).toContain("nothing was changed");
+  expect(message).toContain("go back to the previous version of the app and restart");
+  expect(message).toContain("`play` start-up backup or a `<db>.pre-push-*.bak`");
+  expect(message).toContain("copy at boot (ADR-0076)");
+  expect(message).toContain("fixtures:reset-load");
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: no colour codes in a refusal.
+  expect(message).not.toMatch(/\u001b/);
+  db.close();
+});
+
+test("BL-172 the interrupted-push refusal says what to do on real data", async () => {
+  const db = await fileDb();
+  db.run("CREATE TABLE `__new_token` (id text)");
+  const message = await refusal(db);
+  expect(message).toContain("`<db>.pre-push-*.bak` or `play` start-up backup");
+  expect(message).toContain("-wal / -shm");
+  expect(message).toContain("fixtures:reset-load");
+  db.close();
 });

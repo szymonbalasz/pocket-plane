@@ -79,12 +79,12 @@ export function OverviewToolRail({
         })}
       </ToggleGroup>
       {/* FR-OVW-12: camera only, so it works while not live too. */}
-      <Tooltip content="Fit everything to the free area">
+      <Tooltip content="Zoom to fit everything">
         <Button
           size="icon"
           variant="ghost"
           className={RAIL_TOOL}
-          aria-label="Fit"
+          aria-label="Zoom to fit"
           data-testid="ovw-tool-fit"
           onClick={requestFit}
         >
