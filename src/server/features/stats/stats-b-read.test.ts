@@ -438,6 +438,37 @@ describe("FR-STATS-46 background build failures", () => {
   });
 });
 
+describe("FR-STATS-89 face counts per role", () => {
+  test("FR-STATS-89 FR-STATS-37 a hidden roll is on the DM's bars only, session and campaign alike", async () => {
+    const t = statsSetup();
+    t.roll("Thorn", 20, { public: true });
+    t.roll("Thorn", 20, { public: false });
+    t.roll("Thorn", 7, { public: false });
+    const on = (rows: readonly { key: string; faces: readonly number[] }[], face: number) =>
+      rows.find((r) => r.key === t.thornId)?.faces[face - 1];
+    const dm = t.luck(t.h.dm, {}).rows;
+    const player = t.luck(t.p1, {}).rows;
+    expect([on(dm, 20), on(dm, 7)]).toEqual([2, 1]);
+    expect([on(player, 20), on(player, 7)]).toEqual([1, 0]);
+    const dmAll = (await campaignLuck(t)).rows;
+    const playerAll = (await campaignLuck(t, t.p1)).rows;
+    expect([on(dmAll, 20), on(dmAll, 7)]).toEqual([2, 1]);
+    expect([on(playerAll, 20), on(playerAll, 7)]).toEqual([1, 0]);
+  });
+
+  test("FR-STATS-89 FR-STATS-49 retroactive: a campaign's bars are its sessions' bars added up", async () => {
+    const t = statsSetup();
+    t.roll("Mira", 20, { actor: t.p1 });
+    t.clock.advance(7 * HOUR);
+    t.roll("Mira", 1, { actor: t.p1 });
+    t.roll("Mira", 20, { actor: t.p1 });
+    const [mira] = (await campaignLuck(t, t.p1)).rows;
+    expect(mira?.faces[19]).toBe(2);
+    expect(mira?.faces[0]).toBe(1);
+    expect(mira?.faces.reduce((a, b) => a + b, 0)).toBe(mira?.d20s ?? -1);
+  });
+});
+
 describe("FR-STATS-49 retroactive", () => {
   test("FR-STATS-49 three sittings (injected clock): per-session luck and the campaign sum", async () => {
     const t = statsSetup();
