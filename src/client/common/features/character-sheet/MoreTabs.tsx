@@ -11,7 +11,6 @@ import {
 } from "@shared/character-sheet/sheet";
 import { WALLET_TYPE, type WalletRecord } from "@shared/party-loot/schemas";
 import { useState } from "react";
-import { Tooltip } from "../../components/ui/overlays";
 import { Tip } from "../../components/ui/tip";
 import { useRecords, useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
@@ -114,6 +113,17 @@ function FeatureUses({ f }: { f: FeatureRow }) {
   );
 }
 
+/** A feature's whole text: line breaks kept, dice rollable (Features tab, Main's Limited uses). */
+function FeatureText({ f }: { f: FeatureRow }) {
+  const ctx = useSheet();
+  if (!f.text) return null;
+  return (
+    <p className="text-xs break-words whitespace-pre-wrap text-muted-foreground">
+      <DiceText text={f.text} context={notationContext(ctx, f.name)} />
+    </p>
+  );
+}
+
 function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count: number }) {
   const ctx = useSheet();
   const e = ctx.editing && ctx.canEdit;
@@ -180,14 +190,10 @@ function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count:
       ) : (
         <>
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-sm font-medium">{f.name}</span>
+            <span className="min-w-0 break-words text-sm font-medium">{f.name}</span>
             {f.source && <span className="text-[10px] text-muted-foreground">{f.source}</span>}
           </div>
-          {f.text && (
-            <p className="text-xs whitespace-pre-wrap text-muted-foreground">
-              <DiceText text={f.text} context={notationContext(ctx, f.name)} />
-            </p>
-          )}
+          <FeatureText f={f} />
         </>
       )}
       <FeatureUses f={f} />
@@ -220,7 +226,7 @@ export function FeaturesTab() {
 /**
  * K13 (DM #363, kit "Limited uses"): on the wide Main, the features with uses as counters: the
  * name and the pips + count (the Features tab's, `charx-feature` rows with `data-scope="main"`),
- * the text's first line under them, the whole text in its Tooltip. None with uses → no box.
+ * the whole text under them, drawn as on the Features tab. None with uses → no box.
  */
 export function LimitedUsesBox() {
   const ctx = useSheet();
@@ -229,28 +235,21 @@ export function LimitedUsesBox() {
   if (list.length === 0) return null;
   return (
     <Box box="uses" list label="Limited uses">
-      {list.map((f) => {
-        const line = f.text.split("\n")[0]?.trim() ?? "";
-        return (
-          <div
-            key={f.id}
-            data-testid="charx-feature"
-            data-record-id={f.id}
-            data-scope={scope}
-            className="flex flex-col gap-0.5 border-b py-1.5 last:border-b-0"
-          >
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
-              <span className="min-w-0 truncate text-sm font-medium">{f.name}</span>
-              <FeatureUses f={f} />
-            </div>
-            {line && (
-              <Tooltip content={f.text}>
-                <p className="truncate text-xs text-muted-foreground">{line}</p>
-              </Tooltip>
-            )}
+      {list.map((f) => (
+        <div
+          key={f.id}
+          data-testid="charx-feature"
+          data-record-id={f.id}
+          data-scope={scope}
+          className="flex flex-col gap-0.5 border-b py-1.5 last:border-b-0"
+        >
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+            <span className="min-w-0 break-words text-sm font-medium">{f.name}</span>
+            <FeatureUses f={f} />
           </div>
-        );
-      })}
+          <FeatureText f={f} />
+        </div>
+      ))}
     </Box>
   );
 }

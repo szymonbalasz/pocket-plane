@@ -94,6 +94,7 @@ type Opts = {
   temp?: number;
   stats?: unknown;
   wide?: boolean;
+  features?: FeatureRow[];
 };
 
 function creatureOf(o: Opts): DefinitionRecord {
@@ -126,7 +127,7 @@ function syncOf(client: "dm" | "player") {
 function render(node: React.ReactNode, o: Opts = {}) {
   const client = o.client ?? "player";
   const creature = creatureOf(o);
-  const sheet = { ...defaultSheetData(), spells, features };
+  const sheet = { ...defaultSheetData(), spells, features: o.features ?? features };
   const ctx = {
     creature,
     stats: creature.statBlock,
@@ -577,6 +578,33 @@ describe("K13 wide Main (DM #363)", () => {
       expect(narrow).not.toContain("data-scope");
       expect(narrow).not.toContain('data-testid="charx-attack"');
     }
+  });
+
+  test("FR-CHARX-114 Limited uses shows each feature's whole text: every line, wrapped, dice rollable, no truncation, no tooltip", () => {
+    const name = "Curse of the Very Long and Winding Name That Will Not Fit";
+    const body = [
+      "Bonus action: curse one.",
+      "Add 1d6 to damage against it.",
+      "Ends on death.",
+    ].join(String.fromCharCode(10));
+    const rows = [FeatureRow.parse({ id: "hx", name, usesMax: 1, used: 0, text: body })];
+    const row = elementAt(
+      box(wideMain({ client: "player", features: rows }), "uses"),
+      'data-testid="charx-feature" data-record-id="hx"',
+    );
+    // All three lines, wrapped, line breaks kept, the dice still a roll button.
+    const para = /<p [^>]*>.*<\/p>/s.exec(row)?.[0] ?? "";
+    expect(text(para)).toBe(body);
+    expect(para).toContain("whitespace-pre-wrap");
+    expect(para).toContain("break-words");
+    expect(para).toContain('data-testid="dicex-notation" data-value="1d6"');
+    // Nothing cuts it, name included, and no Tooltip trigger wraps the paragraph.
+    expect(row).not.toContain("truncate");
+    expect(row).not.toContain("line-clamp");
+    expect(/<p [^>]*>/.exec(para)?.[0]).not.toContain("data-state");
+    expect(row).toContain(`<span class="min-w-0 break-words text-sm font-medium">${name}</span>`);
+    // Same rendering as the Features tab.
+    expect(render(<FeaturesTab />, { client: "player", features: rows })).toContain(para);
   });
 
   test("FR-CHARX-114 K13 wide Main: the boxes span both columns, after the abilities + Skills grid (kit wide sheet)", () => {
