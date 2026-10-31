@@ -4467,7 +4467,7 @@ From [scenes-map](../specs/scenes-map.md) FR-MAP-121–123 (#418). **Built by `b
 
 ## 193. Clear damage (build/cbt-clear-damage)
 
-From [combat-tracker](../specs/combat-tracker.md#68-sprint-15-attacks-through-the-tray) FR-CBT-178 (#423). **Built by `build/cbt-clear-damage`.** No new record type.
+From [combat-tracker](../specs/combat-tracker.md#68-sprint-15-attacks-through-the-tray) FR-CBT-178 (#427). **Built by `build/cbt-clear-damage`.** No new record type.
 
 | Item | Shape | Rule | FR |
 |---|---|---|---|

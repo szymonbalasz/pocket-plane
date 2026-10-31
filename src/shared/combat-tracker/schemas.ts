@@ -81,7 +81,7 @@ export const CBT_INTENTS = {
   dismiss: "cbt.dismiss",
   /** FR-CBT-173 (sprint 15, #385): the DM builds or completes a card from a logged roll. */
   useRoll: "cbt.useRoll",
-  /** FR-CBT-178 (#423): the DM takes a card's damage off so a new roll can fill it. */
+  /** FR-CBT-178 (#427): the DM takes a card's damage off so a new roll can fill it. */
   clearDamage: "cbt.clearDamage",
 } as const;
 
@@ -547,7 +547,7 @@ export const DamageCardPayload = z
      */
     diceMaxed: z.literal(true).optional(),
     /**
-     * FR-CBT-178 (#423): the DM cleared this card's damage (`cbt.clearDamage`); the next damage
+     * FR-CBT-178 (#427): the DM cleared this card's damage (`cbt.clearDamage`); the next damage
      * roll of the attacker fills this card first. Gone once new damage attaches. Absent = never.
      */
     damageCleared: z.literal(true).optional(),
@@ -603,7 +603,7 @@ export const samePartRollIds = (sent: PartRollIds, p: DamageCardPayload): boolea
 export const critChanged = (p: DamageCardPayload): boolean =>
   p.toHit !== null && p.damage === null && (p.unusedRolls?.length ?? 0) > 0;
 
-/** FR-CBT-178 (#423): the card waits for a new roll because the DM cleared its damage. */
+/** FR-CBT-178 (#427): the card waits for a new roll because the DM cleared its damage. */
 export const damageClearedWaiting = (p: DamageCardPayload): boolean =>
   p.damageCleared === true && p.damage === null;
 

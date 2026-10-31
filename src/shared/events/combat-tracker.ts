@@ -143,7 +143,7 @@ export const RollUsed = defineEvent({
 });
 
 /**
- * `cbt.clearDamage` (FR-CBT-178, #423): the card's upsert (one frame, no toast), to the DM and the
+ * `cbt.clearDamage` (FR-CBT-178, #427): the card's upsert (one frame, no toast), to the DM and the
  * card's audience. Not undoable; the roll lines stay in the log.
  */
 export const DamageCleared = defineEvent({

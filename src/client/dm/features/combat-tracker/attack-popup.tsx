@@ -20,7 +20,7 @@
 // AC chip, Hit, multiplier, preview; Remove on hover), footer Dismiss · card actions · Apply.
 // Sprint 15 (FR-CBT-174, -176; #385): the "Use roll" step before a card made from a logged roll
 // (Attacker, a Type per untyped damage roll, Make card / Cancel), in the same panel; a crit card
-// completed from a logged roll says its dice weren't doubled (OQ-CBT-104 A). FR-CBT-178 (#423):
+// completed from a logged roll says its dice weren't doubled (OQ-CBT-104 A). FR-CBT-178 (#427):
 // Clear on the damage line takes a card's damage off; the next roll fills the emptied fields.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
@@ -844,7 +844,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
       setApplying(false);
     }
   };
-  // FR-CBT-178 (#423): off the card (a typed total alone needs no intent), then every damage field
+  // FR-CBT-178 (#427): off the card (a typed total alone needs no intent), then every damage field
   // and the old roll's trigger picks are the DM's no longer, so the next roll fills them.
   const clearDamage = async () => {
     if (disabled) return;

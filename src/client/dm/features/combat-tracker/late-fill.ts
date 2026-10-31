@@ -42,7 +42,7 @@ export function ruledRows(
 }
 
 /**
- * FR-CBT-178 (#423): Clear on the damage line: a card with a to-hit that holds damage or a total
+ * FR-CBT-178 (#427): Clear on the damage line: a card with a to-hit that holds damage or a total
  * the DM typed. A damage-only card can't wait for a roll (Dismiss ends it).
  */
 export const clearShown = (card: Pick<DamageCardPayload, "toHit" | "damage">, typed: boolean) =>

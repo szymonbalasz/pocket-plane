@@ -6,7 +6,7 @@
 // card owner's second roll on a completed pending card makes no card (`unusedRolls`).
 // Sprint 15 (FR-CBT-170, -171, #385): the tray's staged parts (`parts`) in place of the row's;
 // `rowless` = no sheet row; the pending match also takes a rowless side.
-// FR-CBT-178 (#423): a card the DM cleared takes the attacker's next roll first.
+// FR-CBT-178 (#427): a card the DM cleared takes the attacker's next roll first.
 import {
   type CharacterRollSpec,
   characterRolls,

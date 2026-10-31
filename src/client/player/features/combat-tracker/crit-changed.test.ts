@@ -42,7 +42,7 @@ describe("FR-CBT-127 crit flip", () => {
     );
     // A plain to-hit-only card still waits for the DM.
     expect(outcomeText(card())).toBe("Waiting for DM");
-    // FR-CBT-178 (#423): the DM cleared the damage: the owner is told to roll again.
+    // FR-CBT-178 (#427): the DM cleared the damage: the owner is told to roll again.
     expect(outcomeText(card({ damageCleared: true }))).toBe(DAMAGE_CLEARED_TEXT);
   });
 });

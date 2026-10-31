@@ -417,13 +417,13 @@ function NameRow({
         <SheetName picker={picker} />
         <span
           data-testid="char-sheet-level"
-          className="mt-1 inline-block max-w-full align-top text-sm text-muted-foreground @min-[560px]/sheet:text-base"
+          className="mt-1 inline-block max-w-full align-top text-sm [overflow-wrap:anywhere] text-muted-foreground @min-[560px]/sheet:text-base"
         >
           <LevelParts parts={[...sub.split(" · "), ...(species ? [species] : [])]} />
           {background && (
             <span className="hidden @min-[560px]/sheet:inline">
               {" "}
-              <span className="whitespace-nowrap">· {background}</span>
+              <span className="inline-block max-w-full">· {background}</span>
             </span>
           )}
         </span>
@@ -440,7 +440,8 @@ function NameRow({
 
 /**
  * The level line's parts ("Level 1 Fighter", "Human"; "CR 1/4", "50 XP"): a later part keeps its
- * "·" and its words together, so the line wraps between parts, never right after a "·" (K11).
+ * "·" and its words together, so the line wraps between parts, never right after a "·" (K11). A
+ * part longer than the column wraps inside itself on its own line instead of being cut.
  */
 function LevelParts({ parts }: { parts: readonly string[] }) {
   return parts.map((p, i) =>
@@ -449,7 +450,7 @@ function LevelParts({ parts }: { parts: readonly string[] }) {
     ) : (
       <span key={p}>
         {" "}
-        <span className="whitespace-nowrap">· {p}</span>
+        <span className="inline-block max-w-full">· {p}</span>
       </span>
     ),
   );
