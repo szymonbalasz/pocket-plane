@@ -156,7 +156,7 @@ function Row({
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="break-words font-medium" data-testid="hold-row-name">
+          <span className="font-medium [overflow-wrap:anywhere]" data-testid="hold-row-name">
             {row.name}
           </span>
           {dm && row.dmOnly && (

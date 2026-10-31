@@ -37,6 +37,7 @@ import {
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
 import { Tip } from "../../components/ui/tip";
+import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useLazyRecords, useRecords, useSync } from "../../sync/store";
 import { Textarea } from "../party-board/controls";
@@ -164,6 +165,9 @@ export function ReminderEditor({
     base.current !== null &&
     JSON.stringify(draftOf(row)) !== base.current;
   const error = draftError(d, viewer);
+  // Only a prefill gets here (Make reminder hands over a facility's whole effect): typing stops at
+  // the limit, so this text is the DM's to trim, not ours to cut unseen.
+  const overLimit = d.text.length > REMINDER_TEXT_MAX;
   const unchanged = draftUnchanged(d, row, viewer);
   const off = !live || busy;
   const save = async () => {
@@ -222,7 +226,13 @@ export function ReminderEditor({
           <Label className="flex flex-col gap-1 text-xs">
             <span className="flex justify-between">
               Text
-              <span data-testid="rem-editor-counter" className="text-muted-foreground tabular-nums">
+              <span
+                data-testid="rem-editor-counter"
+                className={cn(
+                  "tabular-nums",
+                  overLimit ? "text-destructive" : "text-muted-foreground",
+                )}
+              >
                 {d.text.length} / {REMINDER_TEXT_MAX}
               </span>
             </span>
@@ -230,10 +240,16 @@ export function ReminderEditor({
               data-testid="rem-editor-text"
               className="min-h-20 text-sm"
               maxLength={REMINDER_TEXT_MAX}
+              aria-invalid={overLimit}
               value={d.text}
               autoFocus
               onChange={(e) => set({ text: e.target.value })}
             />
+            {overLimit && (
+              <span data-testid="rem-editor-over" role="alert" className="text-destructive">
+                Too long for a reminder: trim it to {REMINDER_TEXT_MAX} characters to save.
+              </span>
+            )}
           </Label>
           <Label className="flex flex-col gap-1 text-xs">
             Source

@@ -232,12 +232,14 @@ function StaffRow({
       <div className="min-w-0 flex-1 text-sm">
         <div className="flex flex-wrap items-center gap-x-1.5">
           {dmOnly && <EyeOffIcon className="size-3.5 text-muted-foreground" aria-label="DM only" />}
-          <span className="break-words font-medium">{m.name}</span>
-          {m.role && <span className="break-words">{m.role}</span>}
+          <span className="font-medium [overflow-wrap:anywhere]">{m.name}</span>
+          {m.role && <span className="[overflow-wrap:anywhere]">{m.role}</span>}
           {m.wage !== null && <span data-testid="hold-staff-wage">{m.wage} gp</span>}
         </div>
-        {works && <p className="text-xs">works in {works}</p>}
-        {m.notes && <p className="break-words text-xs text-muted-foreground">{m.notes}</p>}
+        {works && <p className="text-xs [overflow-wrap:anywhere]">works in {works}</p>}
+        {m.notes && (
+          <p className="text-xs [overflow-wrap:anywhere] text-muted-foreground">{m.notes}</p>
+        )}
         {intent.error && (
           <p role="alert" className="text-xs text-destructive">
             {intent.error}
