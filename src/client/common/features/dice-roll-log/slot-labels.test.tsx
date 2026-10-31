@@ -237,7 +237,7 @@ describe("FR-DICE-98 roll control purpose", () => {
     };
     let comp = compositionOf(options.expressions, "damage", options.partTypes);
     comp = joinDie(comp, 8, "damage");
-    comp = setGroupType(comp, 2, "radiant");
+    comp = setGroupType(comp, comp.terms.length - 1, "radiant");
     const parts = stagedPartsOf(comp, "damage");
     expect(parts).toEqual([
       { expression: "2d6+5", type: "slashing" },

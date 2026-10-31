@@ -33,6 +33,23 @@ export const HitCue = z.strictObject({
 });
 export type HitCue = z.infer<typeof HitCue>;
 
+/** FR-MAP-122: server signal of a teleport's smoke; transient like `vfx.hit`. */
+export const VFX_POOF_SIGNAL = "vfx.poof";
+
+const PoofCell = z.strictObject({ col: z.int(), row: z.int() });
+
+/**
+ * FR-MAP-122: one cue per teleport. `cells` = the top-left cells of the footprints this receiver may
+ * see smoke at (where the token left, where it arrived); `side` = the footprint in cells.
+ */
+export const PoofCue = z.strictObject({
+  id: Id,
+  sceneId: Id,
+  side: z.int().min(1).max(8),
+  cells: z.array(PoofCell).min(1).max(2),
+});
+export type PoofCue = z.infer<typeof PoofCue>;
+
 /** FR-VFX-18: one hit look per key: the 13 damage types, healing, untyped, glance. */
 export const HIT_LOOK_KEYS = [...DAMAGE_TYPES, "healing", "untyped", "glance"] as const;
 export type HitLookKey = (typeof HIT_LOOK_KEYS)[number];

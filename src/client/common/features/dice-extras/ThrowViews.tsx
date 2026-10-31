@@ -10,6 +10,7 @@ import { freeArea, renderedWindowRects, useContentHeights } from "../play-shell/
 import { useViewport } from "../play-shell/hooks";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
 import { DiceLayer } from "./DiceLayer";
+import { flatGlow } from "./die-fx";
 import { pendingInZone } from "./display";
 import { FlatDie } from "./FlatDie";
 import { diceLayerHost, rectOf } from "./layer-host";
@@ -122,7 +123,14 @@ function ZoneView({
       {chips && (
         <div className="flex flex-wrap items-end justify-center gap-1.5">
           {flatDice.map((d) => (
-            <FlatDie key={d.key} die={d} look={looks[d.entryId]} settled={three || atRest} flat />
+            <FlatDie
+              key={d.key}
+              die={d}
+              look={looks[d.entryId]}
+              settled={three || atRest}
+              flat
+              glow={flatGlow(d.damage)}
+            />
           ))}
           {t.more > 0 && (
             <span

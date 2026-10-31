@@ -80,6 +80,7 @@ export function useRun3D(
           value: d.value as number,
           kept: d.kept,
           look: r.looks[d.entryId] ?? STYLE_LOOK.ivory,
+          ...(d.damage && { damage: d.damage }),
         })),
         onRest: (info) => {
           setRest(info);
@@ -258,6 +259,7 @@ export function Mirror3D({
           data-kept={d.kept}
           data-flat={false}
           data-offered={d.offered === true}
+          {...(d.damage && { "data-damage": d.damage })}
           data-style={(looks[d.entryId] ?? STYLE_LOOK.ivory).style}
           data-material={(looks[d.entryId] ?? STYLE_LOOK.ivory).material}
           {...(rest && { "data-settled": rest.settled[d.key] ?? "" })}

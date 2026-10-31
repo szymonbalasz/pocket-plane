@@ -7,6 +7,7 @@ import { fogTool } from "../fog-of-war/tool";
 import { aoeTool } from "../scene-tools/aoe-tool";
 import { propsTool } from "../scene-tools/PropsTool";
 import { structureToolDef } from "../scene-tools/structure-tool";
+import { teleportTool } from "./teleport-tool";
 import { type CanvasToolDef, orderTools } from "./tools";
 
 export const canvasTools: readonly CanvasToolDef[] = orderTools([
@@ -14,4 +15,5 @@ export const canvasTools: readonly CanvasToolDef[] = orderTools([
   propsTool, // scene-tools Props (DM, FR-SCN-16–18)
   aoeTool, // scene-tools: AoE templates (FR-SCN-22), both clients
   fogTool, // fog-of-war: Fog (DM; shapes × Reveal / Fog / Explored / Darkness, all, Undo; FR-FOG-17)
+  teleportTool, // scenes-map: Teleport's cell pick (DM, off the rail; FR-MAP-121)
 ]);

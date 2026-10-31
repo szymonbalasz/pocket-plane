@@ -1,7 +1,14 @@
 // Hit cue subscriber (FR-VFX-21, -22, ADR-0071): the server's transient `vfx.hit` signal, zod-parsed,
 // handed to subscribers on arrival only (no queue, no replay; a malformed frame is dropped with a
 // warning). No rendering here: spell-fx's build plays the looks from these cues.
-import { type HitCue, HitCue as HitCueSchema, VFX_HIT_SIGNAL } from "@shared/spell-fx/cue";
+import {
+  type HitCue,
+  HitCue as HitCueSchema,
+  type PoofCue,
+  PoofCue as PoofCueSchema,
+  VFX_HIT_SIGNAL,
+  VFX_POOF_SIGNAL,
+} from "@shared/spell-fx/cue";
 import type { SignalHandler } from "../../sync/connection";
 import { useSignal } from "../../sync/store";
 
@@ -32,4 +39,16 @@ export function subscribeHitCues(
 export function useHitCues(fn: HitCueHandler): void {
   const handle = hitCueHandler(fn);
   useSignal(VFX_HIT_SIGNAL, handle);
+}
+
+/** React (FR-MAP-122): calls `fn` for every well-formed `vfx.poof` that arrives while mounted. */
+export function usePoofCues(fn: (cue: PoofCue) => void): void {
+  useSignal(VFX_POOF_SIGNAL, (s) => {
+    const r = PoofCueSchema.safeParse(s.data);
+    if (!r.success) {
+      console.warn("vfx.poof dropped: invalid cue", r.error.issues);
+      return;
+    }
+    fn(r.data);
+  });
 }

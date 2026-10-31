@@ -30,7 +30,9 @@ import {
   WebGLRenderer,
 } from "three";
 import { type Arena, pixelRatioOf } from "../arena";
+import { dieFxOf } from "../die-fx";
 import { dieMesh, drawAtlas, drawD4 } from "./faces";
+import { fxLayer } from "./fx-layer";
 import {
   geometryOf,
   type LabelKind,
@@ -52,6 +54,8 @@ export interface Die3D {
   value: number;
   kept: boolean;
   look: DiceLook;
+  /** FR-DICEX-106: the roll's damage type (its effect while rolling). */
+  damage?: string;
 }
 
 export interface RestInfo {
@@ -469,6 +473,18 @@ export function playThrow(o: PlayOptions): PlayHandle {
     return mesh;
   });
   scene.add(group);
+  // FR-DICEX-106: the damage effects, on the dice that have one.
+  const fx = fxLayer(
+    o.dice.flatMap((d, i) => {
+      const die = dieFxOf(d.damage);
+      const mesh = meshes[i];
+      return die && mesh ? [{ mesh, fx: die, radius: geometryOf(d.shape).radius }] : [];
+    }),
+  );
+  if (fx) {
+    group.add(fx.object);
+    own.push(...fx.own);
+  }
 
   const last = sim.frameCount - 1;
   // FR-DICEX-46 b: each die's shift from where the simulation rests it to its cell (world units),
@@ -499,6 +515,7 @@ export function playThrow(o: PlayOptions): PlayHandle {
   const rest = () => {
     rested = true;
     pose(last);
+    fx?.clear();
     meshes.forEach((m, i) => {
       if (o.dice[i]?.kept) return;
       const dim = m.material.clone();
@@ -539,6 +556,8 @@ export function playThrow(o: PlayOptions): PlayHandle {
         return false;
       }
       pose(f);
+      const unit = o.rect().w / Math.max(1e-6, camera.right - camera.left);
+      fx?.update((time - start) / 1000, f / Math.max(1, last), unit);
       return true;
     },
     lost: () => {

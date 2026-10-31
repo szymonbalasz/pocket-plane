@@ -48,7 +48,7 @@ export const TokenDeleted = logged("TokenDeleted", tokenPayload);
 export const TokenHidden = logged("TokenHidden", tokenPayload);
 export const TokenRevealed = logged("TokenRevealed", tokenPayload);
 
-/** `map.moveToken`: not logged (ADR-0016). */
+/** `map.moveToken`, `map.teleportToken` (with `teleportCue`, FR-MAP-122): not logged (ADR-0016). */
 export const TokenMoved = defineEvent({
   type: "TokenMoved",
   payload: z
@@ -57,6 +57,7 @@ export const TokenMoved = defineEvent({
       sceneId: z.string(),
       col: z.number().int(),
       row: z.number().int(),
+      teleportCue: z.string().optional(),
     })
     .strict(),
   logged: false,

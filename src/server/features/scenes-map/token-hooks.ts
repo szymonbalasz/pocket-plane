@@ -18,7 +18,10 @@ import type { RecordChange } from "../../events/types";
 import { cbtxTokenHook } from "../combat-extras/rule-hooks";
 import { combatantTokenHook } from "../combat-tracker/hooks";
 
-export type TokenHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
+export type TokenHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor"> & {
+  /** FR-MAP-123: this move is a teleport, not walked (combat adds no `movedFt`). */
+  teleport?: boolean;
+};
 
 export type TokenChangedHook = (
   env: TokenHookEnv,
