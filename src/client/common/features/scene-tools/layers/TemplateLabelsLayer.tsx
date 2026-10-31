@@ -9,7 +9,7 @@ import Konva from "konva";
 import { Circle, Group, Rect, Text } from "react-konva";
 import { create } from "zustand";
 import { useCanvas } from "../../scenes-map/canvas-context";
-import { CASING_COLOR } from "../../scenes-map/mark-colors";
+import { casingOf } from "../../scenes-map/mark-colors";
 
 export interface TemplatePill {
   /** The template's origin, in map px. */
@@ -78,7 +78,7 @@ function TemplateLabel({ id, pill }: { id: string; pill: TemplatePill }) {
         y={(line + pad) / 2}
         radius={dot / 2}
         fill={pill.color}
-        stroke={CASING_COLOR}
+        stroke={casingOf(pill.color)}
         strokeWidth={1 / s}
       />
       <Text

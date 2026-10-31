@@ -13,6 +13,7 @@ import {
   type PaletteKey,
   PLAYER_COLOR_KEYS,
   PLAYER_COLORS,
+  readableColor,
 } from "@shared/campaign-management/colors";
 import type {
   CampaignRecord,
@@ -28,6 +29,7 @@ import { Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { toastReject } from "../scenes-map/intents";
+import { CASING_COLOR, casingOf } from "../scenes-map/mark-colors";
 import {
   BAD_HEX_MESSAGE,
   type ClampCache,
@@ -49,6 +51,9 @@ import {
 import { colorHex } from "./colors";
 
 export const SET_COLOR_INTENT = "camp.setColor";
+
+/** The status hint for a colour whose names show in a lighter shade (FR-CAMP-31, -35). */
+export const LIGHTER_SHADE_MESSAGE = "Names in windows show a lighter shade";
 
 /** Whose colour a picker sets: a player's id, or `null` = the DM colour (FR-CAMP-25). */
 export type ColorTarget = string | null;
@@ -189,7 +194,8 @@ export interface PickerStatus {
  * The reason line and Apply (FR-CAMP-35): a hovered / focused swatch names its block (or its
  * name); else the draft's problem: a hex field that doesn't parse, no allowed colour at this hue,
  * FR-CAMP-31 / -32; else, while the clamp holds the marker off its target (`pushed`), why the
- * target was refused. Apply needs live, nothing in flight, no problem and a changed draft.
+ * target was refused; else, for a colour that text can't use as is, that its names show lighter.
+ * Apply needs live, nothing in flight, no problem and a changed draft.
  */
 export function pickerView(p: {
   draft: Draft;
@@ -214,7 +220,9 @@ export function pickerView(p: {
     ? { reason: hint.reason, message: hint.message ?? hint.name, block: hint.reason !== null }
     : shown
       ? { reason: shown.reason, message: shown.message, block: true }
-      : null;
+      : readableColor(p.draft.hex) !== p.draft.hex
+        ? { reason: null, message: LIGHTER_SHADE_MESSAGE, block: false }
+        : null;
   const canApply = p.live && !p.inFlight && verdict === null && p.draft.hex !== p.stored;
   return { badHex, status, canApply };
 }
@@ -475,8 +483,8 @@ const nameOf = ({ players }: ColorHolders, id: string) =>
   players.find((p) => p.id === id)?.name ?? "Player";
 
 /**
- * The person's name chip in the draft colour over the dark casing (as the map's laser chip draws
- * it: `#000` at 85 %, 11 px), on a light and a dark map tile.
+ * The person's name chip in the draft colour over its casing (as the map's laser chip draws it:
+ * the casing at 85 %, 11 px), on a light and a dark map tile.
  */
 function Preview({ color, name }: { color: string; name: string }) {
   return (
@@ -489,7 +497,11 @@ function Preview({ color, name }: { color: string; name: string }) {
         >
           <span
             className="truncate rounded-full px-1.5 text-[11px] leading-4"
-            style={{ color, backgroundColor: "rgb(0 0 0 / 0.85)" }}
+            style={{
+              color,
+              backgroundColor:
+                casingOf(color) === CASING_COLOR ? "rgb(0 0 0 / 0.85)" : "rgb(231 229 228 / 0.85)",
+            }}
           >
             {name}
           </span>

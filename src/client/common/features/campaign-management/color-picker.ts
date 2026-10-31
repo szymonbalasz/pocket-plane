@@ -8,6 +8,7 @@ import {
   type ColorProblem,
   colorClash,
   colorProblem,
+  hasColorClash,
   hexToRgb,
   normalizeColor,
 } from "@shared/campaign-management/colors";
@@ -110,7 +111,15 @@ export function pickerRules(others: readonly ColorHolder[]): PickerRules {
     .map((o) => normalizeColor(o.color) ?? "")
     .sort()
     .join(",");
-  return { key, verdict, allowed: (hex) => verdict(hex) === null };
+  // Most asks only need a yes / no: no clash message, and no measuring past the first clash.
+  const allowed = (hex: string) => {
+    const known = memo.get(hex);
+    if (known !== undefined) return known === null;
+    const ok = colorProblem(hex) === null && !hasColorClash(hex, others);
+    if (ok) memo.set(hex, null);
+    return ok;
+  };
+  return { key, verdict, allowed };
 }
 
 const inRange = (x: number) => x >= 0 && x <= 100;

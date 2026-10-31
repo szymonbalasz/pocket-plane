@@ -55,9 +55,9 @@ function rng(seed: number) {
 
 describe("FR-SCN-56 sight through a door over a wall", () => {
   // A hand-drawn wall (points off the grid), a door placed on it slightly off the line.
-  const WALL: Seg = [7.01, 5, 14.01, 5.02];
-  const DOOR: Seg = [9.02, 5.12, 10.02, 4.95];
-  const pieces = wallLeftByDoor([...DOOR], [...WALL]) as Seg[];
+  const WALL: [number, number, number, number] = [7.01, 5, 14.01, 5.02];
+  const DOOR: [number, number, number, number] = [9.02, 5.12, 10.02, 4.95];
+  const pieces = wallLeftByDoor(DOOR, WALL) as Seg[];
   const eye = { x: 9.5, y: 8 };
   const sees = (occluders: Seg[], x: number, y: number) =>
     pointInPolygon(sightPolygon(eye, 40, occluders) as number[], x, y);

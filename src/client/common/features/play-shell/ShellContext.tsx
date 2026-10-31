@@ -51,6 +51,18 @@ const cameraMode = () =>
   mapCanvas()?.getAttribute("data-camera") === "moved" ? ("moved" as const) : ("fitted" as const);
 
 /**
+ * FR-SHELL-210: the window keyboard focus is in, by window id. A press inside a window moves focus
+ * there (`ShellWindow`) and a key press comes from there, so a Dice tray opened from a roll button
+ * knows its window, with no feature passing it along.
+ */
+const focusedWindow = () =>
+  typeof document === "undefined"
+    ? undefined
+    : (document.activeElement
+        ?.closest('[data-testid="ui-window"]')
+        ?.getAttribute("data-record-id") ?? undefined);
+
+/**
  * The drawn tokens' footprints for auto placement (FR-SHELL-40, -45, -57, -77): `pc` = a player
  * character's token (a character, with an owner, in this client's store). Pets, summons and other
  * owned companions rank like any other token (sprint 7 ruling: #310 says PCs).
@@ -98,10 +110,13 @@ export function ShellProvider({
         heights: (id) => contentHeights().get(id),
         available: () => availableIn(registry, sync),
         camera: cameraMode,
+        inUse: focusedWindow,
         // FR-SHELL-108, FR-MAP-97: the map canvas's base port (players' L2b, the map yields).
         dryFit: (windows, reason) => fitPort()?.dryFit(windows, reason) ?? null,
         lastFullCell: () => fitPort()?.lastFullCell() ?? null,
-        onYield: () => fitPort()?.yieldRefit(),
+        onYield: (undoable) => fitPort()?.yieldRefit(undoable),
+        // FR-MAP-125: the window the map yielded to went: the refit is undone.
+        onYieldEnd: () => fitPort()?.yieldEnded(),
         // FR-MAP-114: a squeezed protected window back in its zone over a PC → one `window` refit.
         onRefit: () => fitPort()?.yieldRefit(),
         // FR-SHELL-155: `onAbsorb` learns who this page is.

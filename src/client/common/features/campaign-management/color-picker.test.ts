@@ -74,12 +74,12 @@ describe("FR-CAMP-35 picker model", () => {
       message: "Too close to DM's colour for colour-blind players",
     });
     expect(at("#b388ff")).toEqual({ reason: "taken", by: "p2", message: "Taken by Player 2" });
-    expect(at("#3d6ec9")).toEqual({ reason: "too-dark", message: "Too dark to read on the map" });
+    expect(at("#00008b")).toEqual({ reason: "too-dark", message: "Too dark to see" });
     expect(at("#9e9e9e")).toEqual({ reason: "too-grey", message: "Too grey" });
     expect(at("#f05555")).toEqual({ reason: "too-red", message: "Too close to the danger red" });
     // The memoised rules agree and key on the others' colours, not their order.
     const r = pickerRules(P1_OTHERS);
-    expect(r.verdict("#3d6ec9")?.reason).toBe("too-dark");
+    expect(r.verdict("#00008b")?.reason).toBe("too-dark");
     expect(r.allowed("#7fd8ff")).toBe(true);
     expect(pickerRules([...P1_OTHERS].reverse()).key).toBe(r.key);
     expect(pickerRules(SEVEN).key).not.toBe(r.key);
@@ -89,7 +89,7 @@ describe("FR-CAMP-35 picker model", () => {
     const rules = pickerRules(P1_OTHERS);
     const jade = hexToHsv(PLAYER_COLORS.jade); // (162, 86, 73)
     expect(rules.allowed(hsvToHex(jade))).toBe(true);
-    const target = { ...jade, h: 200 };
+    const target = { ...jade, h: 200, v: 20 };
     expect(rules.verdict(hsvToHex(target))?.reason).toBe("too-dark");
     const got = clamp(target, rules, new Set());
     expect(got).toMatchObject({ h: 200, s: 86, none: false });
@@ -120,16 +120,16 @@ describe("FR-CAMP-35 picker model", () => {
     expect(row).toMatchObject({ v: 80, none: false });
     expect(row.s).toBeGreaterThan(0);
     for (let s = 0; s < row.s; s++) expect(ok(rules, 120)({ s, v: 80 })).toBe(false);
-    // Hue 0, V 50: S 0 grey, the row too dark / too red → a ring point.
-    const ring = clamp({ h: 0, s: 0, v: 50 }, rules, new Set());
+    // Hue 0, V 30: S 0 grey, the row too grey or too dark → a ring point.
+    const ring = clamp({ h: 0, s: 0, v: 30 }, rules, new Set());
     expect(ring.none).toBe(false);
     expect(ring.s).not.toBe(0);
-    expect(ring.v).not.toBe(50);
+    expect(ring.v).not.toBe(30);
     expect(rules.allowed(ring.hex)).toBe(true);
-    const dist = Math.abs(ring.s) + Math.abs(ring.v - 50);
+    const dist = Math.abs(ring.s) + Math.abs(ring.v - 30);
     for (let s = 0; s <= 100; s++) {
       for (let v = 0; v <= 100; v++) {
-        if (s + Math.abs(v - 50) < dist) expect(ok(rules, 0)({ s, v })).toBe(false);
+        if (s + Math.abs(v - 30) < dist) expect(ok(rules, 0)({ s, v })).toBe(false);
       }
     }
     // Ring order: within a ring higher V first, then higher S.
@@ -157,7 +157,8 @@ describe("FR-CAMP-35 picker model", () => {
     });
     // The whole 101 × 101 square was judged once.
     expect(c.calls).toBe(101 * 101);
-    expect(ms).toBeLessThan(500);
+    // A hang guard: about 0.4 s here, once per hue, and only with no colour left at that hue.
+    expect(ms).toBeLessThan(1000);
     c.calls = 0;
     const second = clamp({ h: 213, s: 20, v: 90 }, rules, cache);
     expect(second).toMatchObject({ h: 213, s: 20, v: 90, none: true });

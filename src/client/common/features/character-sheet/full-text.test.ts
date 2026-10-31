@@ -211,8 +211,9 @@ describe("full text: the tray and the sheet header", () => {
 
   test("full text: the header's level line wraps a part too long for the column, never cuts it", () => {
     const src = read("common/features/character-sheet/SheetView.tsx");
-    expect(src).toContain('<span className="inline-block max-w-full">· {p}</span>');
-    expect(src).toContain('<span className="inline-block max-w-full">· {background}</span>');
+    expect(src).toContain("<LevelPart dot={i > 0}>{p}</LevelPart>");
+    expect(src).toContain("<LevelPart dot>{background}</LevelPart>");
+    expect(src).toContain('inline-block max-w-[calc(100%-0.55em)]">');
     expect(src).not.toContain('<span className="whitespace-nowrap">· {p}</span>');
     expect(src).not.toContain('<span className="whitespace-nowrap">· {background}</span>');
   });

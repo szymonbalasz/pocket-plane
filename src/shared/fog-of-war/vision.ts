@@ -8,7 +8,8 @@
 //   `occluders` (raw segments or `prepareOccluders(...)`). r ≤ 0 → null. A segment through the
 //   origin (origin on a wall, or on its line) never occludes: both sides are seen, every other
 //   occluder still cuts beyond. `sightPolygons(origin, radii, occluders)`: the same for several
-//   radii from one sweep (a source's `see` and `dark`, FR-FOG-33).
+//   radii from one sweep (a source's `see` and `dark`, FR-FOG-33). A one-way segment (FR-SCN-61)
+//   only occludes for an origin on the left of its direction, as seen on screen (y down).
 // - `prepareOccluders(segs)`: scaled segments + their pairwise crossings, computed once per scene
 //   and shared by every source (the angular sweep needs crossings as events).
 // - `prepareScene(walls, darkness, bounds?) → SceneOccluders`: walls + non-open doors (scene-tools
@@ -41,8 +42,8 @@ import {
   shapeEdges,
 } from "./shapes";
 
-/** A segment `[x1, y1, x2, y2]` in grid units. */
-export type Seg = readonly [x1: number, y1: number, x2: number, y2: number];
+/** A segment `[x1, y1, x2, y2]` in grid units; a final `1` = one-way (FR-SCN-61). */
+export type Seg = readonly [x1: number, y1: number, x2: number, y2: number, oneWay?: 1];
 
 /**
  * CHARX FR-CHARX-49 / -53: a creature's senses. Sprint 4 (#243 [1], OQ-FOG-51): `visionFt`
@@ -83,6 +84,8 @@ const TWO_PI = 2 * Math.PI;
 export interface PreparedOccluders {
   readonly segs: Float64Array;
   readonly crossings: Float64Array;
+  /** FR-SCN-61: 1 per one-way segment; null when the scene has none. */
+  readonly oneWay: Uint8Array | null;
 }
 
 const sc = (v: number) => Math.round(v * K);
@@ -95,6 +98,7 @@ const sc = (v: number) => Math.round(v * K);
 export function prepareOccluders(list: readonly Seg[]): PreparedOccluders {
   const n = list.length;
   const segs = new Float64Array(4 * n);
+  let oneWay: Uint8Array | null = null;
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
@@ -109,12 +113,16 @@ export function prepareOccluders(list: readonly Seg[]): PreparedOccluders {
     segs[4 * i + 1] = ay;
     segs[4 * i + 2] = bx;
     segs[4 * i + 3] = by;
+    if (s[4] === 1) {
+      oneWay ??= new Uint8Array(n);
+      oneWay[i] = 1;
+    }
     minX = Math.min(minX, ax, bx);
     minY = Math.min(minY, ay, by);
     maxX = Math.max(maxX, ax, bx);
     maxY = Math.max(maxY, ay, by);
   }
-  if (n < 2) return { segs, crossings: new Float64Array(0) };
+  if (n < 2) return { segs, crossings: new Float64Array(0), oneWay };
   let B = 2 * K;
   while (((maxX - minX) / B + 1) * ((maxY - minY) / B + 1) > 1 << 20) B *= 2;
   const c0 = Math.floor(minX / B);
@@ -174,7 +182,7 @@ export function prepareOccluders(list: readonly Seg[]): PreparedOccluders {
       }
     }
   }
-  return { segs, crossings: Float64Array.from(out) };
+  return { segs, crossings: Float64Array.from(out), oneWay };
 }
 
 const orient = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) =>
@@ -315,7 +323,9 @@ function arcBins(a: number, b: number, visit: (bin: number) => void) {
  * pass 1 sweeps only the occluders within 4 cells (no crossings: its boundary can only be
  * farther than the true one, so it is an upper bound per direction); pass 2 sweeps only the
  * occluders that come nearer than that bound somewhere in their angular span (the others are
- * never the nearest), with their crossings. Same result as one sweep over everything.
+ * never the nearest), with their crossings. Same result as one sweep over everything. FR-SCN-61:
+ * a one-way segment whose see-through side holds the origin is dropped here; a crossing of it
+ * only adds a harmless event direction.
  */
 function sweep(
   ox: number,
@@ -323,6 +333,7 @@ function sweep(
   R: number,
   segs: Float64Array,
   crossings: Float64Array | null,
+  oneWay: Uint8Array | null = null,
 ): number[] {
   const ring = boundRing(R);
   const inR2 = (R * Math.cos(Math.PI / SIGHT_SIDES) - 2) ** 2;
@@ -352,6 +363,8 @@ function sweep(
     if (dmin2 > R2) continue;
     const c = ax * by - ay * bx;
     if (c === 0) continue; // through the origin or on its line: never occludes
+    // y down: c > 0 = the origin is on the right of a → b, the side that sees through.
+    if (c > 0 && oneWay?.[i >> 2] === 1) continue;
     if (ax * ax + ay * ay > inR2 || bx * bx + by * by > inR2) {
       const cl = clipToRing(ring, ax, ay, bx, by);
       if (!cl) continue;
@@ -716,7 +729,7 @@ export function sightPolygons(
   const prep = prepOf(occluders);
   const ox = sc(origin.x);
   const oy = sc(origin.y);
-  const big = sweep(ox, oy, rMax * K, prep.segs, prep.crossings);
+  const big = sweep(ox, oy, rMax * K, prep.segs, prep.crossings, prep.oneWay);
   let bigSegs: Float64Array | null = null;
   return radii.map((r) => {
     if (!(r > 0)) return null;

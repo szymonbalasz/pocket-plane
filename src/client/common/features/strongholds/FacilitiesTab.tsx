@@ -130,7 +130,7 @@ function FacilityRow({
           )}
           <span
             data-testid="hold-facility-name"
-            className={`break-words font-medium ${f.state === "replaced" ? "line-through" : ""}`}
+            className={`font-medium [overflow-wrap:anywhere] ${f.state === "replaced" ? "line-through" : ""}`}
           >
             {f.name}
           </span>
@@ -201,7 +201,7 @@ function FacilityRow({
         </p>
       )}
       {f.order !== "" && (
-        <p className="break-words text-xs" data-testid="hold-facility-order">
+        <p className="text-xs [overflow-wrap:anywhere]" data-testid="hold-facility-order">
           Order: {f.order}
         </p>
       )}
@@ -221,7 +221,10 @@ function FacilityRow({
         </p>
       )}
       {staff.length > 0 && (
-        <p className="break-words text-xs text-muted-foreground" data-testid="hold-facility-staff">
+        <p
+          className="text-xs [overflow-wrap:anywhere] text-muted-foreground"
+          data-testid="hold-facility-staff"
+        >
           {staff.join(", ")}
         </p>
       )}

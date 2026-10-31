@@ -5,6 +5,7 @@
 // runs in the app.
 import { MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
 import { footprint } from "@shared/scenes-map/geometry";
+import { DICEX_TRAY_KIND } from "../dice-extras/window-kind";
 import {
   appearanceKeeps,
   type Camera,
@@ -17,14 +18,24 @@ import {
   fitFor,
   footprintBox,
   layoutKey,
+  rememberYield,
   revealRefit,
   visibleArea,
+  type YieldMemory,
+  yieldBack,
 } from "../scenes-map/camera";
 import { fitRooms, renderedWindowRects, storedLayout } from "./free-area";
 import { isRemembered, placedRect, type Rect, type Viewport, workArea } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import { bruteBest, overlaps, REFERENCE_VIEWPORTS } from "./layout-checks";
-import { defaultLayout, pushBars, useful, type WindowAction, type Windows } from "./manager";
+import {
+  defaultLayout,
+  pushBars,
+  useful,
+  type WindowAction,
+  type Windows,
+  windowId,
+} from "./manager";
 import { type PlacementToken, pcBoxes } from "./placement";
 import type { ShellClient, WindowRegistry } from "./registry";
 import {
@@ -144,6 +155,8 @@ export interface ReplayStep {
   drawn?: string;
   /** Scripts: the last fit's `data-fit-visible`. */
   fit?: FitVisible;
+  /** Scripts: the camera after this step. */
+  camera?: Camera;
 }
 
 export interface ReplayRun {
@@ -201,6 +214,10 @@ interface Sim {
   lastFull: number;
   /** The last fit's `data-fit-visible` (FR-MAP-46, -59). */
   visible?: FitVisible;
+  /** FR-MAP-125: the camera before the tray's yield refit (the canvas's `yieldMemory`). */
+  yieldMem?: YieldMemory<null> | null;
+  /** The window focus is in for the next open (FR-SHELL-210: a script's `from`). */
+  inUse?: string;
   /** The canvas's camera per viewport size (H2 FAIL 5), dropped at a page load. */
   sizeCams: ReturnType<typeof createSizeCameras<SizeCam>>;
   key: string;
@@ -252,9 +269,23 @@ function newController(sim: Omit<Sim, "ctl">): ShellController {
     camera: () => sim.mode,
     dryFit: (obstacles, reason) => dryFit(sim as Sim, obstacles, reason),
     lastFullCell: () => sim.lastFull || null,
+    inUse: () => (sim as Sim).inUse,
     // FR-MAP-97: an accepted yield refits once, still `fitted`.
-    onYield: () => {
-      (sim as Sim).cam = fitNow(sim as Sim, undefined, "window").cam;
+    onYield: (undoable) => {
+      const s = sim as Sim;
+      const now = s.cam;
+      s.cam = fitNow(s, undefined, "window").cam;
+      if (undoable && now) s.yieldMem = rememberYield(s.yieldMem ?? null, now, null, s.cam);
+    },
+    // FR-MAP-125, -126: the canvas's `yieldEnded`, on the same pure rule.
+    onYieldEnd: () => {
+      const s = sim as Sim;
+      const mem = s.yieldMem ?? null;
+      s.yieldMem = null;
+      if (!s.cam) return;
+      const back = yieldBack(mem, s.cam, s.mode, fitInputs(s));
+      if (back === "restore" && mem) s.cam = mem.from;
+      else if (back === "refit") s.cam = fitNow(s, undefined, "window").cam;
     },
     // FR-MAP-114: the same `window` refit, `fitted` only.
     onRefit: () => {
@@ -346,6 +377,7 @@ function fullFit(sim: Sim, reason: FitReason = "fit") {
   sim.visible = f.visible;
   sim.mode = "fitted";
   sim.lastFull = cellPx(sim);
+  sim.yieldMem = null;
 }
 
 /** The layout a recorded camera framed (`layoutKey`, as the canvas keys it). */
@@ -419,6 +451,7 @@ function panTo(sim: Sim, at: { x: number; y: number }) {
     y: Math.round(at.y - (box.y + box.h / 2) * s),
   };
   sim.mode = "moved";
+  sim.yieldMem = null;
 }
 
 /** The appearance refit (FR-MAP-61, -90): `fitted` only; kept while every token is clear. */
@@ -678,6 +711,8 @@ function checkPutAway(sim: Sim, before: Windows, opened: string, beforeTokens: P
     .filter((w) => !isProtected(sim.registry, w.kind) && !sim.registry.get(w.kind)?.fixedDefault)
     // FR-SHELL-151: only untouched launcher windows are put away.
     .filter((w) => !isRemembered(w))
+    // FR-SHELL-210: the window a tray open came from gives way last.
+    .filter((w) => opened !== DICEX_TRAY_KIND || windowId(w.kind, w.instance) !== sim.inUse)
     .map((w, i) => ({ w, i }))
     .sort((a, b) => a.w.z - b.w.z || a.i - b.i)
     .map((e) => e.w.kind);
@@ -1053,8 +1088,10 @@ export function runReplay(
  * settle, then the resize refit while `fitted`).
  */
 export type ScriptStep =
-  | { open: string }
+  /** `from`: a Dice tray opened from inside that window (focus there, FR-SHELL-210). */
+  | { open: string; from?: string }
   | { close: string }
+  | { minimise: string }
   | { drag: string; rect: Rect; resized?: boolean }
   | { viewport: Viewport }
   | { pan: { x: number; y: number } }
@@ -1104,6 +1141,7 @@ export function runScript(
       log: sim.ctl.store.getState().settleLog,
       problems,
       ...(sim.visible && { fit: sim.visible }),
+      ...(sim.cam && { camera: sim.cam }),
     });
   const load = (label: string) => {
     sim.cam = null;
@@ -1156,10 +1194,15 @@ export function runScript(
       }
     } else if ("open" in step) {
       const beforeTokens = tokensNow(sim);
+      sim.inUse = step.from === undefined ? undefined : windowId(step.from);
       userOpen(sim, step.open);
       const problems = check(sim, before, { opened: step.open });
       problems.push(...checkPutAway(sim, before, step.open, beforeTokens));
+      sim.inUse = undefined;
       record(`open ${step.open}`, problems);
+    } else if ("minimise" in step) {
+      dispatch(sim, { type: "minimise", kind: step.minimise });
+      record(`minimise ${step.minimise}`, check(sim, before));
     } else {
       dispatch(sim, { type: "close", kind: step.close });
       record(`close ${step.close}`, check(sim, before));

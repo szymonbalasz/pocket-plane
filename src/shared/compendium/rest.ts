@@ -1,6 +1,7 @@
 // compendium REST read shapes (CMP §9, FR-CMP-10–12): search query + filters, result summaries,
 // the entry response. zod is the source of truth; query values arrive as strings.
 import { Cr, MonsterStatBlock } from "@shared/entities/schemas";
+import { fold } from "@shared/search/match";
 import { z } from "zod";
 import {
   CompendiumEntry,
@@ -171,3 +172,36 @@ export const EntryResponse = z.strictObject({
   importedArtAssetId: z.string().min(1).optional(),
 });
 export type EntryResponse = z.infer<typeof EntryResponse>;
+
+// ---------- names on a sheet (FR-CMP-77) ----------
+
+/** The kinds a sheet row's name may link to. */
+export const NameLookupKind = z.enum(["spell", "item", "feature"]);
+export type NameLookupKind = z.infer<typeof NameLookupKind>;
+
+/** Every row a full sheet holds (170), plus an attack's second try as a spell (20). */
+export const NAME_LOOKUP_MAX = 190;
+
+/** `POST /api/compendium/names`: the exact names to look up, in one request per sheet. */
+export const NameLookupBody = z.strictObject({
+  names: z
+    .array(z.strictObject({ kind: NameLookupKind, name: z.string().min(1).max(NAME_MAX) }))
+    .max(NAME_LOOKUP_MAX),
+});
+export type NameLookupBody = z.infer<typeof NameLookupBody>;
+
+/** A name the viewer can read. `entryId`: its one entry; null: several share the name. */
+export const NameMatch = z.strictObject({
+  kind: NameLookupKind,
+  name: z.string().min(1).max(NAME_MAX),
+  entryId: z.string().min(1).max(64).nullable(),
+});
+export type NameMatch = z.infer<typeof NameMatch>;
+
+export const NameLookupResponse = z.strictObject({
+  matches: z.array(NameMatch).max(NAME_LOOKUP_MAX),
+});
+export type NameLookupResponse = z.infer<typeof NameLookupResponse>;
+
+/** Same kind + same name as search's exact tier sees it: case, accents and apostrophes aside. */
+export const nameLookupKey = (kind: NameLookupKind, name: string) => `${kind}:${fold(name)}`;

@@ -1,12 +1,13 @@
 // Compendium REST reads (CMP §9, FR-CMP-10–14, -65). Mounted at /api. Order per request: Cache-Control
 // wrapper → auth (route-local, FR-CMP-13) → query validation → visibility → If-None-Match.
-import { SEARCH_PAGE, SearchQuery } from "@shared/compendium/rest";
+import { NameLookupBody, SEARCH_PAGE, SearchQuery } from "@shared/compendium/rest";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { zodIssues } from "../../commands/errors";
-import { errorBody, errorResponse } from "../../http";
+import { errorBody, errorResponse, jsonBody } from "../../http";
 import type { Services } from "../../services";
 import { type CompendiumEnv, compendiumAuth, noCache } from "./auth";
+import { lookupNames } from "./name-lookup";
 import { etagMatches, readCredits, readEntry } from "./read";
 import { readRulesIndex, readRulesPage } from "./rules";
 import { searchEntries } from "./search";
@@ -33,6 +34,15 @@ export function compendiumRoutes(s: Services) {
             abbrOf,
           );
           return c.json(page, 200);
+        } catch (err) {
+          return errorResponse(c, err, s);
+        }
+      })
+      // FR-CMP-77: a POST for its body's size only (a full sheet's names); it reads, writes nothing.
+      .post("/compendium/names", jsonBody(NameLookupBody), (c) => {
+        try {
+          const { names } = c.req.valid("json");
+          return c.json({ matches: lookupNames(s.db, c.get("viewer"), names) }, 200);
         } catch (err) {
           return errorResponse(c, err, s);
         }

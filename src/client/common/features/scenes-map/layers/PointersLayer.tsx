@@ -14,7 +14,7 @@ import { useStore } from "zustand";
 import { diagonalRuleIn, rulerText } from "../../scene-tools/diagonal-rule";
 import { useCanvas } from "../canvas-context";
 import { movedFtOf } from "../decorations";
-import { CASING_COLOR, CASING_NAME, casingWidth } from "../mark-colors";
+import { CASING_NAME, casingOf, casingWidth } from "../mark-colors";
 import { type MoveTone, movementIndicator } from "../movement";
 import { pingMark, prune, type SignalMark, trailMark } from "../pointers";
 import { tokenOverlays } from "../token-overlays";
@@ -116,7 +116,7 @@ function NameChip({
       opacity={m.opacity}
     >
       <Tag
-        fill={CASING_COLOR}
+        fill={casingOf(m.color)}
         opacity={0.85}
         cornerRadius={8 / cam.scale}
         pointerDirection={side === "below" ? "up" : "left"}
@@ -209,7 +209,7 @@ export function PointersLayer() {
               x={p.x}
               y={p.y}
               radius={radius}
-              stroke={CASING_COLOR}
+              stroke={casingOf(m.color)}
               strokeWidth={casingWidth(3, cam.scale)}
               opacity={m.opacity}
             />
@@ -239,7 +239,7 @@ export function PointersLayer() {
               name={CASING_NAME}
               id={m.id}
               points={points}
-              stroke={CASING_COLOR}
+              stroke={casingOf(m.color)}
               strokeWidth={casingWidth(4, cam.scale)}
               lineCap="round"
               lineJoin="round"

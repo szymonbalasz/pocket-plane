@@ -5,6 +5,8 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Alert } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
+import { type Rect, TOP_BAR_H, type Viewport } from "../play-shell/geometry";
+import { RAIL_CLEAR } from "../play-shell/placement";
 
 /** The pill's word per state ("Connected" reads "Live", FR-KIT-13). */
 export const CONNECTION_LABEL = {
@@ -44,6 +46,35 @@ export function ConnectionIndicator() {
   );
 }
 
+/** FR-SYNC-41: the banner's top, just below the top bar. */
+export const RECONNECT_BANNER_TOP = TOP_BAR_H + 4;
+
+/**
+ * FR-SYNC-41: where a banner of `w` × `h` draws: centred, between gutters as wide as the tool
+ * rail's clearance on both sides, so no width reaches the rail. As `ReconnectBannerSlot` lays it out.
+ */
+export function reconnectBannerBox(vp: Viewport, w: number, h: number): Rect {
+  const width = Math.min(w, vp.w - 2 * RAIL_CLEAR);
+  return { x: (vp.w - width) / 2, y: RECONNECT_BANNER_TOP, w: width, h };
+}
+
+/**
+ * FR-SYNC-41 (BL-164, BL-171): the banner's place in the frame. Moved off the rail, and
+ * click-through: windows can be anywhere, so only `pointer-events: none` keeps every close button
+ * under it working. Its own controls (none today) take clicks.
+ */
+export function ReconnectBannerSlot() {
+  return (
+    <div
+      data-testid="sync-reconnect-slot"
+      className="pointer-events-none absolute inset-x-0 z-30 flex justify-center"
+      style={{ top: RECONNECT_BANNER_TOP, paddingInline: RAIL_CLEAR }}
+    >
+      <ReconnectBanner />
+    </div>
+  );
+}
+
 /** "Reconnecting…" after 1 s not live; after 60 s adds "Server unreachable". */
 export function ReconnectBanner() {
   const notLiveSince = useSync((s) => s.notLiveSince);
@@ -61,7 +92,7 @@ export function ReconnectBanner() {
     <Alert
       variant="warning"
       data-testid="sync-reconnect-banner"
-      className="rounded-none border-x-0"
+      className="pointer-events-none w-auto max-w-full rounded-md bg-background/90 px-3 py-1.5 text-center [&_a]:pointer-events-auto [&_button]:pointer-events-auto"
     >
       Reconnecting…
       {elapsed >= 60_000 && (
