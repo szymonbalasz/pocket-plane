@@ -2737,6 +2737,7 @@ From [spell-fx §8](../specs/spell-fx.md#8-data-model) and [ADR-0071](../archite
 | `effect` | `fx` *(new column, push-safe `ADD COLUMN`)* | **JSON leaf** `{preset, params, spellId?}` \| null, ≤ 200 B (zod `FxRecord`) | null | Rides the effect's rule (FR-CBTX-31): DM full; players on every effect they receive (the redaction gains `fx`) | FR-VFX-03, -07, -09 |
 | `creature-sheet` | `spells[].fx` *(inside the existing JSON leaf)* | `{preset, params}` optional, ≤ 200 B (zod `SpellRowFxRecord`; `char.putRow` takes `SpellRowFx`: catalogue presets, params defaults filled) | absent | As the sheet (DM + owner) | FR-VFX-05 |
 | Hit cue | — | transient server signal `vfx.hit` (`HitCue`) | — | Per connection, protocol §179 | FR-VFX-21 |
+| Teleport smoke cue | — | transient server signal `vfx.poof` (`PoofCue`) | — | Per connection, protocol §192 | FR-MAP-122 |
 
 - **Relations:** `fx.spellId` → a spell row id in the target creature's sheet (soft: a deleted row leaves the effect running).
 - **Derived (pure, `@shared/spell-fx`):** `suggestPreset(name)` (FR-VFX-04), `hitLooks(cue)` (FR-VFX-19, -20), `emanationCells(footprint, radiusFt, map)` (FR-VFX-24: FR-MAP-22 distance from the nearest footprint cell ≤ radius; footprint and off-map cells excluded).

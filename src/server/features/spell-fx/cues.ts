@@ -9,13 +9,17 @@ import { HP_CHANGE_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import { AttackApplied, HpApplied, type HpChangeFacts } from "@shared/events/combat-tracker";
+import { TokenMoved } from "@shared/events/scenes-map";
 import type { SignalFrom } from "@shared/protocol/frames";
-import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { footprint } from "@shared/scenes-map/geometry";
+import { TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import {
   HIT_CUE_PARTS_MAX,
   type HitCue,
   type HitCuePart,
+  type PoofCue,
   VFX_HIT_SIGNAL,
+  VFX_POOF_SIGNAL,
 } from "@shared/spell-fx/cue";
 import { eq } from "drizzle-orm";
 import type { Db } from "../../db/client";
@@ -106,6 +110,38 @@ export function hitCueListener(s: Services) {
         return cue;
       const { attackerTokenId: _hidden, ...rest } = cue;
       return rest;
+    });
+  };
+}
+
+/**
+ * FR-MAP-122: after a teleport commits, one transient `vfx.poof` per connection. The DM gets smoke
+ * at both ends; a player only at the ends where they receive the token (its record before the move
+ * for the cell it left, after for the cell it reached), so fog and hidden tokens leak nothing and a
+ * player who sees neither end gets no signal. Writes nothing; never stored, logged or replayed.
+ */
+export function poofCueListener(s: Services) {
+  return (e: DispatchedEvent): void => {
+    if (e.event.type !== TokenMoved.type || !s.hub || e.event.campaignId === null) return;
+    const { teleportCue, tokenId, sceneId } = e.event.payload as {
+      teleportCue?: string;
+      tokenId: string;
+      sceneId: string;
+    };
+    if (!teleportCue) return;
+    const change = e.event.changes.find((c) => c.type === TOKEN_TYPE && c.id === tokenId);
+    if (!change?.before || !change.after) return;
+    const before = change.before as TokenRecord;
+    const after = change.after as TokenRecord;
+    const sees = (r: TokenRecord, v: Viewer) => s.records.view(TOKEN_TYPE, r, v).vis !== "hidden";
+    s.hub.sendServerSignal(e.event.campaignId, VFX_POOF_SIGNAL, { role: "dm" }, (v) => {
+      const cells = [
+        ...(sees(before, v) ? [{ col: before.col, row: before.row }] : []),
+        ...(sees(after, v) ? [{ col: after.col, row: after.row }] : []),
+      ];
+      if (cells.length === 0) return null;
+      const cue: PoofCue = { id: teleportCue, sceneId, side: footprint(after.size), cells };
+      return cue;
     });
   };
 }

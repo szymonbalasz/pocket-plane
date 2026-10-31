@@ -1,5 +1,5 @@
 // scenes-map's token menu entries (FR-MAP-18): rename, image, shape (FR-MAP-35), owner,
-// hide/reveal, duplicate, delete (no confirm). No size entry (#120). Each sends one `map.*` intent; the server decides.
+// hide/reveal, teleport (FR-MAP-121), duplicate, delete (no confirm). No size entry (#120). Each sends one `map.*` intent; the server decides.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { MAP_INTENTS, TokenName, type TokenShape } from "@shared/scenes-map/schemas";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@ui/components/ui/menus";
 import { AssetPickerDialog } from "@ui/features/assets-pipeline/AssetPicker";
 import { toastReject, useMapIntent } from "@ui/features/scenes-map/intents";
+import { startTeleport } from "@ui/features/scenes-map/teleport-tool";
 import { useRecords } from "@ui/sync/store";
 import {
   CopyIcon,
@@ -23,6 +24,7 @@ import {
   ShapesIcon,
   Trash2Icon,
   UserIcon,
+  WandSparklesIcon,
 } from "lucide-react";
 import { NameFormDialog } from "./NameFormDialog";
 import { setMapSelection } from "./selection";
@@ -183,6 +185,15 @@ export const scenesMapTokenMenu: readonly TokenMenuEntry[] = [
         </DropdownMenuItem>
       );
     },
+  },
+  {
+    id: "map.teleport",
+    order: 47,
+    Item: ({ token }: TokenMenuItemProps) => (
+      <DropdownMenuItem data-testid="map-token-menu-teleport" onSelect={() => startTeleport(token)}>
+        <WandSparklesIcon /> Teleport
+      </DropdownMenuItem>
+    ),
   },
   {
     id: "map.duplicate",

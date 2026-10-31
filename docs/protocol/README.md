@@ -4450,3 +4450,16 @@ From [log-share](../specs/log-share.md) FR-SHARE-01–11 (#415). **Built by `bui
 
 - **Log kind** `share.entry`, payload `{title, line, text, cut?, folded?}`, no `dmPayload`, category `other`; registered in `src/shared/dice-roll-log/kinds.ts`.
 - **Test IDs:** `share-send` (`data-source` = `compendium` or the list, `data-record-id`), `share-confirm-dialog`, `share-confirm-send`, `share-confirm-cancel`, `share-entry-body`, `share-entry-line`, `share-entry-folded`, `share-entry-cut`.
+
+## 192. Teleport (build/token-teleport)
+
+From [scenes-map](../specs/scenes-map.md) FR-MAP-121–123 (#418). **Built by `build/token-teleport`.** No new record type or event type.
+
+| Intent | Payload | Rule | Event | FR |
+|---|---|---|---|---|
+| `map.teleportToken` (DM only) | `{tokenId, col, row}` | As `map.moveToken`'s DM path (footprint must overlap the map, guards, derive, token-changed hooks with `teleport: true`). Its own cell or off the map → `invalid`; a player → refused by role | `TokenMoved` with `teleportCue` | FR-MAP-121, -123 |
+
+- **`TokenMoved`** gains optional `teleportCue` (a fresh id, only on a teleport). Still unlogged, not undoable. Combat's hook adds no `movedFt` for it.
+- **Server signal `vfx.poof`** (server-originated, transient: no event of its own, DB row, log, snapshot or `seq`): `signal {name: "vfx.poof", data: PoofCue, from: {role: "dm"}}`, `PoofCue = {id, sceneId, side, cells: [{col, row}]}` (1–2 cells, top-left of each footprint). Per connection after commit: the DM gets both ends; a player the ends where `records.view` shows them the token (the record before the move for the cell left, after it for the cell reached); neither → no signal.
+- **Canvas tool** `teleport`: DM, `offRail` (a new optional `CanvasToolDef` field: `toolsFor` leaves it off the rail).
+- **Test IDs:** `map-token-menu-teleport`, `map-teleport-panel`, `map-teleport-cancel`; canvas `map-teleport-target` (attrs `col`, `row`), `vfx-poof` (id = cue id; `x`, `y`, `size`), `vfx-over-pass` attr `lastPoof` = cue id.

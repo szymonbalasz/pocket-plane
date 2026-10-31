@@ -67,7 +67,10 @@ export function combatantTokenHook(
   const out: RecordChange[] = [];
   // FR-SCN-30: the campaign's diagonal rule (`map-settings`, no row = 5/10/5). A move refused by a
   // move guard (FR-SCN-11) never reaches the hooks, so it adds nothing.
-  const ft = distanceFt(before, after, diagonalRuleOf(env.tx, before.campaignId));
+  // FR-MAP-123: a teleport isn't walked; its jump still goes on the trail (`trailHook`).
+  const ft = env.teleport
+    ? 0
+    : distanceFt(before, after, diagonalRuleOf(env.tx, before.campaignId));
   const hidden = tokenHiddenForPlayers(after);
   for (const c of bound) {
     // FR-CBT-39: before the copy check (which skips on a move); removed combatants gain nothing.
