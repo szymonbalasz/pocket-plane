@@ -161,6 +161,7 @@ Tier A rules hold: filter, then aggregate; final roll only; names from facts; pa
 | d20s | every d20 face with a value, kept **and dropped** ([FR-DICE-89](dice-roll-log.md#6-functional-requirements)) | ✓ | |
 | Avg d20 | mean of d20s, 1 decimal, "—" with none (expected 10.5) | ✓ | Lifetime |
 | Nat 20s / 1s | `natural` (FR-STATS-10): set only for one kept d20 (FR-DICE-20), so a `1d20+1d20` roll adds faces, never nats | ✓ | Lifetime |
+| Faces 1–20 | how many d20s came up each face, the same dice as d20s, so they add up to it (FR-STATS-89) | ✓ (chart) | |
 | Fights | encounters with a counted fact of theirs | | Lifetime |
 | Dealt, Taken, Healing, Kills, Times downed | FR-STATS-06–08 | | Lifetime |
 | Biggest hit, Biggest overkill | FR-STATS-12 per role, "→ target · fight label" | | Records |
@@ -190,6 +191,15 @@ The [session recap](session-recap.md) reads stats; it changes no stats number, f
 | FR-STATS-86 | **Visibility** exactly as Trophies / awards per role: players the hub filter (public facts and rolls only; no hidden creature, DM roll or hidden request answer in any number), party only, neutral fight labels, no overkill amount; every player the same answer. Ack leak-scanned per player (live, after reconnect, after a hard restart). |
 | FR-STATS-87 | **Read path**: same pipeline, rate limit and memo as FR-STATS-16 / -69 (one memo for all players); from the session partials (FR-STATS-46; a partial also keeps its award winners, fights and kills), `{pending: true}` while building (asked again in 1 s). **Live refresh**: re-query 1 s after any live log upsert (trailing, as Session) and after each snapshot. Ack ≤ 64 KB (rows, award rows ≤ 70). **Bench**: campaign warm ≤ 50 ms at 100 sessions (DM, player). |
 | FR-STATS-88 | **Fits today's Stats window** (400 × 412, useful 400 × 360; no size change): header, then the party table (narrow columns "Dealt Taken Healed Kills Down 20s 1s Fights", names whole; the table **scrolls sideways inside its own box**, the window body never), then records and awards as compact lines. States as FR-STATS-24 / -50 ("No fights yet", "No awards yet", skeleton while pending). |
+
+### 6.4 d20 chart
+
+*DM, 2026-10-31.* Tier A / B rules hold: filter, then aggregate.
+
+| ID | Requirement |
+|---|---|
+| FR-STATS-89 | **Face counts**: a luck row gains `faces`, 20 counts (`faces[0]` the 1s … `faces[19]` the 20s): every d20 face with a value, kept **and dropped**, so they add up to `d20s`. So face 20 can exceed Nat 20: a dropped 20 and `1d20+1d20` count here, not there. Same rows, roles and scopes as FR-STATS-37–40 (players: public rolls only). Worked out from the log like the rest, so **retroactive** (FR-STATS-49); nothing new stored. Tests `FR-STATS-89 …`. |
+| FR-STATS-90 | **Chart window** `stats.dice` "d20 rolls", both clients, a [pop-out type](play-shell.md#6-functional-requirements) (FR-SHELL-201): no launcher, one window, a reload closes it. The Luck tab's **Chart** (`stats-luck-chart`, beside the scope picker) opens it on the tab's scope; after that it has its own `stats-dice-scope` (FR-STATS-40) and `stats-dice-who` (`stats-dice-who-option`, `data-record-id` `everyone` or a row's key: every row the viewer's ack holds, or one). `stats-dice-mode` **Count · Percent** (`stats-dice-mode-item`, `data-value`; default Percent). `stats-dice-chart`: 20 `stats-dice-bar` (`data-record-id` face, `data-value` count) from one baseline, a y axis, `stats-dice-fair-line` where a fair die's bars end (5%, or d20s ÷ 20), `stats-dice-total` "N d20s · Avg x", `stats-dice-fair` + note. Each bar's hover and focus hint: "20: 52 rolls · 5.2%"; only a sole highest and a sole lowest bar print their number (`stats-dice-label`). Percent has 1 decimal, 2 from 10,000 dice. Refreshes as FR-STATS-41. States as FR-STATS-50, "No d20 rolls yet". 440×400, useful 400×340, min 320×280. Page memory only; a close resets it (FR-SHELL-200). Tests `FR-STATS-90 …`, `e2e/stats-dice-chart.e2e.ts`. |
 
 ## 7. UI/UX notes
 
