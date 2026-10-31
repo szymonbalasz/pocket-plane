@@ -68,6 +68,24 @@ describe("FR-NOTE-82 the DM's roll popups keep off the PCs where a clear spot ex
     expect(popupRoom(vp.h, at, W, heads, { left: 496, top: start })).toBeGreaterThanOrEqual(CARD_H);
   });
 
+  test("FR-NOTE-82 BL-118 x1 (a card leaves, the toasts settle): the showing column holds its spot while that stays clear of the rects and the PCs, and moves when a PC or a window reaches it", () => {
+    const pcs = [mira, brakka, thorn];
+    const size = { w: W, h: CARD_H };
+    const first = dmPopupAt(vp, start, size, clear, windows, heads, pcs);
+    // Shorter (a card left), the toasts' start elsewhere: same spot.
+    const shorter = { w: W, h: CARD_H - 40 };
+    expect(dmPopupAt(vp, start - 60, shorter, clear, windows, heads, pcs, first)).toEqual(first);
+    // A PC walks under it: it moves off.
+    const onIt = { x: first.left + 10, y: first.top + 10, w: 48, h: 48 };
+    const moved = dmPopupAt(vp, start, size, clear, windows, heads, [...pcs, onIt], first);
+    expect(moved).not.toEqual(first);
+    expect(hit(column(moved, CARD_H), onIt)).toBe(false);
+    // No PCs: no hold, the rules as they were.
+    expect(dmPopupAt(vp, start, size, clear, windows, heads, [], first)).toEqual(
+      dmPopupAt(vp, start, size, clear, windows, heads),
+    );
+  });
+
   test("FR-NOTE-82 BL-132 a home spot already off the PCs doesn't move: default layout, up to 3 cards", () => {
     const three = 3 * CARD_H + 2 * 8;
     const initD = { x: 1028, y: 60, w: 400, h: 512 };

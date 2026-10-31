@@ -391,7 +391,9 @@ const overlaps = (a: Rect, b: Rect, gap: number) =>
  * every rect it was given and holds the column above the viewport's bottom. Neither → as before
  * (the column may cover windows; `popupRoom` then keeps it off the heads below it). FR-NOTE-82
  * (BL-175, sim-17 b02: over Mira + Brakka for ~6 s): each of those spots also has to be off the
- * `pcs` (footprints + 4 px), else the nearest spot that is; with none, the rules above stand. Pure.
+ * `pcs` (footprints + 4 px), else the nearest spot that is; with none, the rules above stand.
+ * `held`: the spot the showing column is drawn at: kept while it clears the same rects and the PCs
+ * (BL-118: a card leaving or a settled toast stack doesn't move a column off a PC's way). Pure.
  */
 export function dmPopupAt(
   vp: { w: number; h: number },
@@ -401,6 +403,7 @@ export function dmPopupAt(
   windows: readonly Rect[],
   heads: readonly Rect[],
   pcs: readonly Rect[] = [],
+  held: { left: number; top: number } | null = null,
 ): { left: number; top: number } {
   const offPcs = (at: { left: number; top: number }) => {
     const box = { x: at.left, y: at.top, w: size.w, h: size.h };
@@ -410,11 +413,14 @@ export function dmPopupAt(
   for (const keepOff of pcs.length > 0 ? [true, false] : [false]) {
     for (const extra of [windows, heads]) {
       const rects = [...clear, ...extra];
+      const freeAt = (at: { left: number; top: number }) => {
+        const box = { x: at.left, y: at.top, w: size.w, h: size.h };
+        const fits = at.top + size.h <= vp.h - EDGE_GAP && at.left >= RAIL_CLEAR;
+        return fits && !rects.some((r) => overlaps(box, r, EDGE_GAP));
+      };
+      if (keepOff && held && freeAt(held) && offPcs(held)) return held;
       const at = dmStackAt(vp, top, size, rects);
-      const box = { x: at.left, y: at.top, w: size.w, h: size.h };
-      const fits = at.top + size.h <= vp.h - EDGE_GAP && at.left >= RAIL_CLEAR;
-      const free = fits && !rects.some((r) => overlaps(box, r, EDGE_GAP));
-      if (free && (!keepOff || offPcs(at))) return at;
+      if (freeAt(at) && (!keepOff || offPcs(at))) return at;
       if (keepOff) {
         const spot = spotOffPcs(vp, top, size, rects, pcs);
         if (spot) return spot;
