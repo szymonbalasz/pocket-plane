@@ -1082,8 +1082,7 @@ export function TrayWindow() {
         <p
           data-testid="dicex-tray-issue"
           role="status"
-          className="shrink-0 truncate text-xs text-destructive"
-          title={issue}
+          className="shrink-0 break-words text-xs text-destructive"
         >
           {issue}
         </p>
@@ -1093,18 +1092,13 @@ export function TrayWindow() {
         <p
           data-testid="dicex-tray-error"
           role="alert"
-          className="shrink-0 truncate text-xs text-destructive"
-          title={error}
+          className="shrink-0 break-words text-xs text-destructive"
         >
           {error}
         </p>
       )}
       {control.error && (
-        <p
-          className="shrink-0 truncate text-xs text-destructive"
-          role="alert"
-          title={control.error}
-        >
+        <p className="shrink-0 break-words text-xs text-destructive" role="alert">
           {control.error}
         </p>
       )}

@@ -200,6 +200,11 @@ describe("FR-DICEX-99 purpose toggle", () => {
     html = render(<TrayWindow />);
     expect(html).toContain('data-testid="dicex-tray-issue"');
     expect(html).toContain("An attack needs one d20");
+    // Full text: the tray's issue line wraps and grows, never cut, no hover title.
+    const issue = /<p data-testid="dicex-tray-issue"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(issue).toContain("break-words");
+    expect(issue).not.toContain("truncate");
+    expect(issue).not.toContain("title=");
     expect(html).toMatch(/data-testid="dicex-tray-roll"[^>]*disabled/);
     // Damage: a type per group; the purpose presets the category; unclaimed → dice.roll.
     const free = {

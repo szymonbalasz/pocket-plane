@@ -64,6 +64,24 @@ const SPOTS: readonly { what: string; file: string; shown: string; cut: string }
     shown: '<span className="min-w-14 text-xs text-muted-foreground">{part.type}</span>',
     cut: '<span className="w-14 truncate text-xs text-muted-foreground">{part.type}</span>',
   },
+  {
+    what: "the tray's issue line wraps whole, no hover title",
+    file: "common/features/dice-extras/TrayWindow.tsx",
+    shown: 'className="shrink-0 break-words text-xs text-destructive"',
+    cut: "title={issue}",
+  },
+  {
+    what: "the tray's error line wraps whole, no hover title",
+    file: "common/features/dice-extras/TrayWindow.tsx",
+    shown: 'className="shrink-0 break-words text-xs text-destructive"',
+    cut: "title={error}",
+  },
+  {
+    what: "the roll control's error line in the tray wraps whole, no hover title",
+    file: "common/features/dice-extras/TrayWindow.tsx",
+    shown: '<p className="shrink-0 break-words text-xs text-destructive" role="alert">',
+    cut: "title={control.error}",
+  },
 ];
 
 describe("full text in menus and live windows", () => {

@@ -27,6 +27,7 @@ import {
   LOST_SHARE,
   PARTY_HANDOUT_KIND,
 } from "@ui/features/party-board/logic";
+import { RowError } from "@ui/features/party-board/RowError";
 import { selectHandout, startNewHandout } from "@ui/features/party-board/selection";
 import { partyBoardWindowBase } from "@ui/features/party-board/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
@@ -78,11 +79,7 @@ function RowMenu({ h }: { h: HandoutRecord }) {
   }
   return (
     <>
-      {error && (
-        <span role="alert" className="max-w-24 truncate text-xs text-destructive">
-          {error}
-        </span>
-      )}
+      {error && <RowError>{error}</RowError>}
       <DropdownMenu>
         <Tip content={`Actions for ${h.title}`}>
           <DropdownMenuTrigger asChild>

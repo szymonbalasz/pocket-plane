@@ -718,7 +718,8 @@ describe("FR-KIT-83 companion row", () => {
         `<span class="min-w-0 truncate" data-testid="party-companion-name"[^>]*data-tip=""[^>]*>${long}</span>`,
       ),
     );
-    expect(owl).not.toContain("flex-wrap");
+    // No error on the row: it stays one line (the wrap only applies with a `RowError` inside).
+    expect(owl).not.toMatch(/[ "]flex-wrap/);
     expect(owl).not.toContain("break-words");
     expect(owl).toContain('class="flex min-w-0 flex-1 items-center gap-x-1.5"');
   });

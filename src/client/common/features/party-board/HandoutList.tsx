@@ -59,7 +59,7 @@ export function HandoutRow({
       data-record-id={h.id}
       data-shared={sharedModeOf(h)}
       data-new={mark ? "true" : "false"}
-      className="flex items-center gap-1"
+      className="flex items-center gap-1 has-[[data-slot=party-row-error]]:flex-wrap"
     >
       <button
         type="button"
