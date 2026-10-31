@@ -11,7 +11,8 @@
 // its first rows (`head`: the first row-sized record row, not a record container such as the
 // Encounters editor, which the frame's first-row report takes) and its controls; the Game log's
 // newest entries (re-test 3). *(Sprint 11, F2)* FR-NOTE-78 (BL-108): its headings and records
-// too (the first record and the headings are its primary parts).
+// too (the first record and the headings are its primary parts). *(Sprint 15)* FR-NOTE-83 (BL-151):
+// a player's stack gets them too: Initiative is one of their windows, their toast corner no keep-out.
 // Its own module, so the runtime test can stub it (a static render reads no layout).
 import { useEffect, useMemo, useState } from "react";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
@@ -21,7 +22,7 @@ import { firstRows } from "../play-shell/content-heights";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import { type Rect, TITLE_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
-import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
+import { hardRects, TOASTS_KEEP_OUT, useKeepOuts } from "../play-shell/keep-outs";
 import { windowId } from "../play-shell/manager";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
 import { PUSHED_BODY_CLEAR, pushedByPlan, type StackWindow } from "./keep-out";
@@ -40,8 +41,6 @@ export interface StackInputs {
   /** FR-NOTE-44: the windows' first content rows (`ShellWindow`'s reports). */
   rows: FirstRow[];
 }
-
-const NONE: StackInputs = { initiative: null, windows: [], hard: [], rows: [] };
 
 const WINDOW_SELECTOR = '[data-testid="ui-window"]';
 const BODY_SELECTOR = '[data-testid="ui-window-body"]';
@@ -293,8 +292,9 @@ function useBodyChanges(on: boolean): number {
 }
 
 /**
- * The DM stack's inputs (players: none; their stack keeps its corner). `showing`: the stack shows,
- * so the windows' content is measured (FR-NOTE-75).
+ * The stack's inputs. `showing`: the stack shows, so the windows' content is measured (FR-NOTE-75).
+ * FR-NOTE-83: a player has no Initiative apart (`initiative` null, it is in `windows`), and `hard`
+ * leaves out their own toast corner (hard for the placer, FR-SHELL-48; it is the stack's home).
  */
 export function useStackInputs(isDm: boolean, showing = true): StackInputs {
   const registry = useRegistry();
@@ -303,15 +303,14 @@ export function useStackInputs(isDm: boolean, showing = true): StackInputs {
   const vp = useViewport();
   // A first-row report also renews this Map (`reportFirstRow`), so it re-reads `firstRows()`.
   const measured = useContentHeights();
-  const keepOuts = useKeepOuts("dm");
+  const keepOuts = useKeepOuts(isDm ? "dm" : "player");
   // FR-NOTE-53: the plan (`data-placed`) and the displacement causes.
   const placed = useShellState((s) => s.placed);
   const memory = useShellState((s) => s.memory);
-  const measure = isDm && showing;
+  const measure = showing;
   const changed = useBodyChanges(measure);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `changed` re-reads the content ends
   return useMemo(() => {
-    if (!isDm) return NONE;
     const hard = hardRects(keepOuts);
     // As `renderedWindowRects` keeps them, so the rects line up with the windows.
     const open = windows.filter(
@@ -319,11 +318,11 @@ export function useStackInputs(isDm: boolean, showing = true): StackInputs {
     );
     const rects = (list: typeof open) =>
       renderedWindowRects(list, registry, available, vp, measured, hard);
-    const others = open.filter((w) => w.kind !== INITIATIVE_KIND);
+    const others = isDm ? open.filter((w) => w.kind !== INITIATIVE_KIND) : open;
     const causes = (kind: string, instance: string) =>
       memory.filter((d) => d.kind === kind && d.instance === instance).map((d) => d.cause);
     return {
-      initiative: rects(open.filter((w) => w.kind === INITIATIVE_KIND))[0] ?? null,
+      initiative: isDm ? (rects(open.filter((w) => w.kind === INITIATIVE_KIND))[0] ?? null) : null,
       windows: rects(others).map((r, i) => {
         const w = others[i] as (typeof others)[number];
         const id = windowId(w.kind, w.instance);
@@ -347,7 +346,7 @@ export function useStackInputs(isDm: boolean, showing = true): StackInputs {
           ? { ...r, pushed, blocks: true, ...used }
           : { ...r, pushed, ...used };
       }),
-      hard,
+      hard: isDm ? hard : hardRects(keepOuts.filter((k) => k.id !== TOASTS_KEEP_OUT)),
       rows: [...firstRows().values()],
     };
   }, [

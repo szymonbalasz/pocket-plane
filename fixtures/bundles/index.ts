@@ -109,6 +109,7 @@ import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
 import s14KitE2e from "./s14-kit-e2e";
 import s14ToastsE2e from "./s14-toasts-e2e";
+import s15ToastsE2e from "./s15-toasts-e2e";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
@@ -395,4 +396,6 @@ export const bundles: readonly Bundle[] = [
   sessionSim17,
   // Send to game log (build/log-share)
   logShare,
+  // Sprint 15 (fix/s15-toasts): toasts off the PCs and sheet buttons e2e alias of session-sim-13
+  s15ToastsE2e,
 ];
