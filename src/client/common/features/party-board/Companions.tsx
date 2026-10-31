@@ -89,7 +89,7 @@ export function CompanionLine({
       data-testid="party-companion-row"
       data-record-id={row.id}
       data-in-combat={row.inCombat}
-      className="flex min-h-[22px] items-center gap-1.5 pl-4 text-muted-foreground"
+      className="flex min-h-[22px] items-center gap-1.5 pl-4 text-muted-foreground has-[[data-slot=party-row-error]]:flex-wrap"
     >
       {/* FR-KIT-83: the kit's small medallion (portrait, else the initial, neutral). */}
       <Medallion
@@ -130,7 +130,13 @@ export function CompanionLine({
         )}
         {marks}
       </div>
-      <span className={cn("flex shrink-0 items-center gap-1.5", !live && "opacity-70")}>
+      {/* A row error (`RowError`) lays out from the row itself, on its own line under it. */}
+      <span
+        className={cn(
+          "flex shrink-0 items-center gap-1.5 has-[[data-slot=party-row-error]]:contents",
+          !live && "opacity-70",
+        )}
+      >
         <Health row={row} />
         {row.card && <CardButton row={row} />}
         {dm && <dm.menu row={row} disabled={!live} />}
