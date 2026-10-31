@@ -22,8 +22,6 @@
 // the same row, "+N more" as a pill, the DM's turn card first in the stack.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { toastClassOf } from "@shared/notifications/toast-class";
-import { recordsOf } from "@shared/protocol/store";
-import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { ListTodoIcon, XIcon } from "lucide-react";
 import {
   useCallback,
@@ -43,7 +41,6 @@ import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { EDGE_GAP, LAUNCHER_CLEAR, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
-import { pcBoxes } from "../play-shell/placement";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import {
   DM_TOAST_TOP,
@@ -51,7 +48,7 @@ import {
   PLAYER_TOAST_BOTTOM,
   reportShownStack,
 } from "../play-shell/toast-region";
-import { isPlacementPc, tokenScreenBoxes } from "../play-shell/token-boxes";
+import { tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, TurnCard, useAlertToasts } from "./alert-toasts";
 import { useDialogRects, usePopupIds, usePopupRects } from "./dialog-rects";
 import { COMPACT_W, dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
@@ -78,6 +75,7 @@ import {
   useNoteActions,
   useNoteStripe,
 } from "./parts";
+import { pcScreenBoxes, pcTokenIds } from "./pc-boxes";
 import { useStackHeight } from "./stack-height";
 import { useHistoryOpen, useStackInputs } from "./stack-inputs";
 import {
@@ -244,14 +242,7 @@ function useAvoidTokens(
  */
 function usePcTokens(isDm: boolean): string[] {
   const store = useSync((s) => s.store);
-  return useMemo(() => {
-    if (!isDm) return [];
-    type Tok = { id: string; ownerPlayerId: string | null; characterId: string | null };
-    return recordsOf<Tok>(store, TOKEN_TYPE)
-      .filter((t) => isPlacementPc(t))
-      .map((t) => t.id)
-      .sort();
-  }, [isDm, store]);
+  return useMemo(() => (isDm ? pcTokenIds(store) : []), [isDm, store]);
 }
 
 /**
@@ -466,12 +457,7 @@ export function ToastRuntime({
         hard,
         firstRows,
         dialogs,
-        pcBoxes(
-          tokenScreenBoxes(pcKey ? pcKey.split(",") : [], sync?.getState().store).map((b) => ({
-            ...b,
-            pc: true,
-          })),
-        ),
+        pcScreenBoxes(pcKey ? pcKey.split(",") : [], sync?.getState().store),
         popups,
       ),
     [

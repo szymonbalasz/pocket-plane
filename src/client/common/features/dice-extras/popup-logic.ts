@@ -389,7 +389,9 @@ const overlaps = (a: Rect, b: Rect, gap: number) =>
  * the toast stack), first also over every other window (a spot on none), else over their heads
  * (`windowHeads`: off title bars, tab strips and first records); each only where that spot clears
  * every rect it was given and holds the column above the viewport's bottom. Neither → as before
- * (the column may cover windows; `popupRoom` then keeps it off the heads below it). Pure.
+ * (the column may cover windows; `popupRoom` then keeps it off the heads below it). FR-NOTE-82
+ * (BL-175, sim-17 b02: over Mira + Brakka for ~6 s): each of those spots also has to be off the
+ * `pcs` (footprints + 4 px), else the nearest spot that is; with none, the rules above stand. Pure.
  */
 export function dmPopupAt(
   vp: { w: number; h: number },
@@ -398,15 +400,68 @@ export function dmPopupAt(
   clear: readonly Rect[],
   windows: readonly Rect[],
   heads: readonly Rect[],
+  pcs: readonly Rect[] = [],
 ): { left: number; top: number } {
-  for (const extra of [windows, heads]) {
-    const rects = [...clear, ...extra];
-    const at = dmStackAt(vp, top, size, rects);
+  const offPcs = (at: { left: number; top: number }) => {
     const box = { x: at.left, y: at.top, w: size.w, h: size.h };
-    const fits = at.top + size.h <= vp.h - EDGE_GAP && at.left >= RAIL_CLEAR;
-    if (fits && !rects.some((r) => overlaps(box, r, EDGE_GAP))) return at;
+    return !pcs.some((p) => overlaps(box, p, 0));
+  };
+  // Off the PCs first, then (no such spot) over them as before.
+  for (const keepOff of pcs.length > 0 ? [true, false] : [false]) {
+    for (const extra of [windows, heads]) {
+      const rects = [...clear, ...extra];
+      const at = dmStackAt(vp, top, size, rects);
+      const box = { x: at.left, y: at.top, w: size.w, h: size.h };
+      const fits = at.top + size.h <= vp.h - EDGE_GAP && at.left >= RAIL_CLEAR;
+      const free = fits && !rects.some((r) => overlaps(box, r, EDGE_GAP));
+      if (free && (!keepOff || offPcs(at))) return at;
+      if (keepOff) {
+        const spot = spotOffPcs(vp, top, size, rects, pcs);
+        if (spot) return spot;
+      }
+    }
   }
   return dmStackAt(vp, top, size, clear);
+}
+
+/**
+ * FR-NOTE-82: the spot for the column off `rects` (12 px) and `pcs`, nearest its home (centred, at
+ * `start`), sideways + up or down: beside or above / below each of them, right of the rail, in the
+ * viewport, below the DM's top row. Null → none. Pure.
+ */
+function spotOffPcs(
+  vp: { w: number; h: number },
+  start: number,
+  size: { w: number; h: number },
+  rects: readonly Rect[],
+  pcs: readonly Rect[],
+): { left: number; top: number } | null {
+  const home = Math.round((vp.w - size.w) / 2);
+  const edges = [...rects, ...pcs];
+  const lefts = new Set(
+    [home, ...edges.flatMap((r) => [r.x - EDGE_GAP - size.w, r.x + r.w + EDGE_GAP])]
+      .map(Math.round)
+      .filter((l) => l >= RAIL_CLEAR && l + size.w <= vp.w - EDGE_GAP),
+  );
+  const tops = new Set(
+    [start, ...edges.flatMap((r) => [r.y + r.h + EDGE_GAP, r.y - EDGE_GAP - size.h])]
+      .map(Math.round)
+      .filter((t) => t >= DM_TOAST_TOP && t + size.h <= vp.h - EDGE_GAP),
+  );
+  let best: { left: number; top: number } | null = null;
+  let bestD = Number.POSITIVE_INFINITY;
+  for (const top of tops) {
+    for (const left of lefts) {
+      const d = Math.abs(left - home) + Math.abs(top - start);
+      if (d >= bestD) continue;
+      const box = { x: left, y: top, w: size.w, h: size.h };
+      if (rects.some((r) => overlaps(box, r, EDGE_GAP))) continue;
+      if (pcs.some((p) => overlaps(box, p, 0))) continue;
+      best = { left, top };
+      bestD = d;
+    }
+  }
+  return best;
 }
 
 /**

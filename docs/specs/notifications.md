@@ -131,6 +131,17 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 |---|---|---|---|
 | FR-NOTE-79 | The DM summary alone that still covers a window's content or a modal dialog goes compact (one line, 200 px) and is placed again at that width (BL-141, F2 side finding) | F3 | `FR-NOTE-79 FR-NOTE-76 F2 side finding …`, `FR-NOTE-79 K6c gap 1 …`, `FR-NOTE-79 the fold's last step …`, `FR-NOTE-79 BL-115 …` (`keep-out-compact.test.ts`), e2e `s14-kit` |
 
+> **Sprint 15 (play fixes, `fix/s15-toasts`), 2026-10-31.** Fixes **BL-175** (session-sim-17 glitch 2 and 6, `.verify/20261031-102757-session-sim-17/`: at DM 1440 mid-fight the damage-card popup at 68, 60 on Mira, v12; the tray's roll popup on Mira + Brakka for ~6 s with Party Manager + tray open, b02). Client only, 0 B.
+> - **Root causes** (code read + rects from the DM's captured token records): the stack only kept off PCs in a slide beside a window, so a column spot on a PC beat it; the damage-card popup counted PCs in its last tier, and was placed once at its height at open, before the DM picked a target and a row grew it (255 → 305 px, clear of Mira at open, on her after); the roll-popup column looked at windows only.
+> - **The three cards of v12 stay at home:** none of the tokens east of the wall is a PC (Goblin 3, 4, Elite 2, Wolf 2, Plain Brute, a Fire Elemental). Other tokens matter less than PCs, as in FR-NOTE-75–79: a move or a fold for them is not part of this.
+> - **"A clear spot"** in FR-NOTE-80–82 is one clear of what the rule already keeps clear **and** of the PCs. None → the rules before stand: a card or popup then stays over a PC, and a PC never folds a card.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-NOTE-80 | The DM stack keeps off PC tokens (footprint + 4 px) where a clear spot exists: in the column the spot over the least PC area first; one over a PC waits for the slides (beside a window, then beside the PC, left of home any distance, right of home within the cap, #288, #364). No clear spot → the rules before; `covers` and the fold count windows only (BL-175) | S15 | `FR-NOTE-80 …` (`keep-out-s15.test.ts`), e2e `s15-toasts` |
+| FR-NOTE-81 | The damage-card popup (amends [FR-CBT-55, -56, -75](combat-tracker.md#6-functional-requirements)) keeps off PC tokens: after the rows' tokens and the likely targets, before the other combatants, and a spot (its toast's too) is free only off them, counting the height of a target row added after it opens. Still placed once per open (BL-175) | S15 | `FR-NOTE-81 …` (`popup-placement-s15.test.ts`), e2e `s15-toasts` |
+| FR-NOTE-82 | The DM's roll-popup column (amends [FR-DICEX-55](dice-extras.md#6-functional-requirements), BL-132) keeps off PC tokens: each of its spots must be off them, else the nearest spot that clears what that spot clears and the PCs; none → the rules before. PCs read when a popup arrives or leaves (BL-118). Size stays #348's (BL-175) | S15 | `FR-NOTE-82 …` (`popup-place.test.ts`) |
+
 ## 1. Summary
 
 - **Notification**: a persisted, toast-like message with a history feed. It has a kind, an audience and optionally an action ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md), [decisions #47](../decisions-log.md)). With an action it is a **pending action** until resolved or dismissed (e.g. a damage card's "Apply"). Without one it is info.
