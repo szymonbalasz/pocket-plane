@@ -3,6 +3,7 @@
 // `(source, sourceKey)` → per record created | updated | existing. Any error → nothing written,
 // every issue returned. Changed definitions run entities' hooks (FR-CMP-08). Then one
 // `CompendiumImported`, only if something was written. No route here (C3 adds it).
+import { END_COMBAT_FIRST } from "@shared/compendium/import";
 import { BOOK_SOURCE_PREFIX } from "@shared/compendium/match";
 import { COMPENDIUM_KINDS, CompendiumKind, SourceKey } from "@shared/compendium/schemas";
 import { CompendiumImported, type ImportCounts } from "@shared/events/compendium";
@@ -35,8 +36,7 @@ import { fiveEtoolsBook } from "./sources/five-etools";
 
 export const IMPORT = "cmp.import";
 export const IMPORT_RECORDED = "cmp.importRecorded";
-/** FR-CMP-07: the one-transaction write pauses every command, combat included. */
-export const END_COMBAT_FIRST = "End combat first";
+export { END_COMBAT_FIRST };
 
 const isBundledKey = (s: string): s is BundledSourceKey =>
   (BUNDLED_SOURCE_KEYS as readonly string[]).includes(s);

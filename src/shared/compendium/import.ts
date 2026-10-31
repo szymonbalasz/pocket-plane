@@ -9,6 +9,9 @@ import { type CompendiumKind, CompendiumSource } from "./schemas";
  * `run`: the same value on each book of one Import / Update, which adapts from one folder read;
  * `last` on its last book ends the run (the server's log line, the read dropped).
  */
+/** FR-CMP-07: the one-transaction write pauses every command, combat included. */
+export const END_COMBAT_FIRST = "End combat first";
+
 export const ImportRequest = z.strictObject({
   source: z.string().min(1).max(64),
   run: z.string().min(1).max(64).optional(),

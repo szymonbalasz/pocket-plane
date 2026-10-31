@@ -1,7 +1,8 @@
 // e2e-bundle: cmpx-5etools
 // Thin 5etools flow (compendium-expansion §13 E2E): the DM imports both fixture books from the
 // panel; "goblin" → one row badged TB1; drag it onto the map, it shows its token art, a second reuses
-// it; player-1 finds the TB1 spell and no monsters. States, versions, crash, credits, visibility:
+// it; player-1 finds the TB1 spell and no monsters; in a fight Import selected is locked with why.
+// States, versions, crash, credits, visibility:
 // bun test (cmpx-panel, five-etools, imported-art).
 //
 // This spec runs its own server: the folder is a per-server env value (`PP_5ETOOLS_DIR`), and
@@ -16,7 +17,7 @@ import { type Browser, expect, type Locator, type Page, test } from "@playwright
 import { loginDm } from "./support/env";
 import { konvaNodes } from "./support/konva";
 import { mapPoint } from "./support/map";
-import { openWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 const run = promisify(execFile);
 const ROOT = path.join(import.meta.dirname, "..");
@@ -136,7 +137,7 @@ test.afterAll(async () => {
   }
 });
 
-test("FR-CMPX-17 FR-CMPX-14 FR-CMPX-16 import both books, 'goblin' → one TB1 row, drag to the map; player: the TB1 spell, no monsters", async ({
+test("FR-CMPX-17 FR-CMPX-14 FR-CMPX-16 BL-177 import both books, 'goblin' → one TB1 row, drag to the map; player: the TB1 spell, no monsters", async ({
   browser,
 }) => {
   const dm = await rolePage(browser);
@@ -250,4 +251,21 @@ test("FR-CMPX-17 FR-CMPX-14 FR-CMPX-16 import both books, 'goblin' → one TB1 r
   await expect(spell).toContainText("TB1");
   await pw.getByTestId("cmp-search").fill("goblin");
   await expect(pw.getByTestId("cmp-result")).toHaveCount(0);
+
+  // BL-177: a fight on: Import selected off with a book ticked, its tooltip saying why.
+  const enc = await openWindow(dm, "cbt.encounters");
+  await enc.getByTestId("cbt-enc-new").click();
+  await enc.getByTestId("cbt-enc-start").click();
+  await dm.getByTestId("cbt-enc-start-confirm").click();
+  // The Compendium is not open after Start; reopened, it starts folded.
+  await expect(shellWindow(dm, "cbt.initiative")).toBeVisible();
+  const fighting = await openWindow(dm, "cmp.compendium");
+  await fighting.getByTestId("cmpx-books-toggle").click();
+  await fighting.getByTestId("cmpx-book-search").fill("test book");
+  await fighting.getByTestId("cmpx-select-all").click();
+  const locked = fighting.getByTestId("cmpx-import");
+  await expect(locked).toBeDisabled();
+  await expect(locked).toHaveAttribute("data-locked", "true");
+  await locked.locator("..").hover();
+  await expect(dm.getByRole("tooltip")).toContainText("End combat first");
 });
