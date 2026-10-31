@@ -306,7 +306,7 @@ function ItemView({ it, index, count }: { it: ItemRow; index: number; count: num
         </div>
       ) : (
         <div className="flex items-baseline justify-between gap-2 text-sm">
-          <span className="min-w-0 truncate">
+          <span className="min-w-0 break-words">
             {it.name}
             {it.qty !== 1 && <span className="text-muted-foreground"> ×{it.qty}</span>}
           </span>

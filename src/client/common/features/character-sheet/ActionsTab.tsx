@@ -355,7 +355,7 @@ function AttackLine({ a }: { a: Attack }) {
     return (
       <div className="flex flex-col">
         <span className="flex items-baseline justify-between gap-2">
-          <span className="min-w-0 truncate text-[15px] font-bold">{v.name}</span>
+          <span className="min-w-0 break-words text-[15px] font-bold">{v.name}</span>
           {v.badge && (
             <Badge data-testid="charx-attack-bonus" data-value={a.bonus} variant="outline">
               {v.badge}
@@ -850,7 +850,7 @@ function SpellRowView({
         <SpellEditor s={s} index={index} count={count} />
       ) : (
         <div className="flex items-baseline justify-between gap-2 text-sm">
-          <span className={cn("min-w-0 truncate", scope === "main" && "text-[15px] font-bold")}>
+          <span className={cn("min-w-0 break-words", scope === "main" && "text-[15px] font-bold")}>
             {s.name}
           </span>
           <span className="text-[10px] text-muted-foreground">{marks(s)}</span>

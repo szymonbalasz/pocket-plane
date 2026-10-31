@@ -66,7 +66,7 @@ export function Box({
             "relative -mx-2 -mt-1.5 mb-1 flex min-w-0 items-center justify-center border-b px-2.5 pt-1.5 pb-1 text-center",
           )}
         >
-          <span className="truncate">{label}</span>
+          <span className="min-w-0 break-words">{label}</span>
           {aside && <span className="absolute right-2 normal-case tracking-normal">{aside}</span>}
         </div>
       ) : (
@@ -77,7 +77,7 @@ export function Box({
               list ? "justify-between" : "justify-center",
             )}
           >
-            {label && <span className={cn(BOX_LABEL, "truncate")}>{label}</span>}
+            {label && <span className={cn(BOX_LABEL, "min-w-0 break-words")}>{label}</span>}
             {aside}
           </div>
         )

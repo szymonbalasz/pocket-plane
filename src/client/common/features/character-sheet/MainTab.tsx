@@ -195,7 +195,7 @@ function HitPoints() {
       data-slot="sheet-box"
       className="col-span-3 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2.5 gap-y-1 rounded-md border bg-card px-2.5 pt-[5px] pb-2 @min-[560px]/sheet:col-span-1"
     >
-      <span className={cn(BOX_LABEL, "col-span-2 truncate text-center")}>
+      <span className={cn(BOX_LABEL, "col-span-2 min-w-0 break-words text-center")}>
         {hp === null ? "HP max" : "Hit Points"}
       </span>
       <span className="col-start-1 flex min-w-0 flex-wrap items-baseline gap-x-1.5">
@@ -1044,7 +1044,7 @@ function SkillsBlock() {
                   <ProfDot on={r.proficiency !== null} double={r.proficiency === "expertise"} />
                 </button>
               </Tip>
-              <span className="min-w-0 flex-1 truncate">{r.name}</span>
+              <span className="min-w-0 flex-1 break-words">{r.name}</span>
               <span className="w-[34px] shrink-0 text-xs tracking-wide text-muted-foreground">
                 {r.abbr}
               </span>
@@ -1083,7 +1083,7 @@ function SkillsBlock() {
             data-slot="sheet-box"
             className="flex min-w-0 flex-col items-center rounded-md border bg-card px-1 pt-[5px] pb-1.5 text-center"
           >
-            <span className={cn(BOX_LABEL, "max-w-full truncate")}>
+            <span className={cn(BOX_LABEL, "max-w-full break-words")}>
               <span className="@min-[560px]/sheet:hidden">{PASSIVE_SHORT[p.skill]}</span>
               <span className="hidden @min-[560px]/sheet:inline">{p.name}</span>
             </span>

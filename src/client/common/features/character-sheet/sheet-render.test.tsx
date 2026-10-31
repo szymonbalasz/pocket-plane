@@ -408,7 +408,7 @@ describe("FR-CHARX-48 pinned header", () => {
     // The Tooltip trigger is the picker wrapper (it carries the select); the name clamps at 2 lines.
     expect(tagOf(html, "charx-name-picker")).toContain("data-tip");
     expect(html).toMatch(/<span class="line-clamp-2 min-w-0 break-normal text-balance">Mira</);
-    expect(html).not.toContain("break-words");
+    expect(html).not.toMatch(/<span class="[^"]*break-words[^"]*">Mira</);
     // K11: portrait and name column in a grid; the actions (K13: floated top-right in the name
     // column) stack in a column when narrow (the name keeps its room), a row once wide.
     expect(html).toContain(

@@ -29,7 +29,7 @@ import { createWindowRegistry } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { ActionsTab } from "./ActionsTab";
 import { ABILITY_GRID, COLUMNS, MainTab, STAT_GRID } from "./MainTab";
-import { FeaturesTab } from "./MoreTabs";
+import { FeaturesTab, InventoryTab } from "./MoreTabs";
 import { PublicRolls, PublicRollsMenu } from "./PublicMenu";
 import { rollRoutes } from "./roll-routes";
 import { ROLL_HINT, rollHint } from "./rolls";
@@ -95,6 +95,7 @@ type Opts = {
   stats?: unknown;
   wide?: boolean;
   features?: FeatureRow[];
+  items?: unknown[];
 };
 
 function creatureOf(o: Opts): DefinitionRecord {
@@ -127,7 +128,12 @@ function syncOf(client: "dm" | "player") {
 function render(node: React.ReactNode, o: Opts = {}) {
   const client = o.client ?? "player";
   const creature = creatureOf(o);
-  const sheet = { ...defaultSheetData(), spells, features: o.features ?? features };
+  const sheet = {
+    ...defaultSheetData(),
+    spells,
+    features: o.features ?? features,
+    items: (o.items ?? []) as never[],
+  };
   const ctx = {
     creature,
     stats: creature.statBlock,
@@ -621,7 +627,7 @@ describe("K13 wide Main (DM #363)", () => {
     const wide = wideMain({ client: "dm" });
     const row = elementAt(wide, 'data-testid="charx-attack" data-record-id="lb" data-scope="main"');
     expect(row).toContain("py-[7px] last:border-b-0");
-    expect(row).toContain('<span class="min-w-0 truncate text-[15px] font-bold">Longbow</span>');
+    expect(row).toContain('<span class="min-w-0 break-words text-[15px] font-bold">Longbow</span>');
     expect(row).toContain('class="mt-[5px] flex flex-wrap gap-[5px]"');
     expect(row).not.toContain("justify-end");
     const btn = /<button[^>]*data-testid="charx-roll-attack"[^>]*>/.exec(row)?.[0] ?? "";
@@ -1058,7 +1064,7 @@ describe("K11 walkthrough fixes", () => {
     expect(text(derive)).toBe("");
     expect(html).toContain('data-testid="charx-readonly"');
     expect(html).toContain("line-clamp-2 min-w-0 break-normal text-balance");
-    expect(html).not.toContain("break-words");
+    expect(html).not.toMatch(/<span class="[^"]*break-words[^"]*">Elite Goblin</);
   });
 
   test("FR-KIT-85 level line wraps between parts, never right after a '·' (each later part keeps its '·')", () => {
@@ -1148,5 +1154,75 @@ describe("FR-CHARX-119 slots present", () => {
       const src = readFileSync(join(dir, f), "utf8");
       expect({ f, theme: /data-theme|gilt|useTheme/i.test(src) }).toEqual({ f, theme: false });
     }
+  });
+});
+
+describe("full text on the sheet (DM: reading text is never cut)", () => {
+  const wide = (o: Opts = {}) =>
+    render(
+      <SheetWide.Provider value>
+        <MainTab />
+      </SheetWide.Provider>,
+      o,
+    );
+
+  const inventory = (o: Opts) => {
+    const g = globalThis as { document?: unknown };
+    g.document = { title: "", hidden: false };
+    try {
+      return render(
+        <ShellProvider registry={createWindowRegistry(o.client ?? "player", [])}>
+          <InventoryTab />
+        </ShellProvider>,
+        o,
+      );
+    } finally {
+      delete g.document;
+    }
+  };
+
+  test("FR-CHARX-114 no sheet tab cuts a name, a label or a text: Main (wide and narrow), Actions, Features, Inventory", () => {
+    const item = {
+      id: "i1",
+      name: "Very Long Named Bag of Holding",
+      qty: 2,
+      notes: "Holds 500 lb.",
+    };
+    for (const client of ["player", "dm"] as const) {
+      const tabs = [
+        wide({ client }),
+        render(<MainTab />, { client }),
+        render(<ActionsTab />, { client }),
+        render(<FeaturesTab />, { client }),
+        inventory({ client, items: [item] }),
+      ];
+      for (const html of tabs) {
+        expect(html).not.toContain("truncate");
+        expect(html).not.toContain("line-clamp");
+      }
+    }
+  });
+
+  test("FR-CHARX-114 long attack, spell and skill names wrap", () => {
+    const html = wide({ client: "player" });
+    expect(elementAt(html, 'data-testid="charx-attack" data-record-id="lb"')).toContain(
+      '<span class="min-w-0 break-words text-[15px] font-bold">Longbow</span>',
+    );
+    expect(elementAt(html, 'data-testid="charx-spell" data-record-id="hm"')).toContain(
+      "min-w-0 break-words text-[15px] font-bold",
+    );
+    expect(elementAt(html, 'data-testid="charx-skill" data-value="stealth"')).toContain(
+      '<span class="min-w-0 flex-1 break-words">Stealth</span>',
+    );
+  });
+
+  test("FR-CHARX-114 an inventory item's long name wraps, its quantity stays with it", () => {
+    const item = { id: "i1", name: "Very Long Named Bag of Holding", qty: 2, notes: "" };
+    const row = elementAt(
+      inventory({ client: "player", items: [item] }),
+      'data-testid="charx-item" data-record-id="i1"',
+    );
+    expect(row).toContain('<span class="min-w-0 break-words">Very Long Named Bag of Holding');
+    expect(text(row)).toContain("Very Long Named Bag of Holding ×2");
   });
 });
