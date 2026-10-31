@@ -2,21 +2,38 @@
 // hover vertex / segment and the erase box; plus what the shown canvas publishes for the tool's
 // handlers (scene, structure, zoom, loaded) and the door menu. DOM-free.
 import type { Vertex } from "@shared/scene-tools/geometry";
-import type { DoorState } from "@shared/scene-tools/schemas";
+import {
+  type DoorState,
+  WALL_ONE_WAY,
+  WALL_WINDOW,
+  type WallKind,
+} from "@shared/scene-tools/schemas";
 import { createStore } from "zustand";
 import { EMPTY_STRUCTURE, type PxBox, type StructureView } from "./structure-view";
 
-export const STRUCTURE_MODES = ["wall", "door", "erase"] as const;
+export const STRUCTURE_MODES = ["wall", "window", "one-way", "door", "erase", "flip"] as const;
 export type StructureMode = (typeof STRUCTURE_MODES)[number];
+
+/** The modes that draw a polyline of walls, with the kind each draws (FR-SCN-57). */
+const LINE_KINDS: Partial<Record<StructureMode, WallKind | null>> = {
+  wall: null,
+  window: WALL_WINDOW,
+  "one-way": WALL_ONE_WAY,
+};
+export const drawsLine = (mode: StructureMode): boolean => LINE_KINDS[mode] !== undefined;
+export const lineKind = (mode: StructureMode): WallKind | undefined =>
+  LINE_KINDS[mode] ?? undefined;
+/** The modes that pick existing segments rather than place points (FR-SCN-08, -59). */
+export const picksSegments = (mode: StructureMode): boolean => mode === "erase" || mode === "flip";
 
 export interface StructureToolState {
   mode: StructureMode;
-  /** Wall: the polyline so far; Door: the first click. */
+  /** Wall / Window / One-way: the polyline so far; Door: the first click. */
   points: Vertex[];
   hover: Vertex | null;
-  /** Erase: Ctrl / Shift-drag box, map px. */
+  /** Erase / Flip: Ctrl / Shift-drag box, map px. */
   box: PxBox | null;
-  /** Erase: the segment under the pointer. */
+  /** Erase / Flip: the segment under the pointer. */
   hoverN: number | null;
 }
 

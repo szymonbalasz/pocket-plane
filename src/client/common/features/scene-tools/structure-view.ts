@@ -22,6 +22,8 @@ import {
   type PlayerSceneStructureRecord,
   type SceneStructureRecord,
   type Segment,
+  WALL_ONE_WAY,
+  WALL_WINDOW,
   type Wall,
 } from "@shared/scene-tools/schemas";
 import type { Grid } from "@shared/scenes-map/geometry";
@@ -69,10 +71,65 @@ export function structureView(
 
 export const doorStateName = (s: DoorState): DoorStateName => DOOR_STATE_NAMES[s];
 
+/** FR-SCN-59: what Flip can pick: one-way walls only. */
+export function oneWayView(s: StructureView): StructureView {
+  return { ...s, walls: s.walls.filter((w) => w[5] === WALL_ONE_WAY), doors: [] };
+}
+
+/** FR-SCN-57: the wall kinds' segments as drawn, map px. */
+export function wallsByKind(
+  walls: readonly Wall[],
+  g: Grid,
+): { plain: PxSegment[]; windows: PxSegment[]; oneWay: PxSegment[] } {
+  const out = { plain: [] as PxSegment[], windows: [] as PxSegment[], oneWay: [] as PxSegment[] };
+  for (const w of walls) {
+    const px = segmentPx(g, [w[1], w[2], w[3], w[4]]);
+    if (w[5] === WALL_WINDOW) out.windows.push(px);
+    else if (w[5] === WALL_ONE_WAY) out.oneWay.push(px);
+    else out.plain.push(px);
+  }
+  return out;
+}
+
+/** FR-SCN-57: an arrow's height and half width, in cells. */
+const ARROW_TALL = 0.18;
+const ARROW_HALF = 0.16;
+
+/**
+ * FR-SCN-57: a one-way wall's arrows, about one per cell, as `[x1, y1, tipX, tipY, x2, y2]` in map
+ * px. They point to the left of its direction as seen on screen: the way sight passes.
+ */
+export function oneWayArrows(
+  [ax, ay, bx, by]: PxSegment,
+  cell: number,
+): [number, number, number, number, number, number][] {
+  const len = Math.hypot(bx - ax, by - ay);
+  if (len === 0) return [];
+  const ux = (bx - ax) / len;
+  const uy = (by - ay) / len;
+  const half = Math.min(ARROW_HALF * cell, len / 2);
+  const k = Math.max(1, Math.round(len / cell));
+  return Array.from({ length: k }, (_, i) => {
+    const t = ((i + 0.5) / k) * len;
+    const mx = ax + t * ux;
+    const my = ay + t * uy;
+    return [
+      mx - half * ux,
+      my - half * uy,
+      mx + ARROW_TALL * cell * uy,
+      my - ARROW_TALL * cell * ux,
+      mx + half * ux,
+      my + half * uy,
+    ];
+  });
+}
+
 // ---------- hit tests (map px) ----------
 
 /** A segment's endpoints in map px. */
-export function segmentPx(g: Grid, [x1, y1, x2, y2]: Segment): [number, number, number, number] {
+export type PxSegment = [number, number, number, number];
+
+export function segmentPx(g: Grid, [x1, y1, x2, y2]: Segment): PxSegment {
   const a = vertexToPx(g, { x: x1, y: y1 });
   const b = vertexToPx(g, { x: x2, y: y2 });
   return [a.x, a.y, b.x, b.y];

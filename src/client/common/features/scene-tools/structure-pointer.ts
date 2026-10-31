@@ -1,18 +1,30 @@
-// Structure tool pointer handlers (FR-SCN-08), dispatched by MapCanvas (FR-SCN-06). Wall: click
-// vertices (snapped), double-click ends → one `scn.addWalls`; Door: two clicks → `scn.addDoor`
+// Structure tool pointer handlers (FR-SCN-08, -57, -59), dispatched by MapCanvas (FR-SCN-06). Wall,
+// Window, One-way: click vertices (snapped), double-click ends → one `scn.addWalls`; Door: two
+// clicks → `scn.addDoor`
 // (closed). Sprint 3: a click with Ctrl held places the free point under the pointer (0.01 cell);
 // in both modes a point within 8 screen px of an existing endpoint snaps to it (magnet). Erase: click within 8 screen px of a segment, or Ctrl / Shift-drag a box (segments
-// fully inside) → `scn.removeSegments`. Esc, a tool / scene switch or leaving live drops the
+// fully inside) → `scn.removeSegments`. Flip: the same picks, one-way walls only →
+// `scn.flipWalls`. Esc, a tool / scene switch or leaving live drops the
 // gesture (FR-SCN-34). Nothing happens until the shown scene's rows are loaded (ADR-0041).
 import type { ToolPointer, ToolPointerHandlers } from "../scenes-map/tools";
-import { addDoorEdit, addWallsEdit, removeEdit } from "./structure-edits";
-import { resetStructureGesture, shownStructure, structureTool } from "./structure-store";
+import { addDoorEdit, addWallsEdit, flipEdit, removeEdit } from "./structure-edits";
+import {
+  drawsLine,
+  lineKind,
+  picksSegments,
+  resetStructureGesture,
+  type StructureMode,
+  shownStructure,
+  structureTool,
+} from "./structure-store";
 import {
   addPoint,
   hitSegment,
   MAGNET_PX,
+  oneWayView,
   pickPoint,
   polylineSegments,
+  type StructureView,
   segmentsInBox,
   tooClose,
 } from "./structure-view";
@@ -40,6 +52,10 @@ function pointAt(e: ToolPointer): { x: number; y: number } {
   return pickPoint(s.view, structureTool.getState().points, e.grid, e, MAGNET_PX / s.scale);
 }
 
+/** What Erase / Flip can pick in a mode. */
+const pickable = (mode: StructureMode, view: StructureView) =>
+  mode === "flip" ? oneWayView(view) : view;
+
 /** Edits report a reject here (the tool shows it with `toastReject`). */
 export function structurePointer(onReject: (err: unknown) => void): ToolPointerHandlers {
   const set = structureTool.setState;
@@ -49,7 +65,7 @@ export function structurePointer(onReject: (err: unknown) => void): ToolPointerH
       if (!s) return;
       const st = structureTool.getState();
       const v = pointAt(e);
-      if (st.mode === "wall") {
+      if (drawsLine(st.mode)) {
         const points = addPoint(st.points, v);
         if (e.clicks < 2) {
           set({ points });
@@ -58,7 +74,9 @@ export function structurePointer(onReject: (err: unknown) => void): ToolPointerH
         set({ points: [] });
         const segments = polylineSegments(points);
         if (segments.length > 0) {
-          addWallsEdit(e.intent, e.scene.id, s.view, segments).catch(onReject);
+          addWallsEdit(e.intent, e.scene.id, s.view, segments, undefined, lineKind(st.mode)).catch(
+            onReject,
+          );
         }
         return;
       }
@@ -77,19 +95,21 @@ export function structurePointer(onReject: (err: unknown) => void): ToolPointerH
         set({ box: { x0: e.x, y0: e.y, x1: e.x, y1: e.y } });
         return;
       }
-      const n = hitSegment(s.view, e.grid, e, ERASE_TOLERANCE_PX / s.scale);
-      if (n !== null) removeEdit(e.intent, e.scene.id, s.view, [n]).catch(onReject);
+      const n = hitSegment(pickable(st.mode, s.view), e.grid, e, ERASE_TOLERANCE_PX / s.scale);
+      if (n === null) return;
+      if (st.mode === "flip") flipEdit(e.intent, e.scene.id, [n]).catch(onReject);
+      else removeEdit(e.intent, e.scene.id, s.view, [n]).catch(onReject);
     },
     move(e) {
       lastMove = { e, move: (x) => handlers.move?.(x) };
       const st = structureTool.getState();
       const s = shown(e);
       const hoverN =
-        st.mode === "erase" && s && !st.box
-          ? hitSegment(s.view, e.grid, e, ERASE_TOLERANCE_PX / s.scale)
+        picksSegments(st.mode) && s && !st.box
+          ? hitSegment(pickable(st.mode, s.view), e.grid, e, ERASE_TOLERANCE_PX / s.scale)
           : null;
       const box = st.box ? { ...st.box, x1: e.x, y1: e.y } : null;
-      const hover = st.mode === "erase" ? e.vertex : pointAt(e);
+      const hover = picksSegments(st.mode) ? e.vertex : pointAt(e);
       const v = st.hover;
       if (v?.x === hover.x && v?.y === hover.y && hoverN === st.hoverN && !box) return;
       set({ hover, hoverN, box });
@@ -101,8 +121,10 @@ export function structurePointer(onReject: (err: unknown) => void): ToolPointerH
       set({ box: null });
       const s = shown(e);
       if (!s) return;
-      const ns = segmentsInBox(s.view, e.grid, box);
-      if (ns.length > 0) removeEdit(e.intent, e.scene.id, s.view, ns).catch(onReject);
+      const ns = segmentsInBox(pickable(st.mode, s.view), e.grid, box);
+      if (ns.length === 0) return;
+      if (st.mode === "flip") flipEdit(e.intent, e.scene.id, ns).catch(onReject);
+      else removeEdit(e.intent, e.scene.id, s.view, ns).catch(onReject);
     },
     cancel: () => {
       lastMove = null;

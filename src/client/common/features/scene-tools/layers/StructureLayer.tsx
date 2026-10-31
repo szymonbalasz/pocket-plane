@@ -1,6 +1,6 @@
 // `scn-structure` canvas layer (order 26, FR-SCN-02, -09, -12, -13, -14): a Konva Group in the
-// shared `scn-objects` layer, above props. DM: walls as one shape (`scn-walls`, attr `count`;
-// hidden while the "DM-only items" switch is off), doors with a glyph per state (`scn-door`, id
+// shared `scn-objects` layer, above props. DM: walls as one shape per kind (`scn-walls`,
+// `scn-windows`, `scn-one-way`, attr `count`; hidden while the "DM-only items" switch is off), doors with a glyph per state (`scn-door`, id
 // `door-<n>`, attr `state`), double-click (Select tool) toggles open ↔ closed, right-click opens
 // the door menu; while dragging a token, the crossed segments in red (`scn-wall-crossed`, attr
 // `ns`) and a "through wall" tag (`scn-through-wall`). Players: doors only (open / closed), a 1 s
@@ -35,9 +35,12 @@ import {
   doorStateName,
   dragHint,
   FLASH_MS,
+  oneWayArrows,
+  type PxSegment,
   segmentPx,
   structureView,
   toggledDoor,
+  wallsByKind,
   watchDrop,
 } from "../structure-view";
 import { subscribeWallHint } from "../wall-hint";
@@ -70,6 +73,52 @@ function Segments({
         for (const [ax, ay, bx, by] of segs) {
           ctx.moveTo(ax, ay);
           ctx.lineTo(bx, by);
+        }
+        ctx.strokeShape(shape);
+      }}
+    />
+  );
+}
+
+/**
+ * FR-SCN-57: one-way walls as one shape: the line and its arrows, the way sight passes. Also the
+ * Structure tool's preview of a polyline in progress.
+ */
+export function OneWaySegments({
+  segs,
+  name,
+  stroke,
+  width,
+  cell,
+  attrs,
+}: {
+  segs: PxSegment[];
+  name: string;
+  stroke: string;
+  width: number;
+  cell: number;
+  attrs?: Record<string, unknown>;
+}) {
+  return (
+    <Shape
+      name={name}
+      {...attrs}
+      stroke={stroke}
+      strokeWidth={width}
+      lineCap="round"
+      lineJoin="round"
+      listening={false}
+      perfectDrawEnabled={false}
+      sceneFunc={(ctx, shape) => {
+        ctx.beginPath();
+        for (const s of segs) {
+          ctx.moveTo(s[0], s[1]);
+          ctx.lineTo(s[2], s[3]);
+          for (const [x1, y1, tx, ty, x2, y2] of oneWayArrows(s, cell)) {
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(tx, ty);
+            ctx.lineTo(x2, y2);
+          }
         }
         ctx.strokeShape(shape);
       }}
@@ -291,10 +340,7 @@ export function ScnStructureLayer() {
   const hintPieces = useWallHint(!dm);
 
   const width = Math.max(2, grid.gridCellSize * 0.07);
-  const walls = useMemo(
-    () => view.walls.map((w) => segmentPx(grid, [w[1], w[2], w[3], w[4]] as Segment)),
-    [view.walls, grid],
-  );
+  const walls = useMemo(() => wallsByKind(view.walls, grid), [view.walls, grid]);
   const crossed = useMemo(() => {
     if (!hint) return [];
     const ns = new Set(hint.ns);
@@ -307,13 +353,37 @@ export function ScnStructureLayer() {
   return (
     <Group name="scn-structure">
       {dm && !wallsOff && (
-        <Segments
-          segs={walls}
-          name="scn-walls"
-          stroke={colors.primary}
-          width={width}
-          attrs={{ count: walls.length }}
-        />
+        <>
+          <Segments
+            segs={walls.plain}
+            name="scn-walls"
+            stroke={colors.primary}
+            width={width}
+            attrs={{ count: walls.plain.length }}
+          />
+          {/* FR-SCN-57: a window is a hollow line: glass between two edges. */}
+          <Segments
+            segs={walls.windows}
+            name="scn-windows"
+            stroke={colors.primary}
+            width={width * 1.5}
+            attrs={{ count: walls.windows.length }}
+          />
+          <Segments
+            segs={walls.windows}
+            name="scn-windows-glass"
+            stroke={colors.background}
+            width={width * 0.7}
+          />
+          <OneWaySegments
+            segs={walls.oneWay}
+            name="scn-one-way"
+            stroke={colors.primary}
+            width={width * 0.7}
+            cell={grid.gridCellSize}
+            attrs={{ count: walls.oneWay.length }}
+          />
+        </>
       )}
       {view.doors.map((d) => (
         <DoorGlyph key={d.n} d={d} sceneId={scene.id} interactive={dm} />

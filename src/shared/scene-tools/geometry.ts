@@ -5,7 +5,8 @@
 // points carry ≤ 2 decimals; the blocking rule runs on integers scaled by 200 (FR-SCN-10); walls
 // and non-open doors are FOG's sight occluders (FR-SCN-37); door sample points (FR-SCN-36); the
 // first-crossing wall hint for `map.checkMove` (FR-SCN-38). Sprint 4: template cells come from
-// the shared coverage helper `@shared/scenes-map/area` (FR-SCN-41, -42).
+// the shared coverage helper `@shared/scenes-map/area` (FR-SCN-41, -42). FR-SCN-57: window and
+// one-way walls block moves like any wall; only `sightOccluders` tells them apart.
 import { cells, footprintCells, templateArea } from "@shared/scenes-map/area";
 import { distanceFt as distance5105, type Grid, type MapRect } from "@shared/scenes-map/geometry";
 import {
@@ -15,6 +16,8 @@ import {
   FT_PER_CELL,
   type Segment,
   type TemplateGeometry,
+  WALL_ONE_WAY,
+  WALL_WINDOW,
   type Wall,
 } from "./schemas";
 
@@ -197,12 +200,24 @@ export function blockingSegments(
   return out;
 }
 
-/** FR-SCN-37: walls and doors whose state ≠ open, as FOG's sight occluders (grid units). */
+/** An occluder in grid units; `1` at the end = one-way (see `Seg`, `@shared/fog-of-war/vision`). */
+export type SightSegment = readonly [x1: number, y1: number, x2: number, y2: number, oneWay?: 1];
+
+/**
+ * FR-SCN-37: walls and doors whose state ≠ open, as FOG's sight occluders (grid units). FR-SCN-57:
+ * without windows; a one-way wall keeps its direction and says so.
+ */
 export function sightOccluders(structure: {
   walls: readonly Wall[];
   doors: readonly Door[];
-}): Segment[] {
-  return blockers(structure.walls, structure.doors).map(segmentOf);
+}): SightSegment[] {
+  const out: SightSegment[] = [];
+  for (const w of structure.walls) {
+    if (w[5] === WALL_WINDOW) continue;
+    out.push(w[5] === WALL_ONE_WAY ? [...segmentOf(w), 1] : segmentOf(w));
+  }
+  for (const d of structure.doors) if (d[5] !== DOOR_OPEN) out.push(segmentOf(d));
+  return out;
 }
 
 /** FR-SCN-38: half the hint piece's length, in cells, either side of the crossing. */
