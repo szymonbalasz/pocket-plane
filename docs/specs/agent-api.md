@@ -21,7 +21,7 @@ phase: post-mvp
 ## 2. Scope
 
 - **Read:** campaigns, players, characters, creatures (custom + SRD), compendium.
-- **Write:** custom creatures (create, derive, edit, NPC sheet rows and notes), homebrew (create, edit, share), character sheets (fields, rows).
+- **Write:** custom creatures (create, derive, edit, NPC sheet rows and notes), homebrew (create, edit, share), character sheets (fields, rows), a character's effect presets and rule triggers, switching a preset on or off (§6 slice 6).
 - `plan_check`: validate a whole plan without writing.
 - Skill `.claude/skills/pocket-plane-content/`: variants recipe, plan check, mount.
 - `bun run mcp:call <tool> '<json>'`: one call over real stdio (walkthroughs, e2e).
@@ -37,7 +37,8 @@ phase: post-mvp
 
 - New server API: no route, intent, record type or event (ADR D4).
 - Anything off the machine besides the model call (§1); never the tunnel.
-- Delete, campaigns, players and links (incl. a character's owner), combat, maps, dice; player-side agents; live AI follow-along (tier F).
+- Delete, campaigns, players and links (incl. a character's owner), combat, maps, dice; player-side agents; live AI follow-along (tier F). `character_toggle_preset` is the sheet's switch, not a combat action.
+- Campaign-wide presets, monster-definition triggers, `force` / `overspend` on a toggle.
 
 ## 5. User stories
 
@@ -94,6 +95,19 @@ phase: post-mvp
 | FR-AGENT-27 | `character_edit {id, set}`: `CharEditSet` **minus `ownerPlayerId`** → `char.edit`; DM authority (locked sheets, drafts; FR-CHARX-12). A monster → `invalid` "Not a character". |
 | FR-AGENT-28 | `character_put_row`: `CharPutRowIntent` → `char.putRow` on a character. |
 
+**Character effects (slice 6)**
+
+| ID | Requirement |
+|---|---|
+| FR-AGENT-33 | `character_effects {id}`: one character's `effect-preset` rows, `rule-trigger` rows (`sync.load`) and active `effect` rows, with ids, in their wire shapes. A monster → `invalid`; unknown → `not_found`. |
+| FR-AGENT-34 | `character_put_preset` → `mod.putPreset`, character presets only: no `id` adds, `id` replaces that character's preset; on a replace, absent fields are sent as stored (FR-AGENT-17). Unknown `id` on this character → `not_found`. DM authority: locked sheets too. |
+| FR-AGENT-35 | `from` (a built-in key) copies the built-in as this build ships it (FR-MOD-05) and sets `originKey`, as the sheet's Start from does, so a trigger requiring that key matches (FR-MOD-36). Other fields override the copy. `from` reads the built-in, never a campaign customisation of it. |
+| FR-AGENT-36 | `character_put_trigger` → `mod.putTrigger`, character triggers only: `rule` is the stored `TriggerRule`, no `id` adds, `id` replaces; on a replace an absent `enabled` / `public` is kept. |
+| FR-AGENT-37 | `character_toggle_preset {characterId, presetId \| presetName, on}` → `mod.toggle`, as the sheet's switch: on spends a linked use, already in that state changes nothing. No `force`, no `overspend` (the input refuses both): no uses left → the server's `conflict` is reported. |
+| FR-AGENT-38 | **One pass:** `usesFeature`, `requiresPreset` and `presetName` take names, resolved when the call runs, case-insensitive, on that character. No match, or more than one → `invalid` naming the ids, nothing sent. A row name counts rows with uses only. `plan_check` resolves them the same way, counting rows and presets planned earlier in the plan. `rule.every.feature` still takes a row id. |
+| FR-AGENT-39 | **No duplicates:** a preset or trigger name the character already has (case-insensitive, also a rename) → `conflict` naming the existing id to replace; nothing sent. `character_put_row` is unchanged and doesn't refuse a repeated row name. The check is client side, so a race can still duplicate (the server has no such rule). |
+| FR-AGENT-40 | Each write tool has a `plan` checker: target, body (`PresetInput`, `TriggerRule`, the formula for this character), names (FR-AGENT-38, -39), replace ids, the preset and trigger caps incl. planned ones, a toggle with no uses left. |
+
 **Skill (slice 5)**: guidance, reviewed; §13 tests its example plan.
 
 | ID | Requirement |
@@ -102,6 +116,7 @@ phase: post-mvp
 | FR-AGENT-30 | **Variants:** one base → N `creature_derive` calls, each with a `set` diff, `rows`, `notes`. |
 | FR-AGENT-31 | `plan_check` the whole plan → one table for the DM (call, name, key values, issues) → run in order after the DM's yes → on failure report `done` / `failedAt`. |
 | FR-AGENT-32 | **Mount:** rider + mount, two create / derive calls whose `notes` hold "Mount: ‹mount›" / "Rider: ‹rider›"; on existing notes the line is appended. |
+| FR-AGENT-41 | **Toggle plus trigger:** a recipe (row, preset, trigger, optional switch on) and `examples/toggle-and-trigger.json`, which passes `plan_check` with no new ids. |
 
 ## 7. UI/UX notes
 
@@ -138,6 +153,10 @@ N/A: no entity, table, field, record type or event. In memory only: the "auth re
 | `creature_put_row`, `character_put_row` | `CharPutRowIntent` | `char.putRow` | NPC sheet DM (pet: owner); character DM + owner |
 | `homebrew_create`, `homebrew_edit`, `homebrew_share` | `PutEntryBody` | `POST` / GET + `PUT /api/compendium/entries[/:id]` | players only if `shared`, at next search |
 | `character_edit` | `CharEditSet` minus `ownerPlayerId` | `char.edit` | owner full; others whitelist |
+| `character_effects` | `{id}` | snapshot `effect-preset`, `effect`; `sync.load {type: "rule-trigger"}` | DM view |
+| `character_put_preset` | `PresetInput` (`@shared/effect-modifiers/intents`) for a character + `from?`, `usesFeature?` | `mod.putPreset` | DM + owner (MOD §9) |
+| `character_put_trigger` | `TriggerRule` (`@shared/effect-modifiers/triggers`) + `characterId`, `id?`, `name`, `enabled?`, `public?`, `requiresPreset?` | `sync.load`; `mod.putTrigger` | DM + owner (FR-MOD-47) |
+| `character_toggle_preset` | `ToggleInput` minus `force`, `overspend`; `presetId` or `presetName` | `mod.toggle` | as the sheet's switch |
 
 **No route / intent for:** per-field `type` / `hpFormula` / `tokenShape` (→ `PUT`, OQ-AGENT-03); per-field homebrew edit or `If-Match` (→ GET + `PUT`, OQ-AGENT-04); validate-only (→ `plan_check`, OQ-AGENT-07); entity links (ADR-0011 open → notes text).
 
@@ -148,6 +167,9 @@ N/A: no entity, table, field, record type or event. In memory only: the "auth re
 | `EntityCreated`, `EntityUpdated` | `entity` + hook-changed instances | ADR-0024; pets FR-ENT-37; instances by their types |
 | `CharacterSheetEdited` | `entity` / `creature-sheet` + hook rows | FR-ENT-15, FR-CHARX-35/36 (pet sheet: owner) |
 | `CompendiumEntrySaved` | none (CON-44) | DM only; reads per FR-CMP-14 |
+| `EffectPresetSaved` | `effect-preset`, `trigger-state` | DM + owner ([MOD §9](effect-modifiers.md#9-api--events)) |
+| `RuleTriggerSaved` | `rule-trigger`, `trigger-state` | DM + owner; campaign preset refs redacted (FR-MOD-47) |
+| `EffectToggled` | `effect`, `effect-preset`, `creature-sheet` when a use is spent | `effect` per FR-MOD-21; preset, sheet: DM + owner |
 
 ## 10. Permissions
 
@@ -156,7 +178,9 @@ N/A: no entity, table, field, record type or event. In memory only: the "auth re
 | Any tool | ✓ (`PP_DM_SECRET`) | ✗ | FR-CAMP-04, CON-21 |
 | Edit imported definition | ✗ | ✗ | `forbidden` (FR-ENT-07) |
 | Edit locked / draft character | ✓ | — | FR-CHARX-12 |
-| Change owner, delete | ✗ | — | FR-AGENT-14, -27 |
+| Character presets, triggers, toggle (locked too) | ✓ | — | FR-AGENT-34, -36, -37; `editableCreature` |
+| Campaign presets, monster triggers, `force`, `overspend` | ✗ | — | FR-AGENT-34, -36, -37 |
+| Change owner, delete (incl. `mod.deletePreset`, `mod.deleteTrigger`) | ✗ | — | FR-AGENT-14, -27 |
 
 ## 11. Edge cases & failure modes
 
@@ -195,6 +219,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | Slow | Real process: stdout parses as JSON-RPC after `initialize`; `PP_TEST_CRASH=entities.create:before-commit` / `:after-commit` → `server_stopped`; after restart, no row / the row |
 | E2E | `e2e/agent-api.e2e.ts`: `mcp:call character_put_row` → `player-1` shows the item, no reload |
 
+**Character effects** (`src/mcp/effects.test.ts`, bundle `rule-triggers`; a new Barbarian 5 joins the started ambush): one plan before any ids exist; refused names and name clashes at run time and in `plan_check`; a replace keeps what it doesn't name. **Divine Fury:** Rage off → no part on the card; Rage on → a use spent, the radiant part "1d6+2" offered. **Enlarge:** spends its row, no uses left → `conflict`, `force` / `overspend` refused by the input. **Luckstone:** on through `char.rest` long. **Visibility:** the owner gets preset and trigger live, the other player neither, nor the note or row name. **Locked:** the owner's `mod.putPreset` → `forbidden`, the tools still work. **Skill plan:** `examples/toggle-and-trigger.json` → `ok`, no write.
+
 Walkthrough ids come from `characters_list` / `creatures_list` / `compendium_search`.
 
 **Walkthrough A: live** (verify profile; `pw-dm`, `pw-player-1`, `pw-player-2`)
@@ -208,6 +234,12 @@ Walkthrough ids come from `characters_list` / `creatures_list` / `compendium_sea
 2. Clean stop (Ctrl+C in the pane; lock removed): `mcp:call creatures_list` and `creature_create …` → exit ≠ 0, "Start the server".
 3. Start, then hard-kill the PID from `data/verify/server.lock` (`taskkill /F /PID <pid>` or `Stop-Process -Id <pid> -Force`). The same calls are refused, and the lock file stays.
 4. Restart: `state:digest` = D1; calls work.
+
+**Walkthrough C: effects over stdio** (verify profile, `bun run fixtures:reset-load rule-triggers --profile verify`, `bun run mcp:call … --profile verify` on Mira)
+1. `plan_check` on `examples/toggle-and-trigger.json` with Mira's id → `ok`; `character_effects` shows no new preset.
+2. Run its calls in order → ids returned. Run the preset call again → exit 1, `conflict` naming the id.
+3. `character_toggle_preset` Rage on → a use spent (`character_get`), then off.
+4. Add Enlarge (`usesMax` 1): on, off, on → exit 1, "No … uses left". `character_effects` → Luckstone still active.
 
 ## 14. Dependencies
 
@@ -226,6 +258,7 @@ Walkthrough ids come from `characters_list` / `creatures_list` / `compendium_sea
 | 3 Homebrew | `src/mcp/tools/homebrew.ts` |
 | 4 Characters, walkthroughs, e2e | `src/mcp/tools/character.ts`, `e2e/agent-api.e2e.ts` |
 | 5 Skill | `.claude/skills/pocket-plane-content/{SKILL.md,examples/}`, `src/mcp/skill-plans.test.ts` |
+| 6 Character effects | `src/mcp/tools/effects.ts`, `src/mcp/effects.test.ts`, `examples/toggle-and-trigger.json`; `plan.ts` (`presets`, `effects`, `triggers`, `planned`) |
 
 ## 15. Open questions
 
