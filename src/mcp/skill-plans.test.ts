@@ -86,6 +86,8 @@ beforeAll(async () => {
   client = new Client({ name: "test", version: "0" });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await Promise.all([server.connect(a), client.connect(b)]);
+  const mira = await call("characters_list", { q: "Mira" });
+  ids["<character id>"] = mira.json.characters[0].id;
   for (const [ph, name] of Object.entries(STAND_INS)) {
     const r = await call("compendium_search", { q: name, kind: "monster" });
     const hit = r.json.results.find((x: { name: string }) => x.name === name);
@@ -123,7 +125,7 @@ describe("agent-api content skill", () => {
     expect(registered.filter((t) => !named.includes(t))).toEqual([]);
     expect(AgentErrorCode.options.filter((c) => !skillMd.includes(`| \`${c}\` |`))).toEqual([]);
 
-    for (const file of ["orc-variants.json", "reddit-item.json"]) {
+    for (const file of ["orc-variants.json", "reddit-item.json", "toggle-and-trigger.json"]) {
       for (const c of example(file).calls) expect(known.has(c.tool)).toBe(true);
     }
   });
@@ -177,6 +179,23 @@ describe("agent-api content skill", () => {
         message: 'Name "orc SPEAR runner" is already used by call 1',
       },
     ]);
+    expect(eventCount()).toBe(before);
+  });
+
+  test("FR-AGENT-41 toggle-and-trigger.json → plan_check ok in one pass, no ids, nothing written", async () => {
+    const before = eventCount();
+    const r = await call("plan_check", filled(example("toggle-and-trigger.json")));
+    expect(r.json).toEqual({
+      ok: true,
+      issues: [],
+      would: [
+        'character_put_row: add features row "Rage" on Mira',
+        'character_put_preset: add "Rage" on Mira from rage, spends "Rage"',
+        'character_put_trigger: add "Divine Fury" on Mira, requires "Rage"',
+        'character_put_preset: add "Luckstone" on Mira',
+        'character_toggle_preset: "Luckstone" on on Mira',
+      ],
+    });
     expect(eventCount()).toBe(before);
   });
 

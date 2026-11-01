@@ -5,6 +5,9 @@ import {
   CreatureSheetRecord,
   ROW_LIMITS,
 } from "@shared/character-sheet/sheet";
+import { EFFECT_TYPE, EffectRecord } from "@shared/combat-extras/schemas";
+import { EFFECT_PRESET_TYPE, EffectPresetRecord } from "@shared/effect-modifiers/schemas";
+import { RULE_TRIGGER_TYPE, RuleTriggerRecord } from "@shared/effect-modifiers/trigger-records";
 import {
   ENTITY_TYPE,
   type EntityKind,
@@ -47,6 +50,10 @@ export interface PlanWorld {
   campaign: { id: string; name: string };
   entities: EntityRecord[];
   sheets: CreatureSheetRecord[];
+  presets: EffectPresetRecord[];
+  effects: EffectRecord[];
+  /** Every `rule-trigger` of the campaign (a lazy type: `sync.load`, cached). */
+  triggers(): Promise<RuleTriggerRecord[]>;
   /** An imported definition by id (`sync.load`, cached); null = none. */
   imported(id: string): Promise<ImportedEntityRecord | null>;
 }
@@ -67,6 +74,8 @@ export interface PlanContext {
   claimName(scope: string, name: string, path: Issue["path"], existing: Iterable<string>): void;
   /** `ROW_LIMITS` incl. rows planned earlier for the same creature (or planned creature key). */
   planRows(creatureId: string, list: SheetRowList, add: number, path: Issue["path"]): void;
+  /** What earlier calls of this plan would add under `key`; a checker appends its own (FR-AGENT-38). */
+  planned<T>(key: string): T[];
 }
 
 /** Runs the generic checks, then each tool's checker, in plan order. Pure but for `world`. */
@@ -80,6 +89,7 @@ export async function checkPlan(
   const would: string[] = [];
   const claimed = new Map<string, Map<string, number>>();
   const plannedRows = new Map<string, number>();
+  const plannedByKey = new Map<string, unknown[]>();
 
   for (const [i, call] of calls.entries()) {
     const add = (path: Issue["path"], message: string) => issues.push({ call: i, path, message });
@@ -150,6 +160,11 @@ export async function checkPlan(
           );
         }
       },
+      planned<T>(key: string) {
+        const list = plannedByKey.get(key) ?? [];
+        plannedByKey.set(key, list);
+        return list as T[];
+      },
     };
     would.push(tool.plan ? await tool.plan(ctx, parsed.data) : `${tool.name}: read only`);
   }
@@ -159,10 +174,17 @@ export async function checkPlan(
 /** The world from one WS session: the DM snapshot, imported definitions loaded on demand. */
 export function worldOf(s: WsSession): PlanWorld {
   const cache = new Map<string, ImportedEntityRecord | null>();
+  let triggers: RuleTriggerRecord[] | undefined;
   return {
     campaign: s.campaign,
     entities: s.records(ENTITY_TYPE, EntityRecord),
     sheets: s.records(CREATURE_SHEET_TYPE, CreatureSheetRecord),
+    presets: s.records(EFFECT_PRESET_TYPE, EffectPresetRecord),
+    effects: s.records(EFFECT_TYPE, EffectRecord),
+    async triggers() {
+      triggers ??= await s.load(RULE_TRIGGER_TYPE, RuleTriggerRecord);
+      return triggers;
+    },
     async imported(id) {
       if (!cache.has(id)) {
         const ok = id.length > 0 && id.length <= 64;

@@ -206,6 +206,9 @@ describe("FR-AGENT-19 plan_check frame", () => {
     campaign: { id: "c1", name: "Fixture Campaign" },
     entities: [elite],
     sheets: [sheet],
+    presets: [],
+    effects: [],
+    triggers: async () => [],
     imported: async (id) => (id === "imp-goblin" ? ({ id, name: "Goblin" } as never) : null),
   };
   // A stand-in write tool (slice 2's creature tools register the real ones).
@@ -326,7 +329,10 @@ describe("FR-AGENT-01 list-tools", () => {
     const { tools } = await client.listTools();
     const writes = [
       "character_edit",
+      "character_put_preset",
       "character_put_row",
+      "character_put_trigger",
+      "character_toggle_preset",
       "creature_create",
       "creature_derive",
       "creature_edit",
@@ -338,8 +344,12 @@ describe("FR-AGENT-01 list-tools", () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       "campaigns_list",
       "character_edit",
+      "character_effects",
       "character_get",
+      "character_put_preset",
       "character_put_row",
+      "character_put_trigger",
+      "character_toggle_preset",
       "characters_list",
       "compendium_get",
       "compendium_search",

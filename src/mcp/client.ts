@@ -30,7 +30,14 @@ export const ALLOWED_ROUTES = [
   "PUT /api/compendium/entries/:id",
 ] as const;
 export type AllowedRoute = (typeof ALLOWED_ROUTES)[number];
-export const ALLOWED_INTENTS = [SYNC_LOAD, "char.putRow", "char.edit"] as const;
+export const ALLOWED_INTENTS = [
+  SYNC_LOAD,
+  "char.putRow",
+  "char.edit",
+  "mod.putPreset",
+  "mod.putTrigger",
+  "mod.toggle",
+] as const;
 export type AllowedIntent = (typeof ALLOWED_INTENTS)[number];
 
 /** FR-AGENT-06: no answer within this → `server_stopped`. */

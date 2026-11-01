@@ -1,6 +1,6 @@
 ---
 name: pocket-plane-content
-description: Use when the DM asks to create or edit Pocket Plane content (custom creatures and NPC variants, mounts, homebrew items / spells / features / conditions / house rules, character sheets), from pasted text, a link's text or an image, through the Pocket Plane MCP tools.
+description: Use when the DM asks to create or edit Pocket Plane content (custom creatures and NPC variants, mounts, homebrew items / spells / features / conditions / house rules, character sheets, a character's toggles and rule triggers), from pasted text, a link's text or an image, through the Pocket Plane MCP tools.
 ---
 
 # Pocket Plane content
@@ -25,6 +25,7 @@ Turn what the DM gives you (a paste, a page's text, a stat-block image, "an orc 
 | A base custom creature, name clashes | `creatures_list {q}` → `id` = `baseId`; `creature_get {id}` for the full block, NPC sheet, notes |
 | Homebrew name clashes, a clone base | `compendium_search {q, kind}`; `compendium_get {id}` |
 | Characters / players | `characters_list {q}`, `character_get {id}`, `players_list` |
+| A character's toggles, triggers, active effects | `character_effects {id}` |
 
 - Names are unique per kind, case-insensitive (creatures; homebrew per kind). Pick a new name if taken.
 - Lists return ≤ 50; pass `nextCursor` back as `cursor`.
@@ -42,6 +43,9 @@ Turn what the DM gives you (a paste, a page's text, a stat-block image, "an orc 
 | Share / unshare homebrew | `homebrew_share` | `{id, shared}`, only when the DM asks |
 | Character sheet field | `character_edit` | `{id, set}`: `CharEditSet` without `ownerPlayerId` |
 | Character sheet row | `character_put_row` | `{creatureId, list, row}`, as `creature_put_row` |
+| A toggle on a sheet (Rage, Enlarge, a permanent item) | `character_put_preset` | `{characterId, id?, from?, name?, modifiers?, durationRounds?, concentration?, note?, usesFeature? \| usesFeatureId?}` (§6.1) |
+| A rule trigger on a sheet (Divine Fury) | `character_put_trigger` | `{characterId, id?, name, enabled?, public?, requiresPreset?, rule}` (§6.1) |
+| Switch a toggle on or off | `character_toggle_preset` | `{characterId, presetId \| presetName, on}` |
 
 **Stat block → rows** (`rows: [{list, row}]`):
 
@@ -102,6 +106,44 @@ Turn what the DM gives you (a paste, a page's text, a stat-block image, "an orc 
 - `character_get` first. `character_edit {id, set}` for fields (`ac`, `hpMax`, `abilities`, `speed`, `notes`, …), `character_put_row` for attacks / spells / features / items.
 - The owner can't be changed. Locked sheets are fine (DM authority). Players see the change live.
 
+### 6.1 A toggle plus its trigger
+
+Read first: `character_get` (does the feature row exist?) and `character_effects` (do the preset and trigger exist?). Then one plan, in this order, names instead of ids: see [`examples/toggle-and-trigger.json`](examples/toggle-and-trigger.json).
+
+| Step | Call | Notes |
+|---|---|---|
+| 1. The uses | `character_put_row` `{list: "features", row: {name, usesMax, reset}}` | Only if the row isn't there: this tool does **not** refuse a repeated name, and a second row with uses makes the name ambiguous |
+| 2. The toggle | `character_put_preset` | `from` a built-in key (`bless`, `bane`, `rage`, `hunters-mark`, `guidance`, `resistance`, `shield-of-faith`, `reckless`, `dodge`), or custom: `name`, `modifiers`, `durationRounds` (null = none), `concentration`. `usesFeature`: the row name to spend |
+| 3. The trigger | `character_put_trigger` | `requiresPreset`: the preset's name. Or `rule.requires.preset`: a built-in key, matched by origin, so any `from` copy counts |
+| 4. Permanent item | `character_toggle_preset` `{presetName, on: true}` | Stays on, a long rest included, until toggled off. Otherwise leave it to the table: on spends a use |
+
+- **Names** resolve when the call runs, case-insensitive, and `plan_check` counts rows and presets planned earlier. No match or two matches → refused: pass the id.
+- **No duplicates:** a preset or trigger name the character already has → `conflict` naming the id. Pass that `id` to replace; don't rename around it. There is no delete. A replace keeps what it doesn't name.
+- **Limits:** 6 presets and 6 triggers per character, 40 triggers per campaign, 1–6 modifiers per preset.
+- **No uses left:** the toggle is refused and you report it. There is no force and no overspend here: the DM does that in the DM client.
+- `rule.every`'s `{feature}` takes a row id, so that row must exist before the plan.
+- Monster triggers and campaign presets aren't available here.
+
+**`modifiers`** (`on.abilities` on `save` / `check`, `on.via` on `attack` / `damage`, absent = all):
+
+| Effect | Modifier |
+|---|---|
+| +1d4 weapon damage | `{kind: "dice", on: {roll: "damage", via: "weapon"}, dice: "1d4", sign: 1}` |
+| Advantage on Str saves | `{kind: "mode", on: {roll: "save", abilities: ["str"]}, mode: "advantage"}` |
+| +1 on checks | `{kind: "flat", on: {roll: "check"}, value: 1}` (`{roll: "ac"}` for AC) |
+| Resist fire | `{kind: "defense", types: ["fire"], level: "resistance"}` |
+
+**`rule`**: `{on, when, every, then, requires?}`.
+
+| `on` | `when` filters | `then` |
+|---|---|---|
+| `hit` | `via`, `row`, `ownTurn`, `crit`, `mode`, `targetMarked`, `targetHurt`, `ask` | `{do: "damage", formula, type}` (null = the attack's type) |
+| `roll` | `roll` (exactly one), `row`, `ownTurn`, `crit`, `mode` | `{do: "part", formula}`, `{do: "mode", mode}` |
+| `turnStart` | `ownTurn` | `{do: "remind", text, value?}`; `every` must be `"each"` |
+
+- `every`: `"each"`, `"turn"`, `"round"`, `"encounter"` or `{feature: rowId}` (hit triggers only).
+- Formula: `1d6 + floor(level(barbarian) / 2)`, `(ceil(level(rogue) / 2))d6`; vars `level`, `prof`, `str` … `cha`; calls `floor`, `ceil`, `min`, `max`, `steps`, `level(class)`. Spec: `docs/specs/effect-modifiers.md` §8.4, §8.5.
+
 ## 7. Errors
 
 | `code` | Say / do |
@@ -125,4 +167,5 @@ Turn what the DM gives you (a paste, a page's text, a stat-block image, "an orc 
 
 - [`examples/orc-variants.json`](examples/orc-variants.json): an SRD Orc base → shield-and-mace, spear runner, wolf rider + "Orc Wolf Rider's Wolf" mount.
 - [`examples/reddit-item.json`](examples/reddit-item.json): a pasted Reddit item → one unshared `homebrew_create`.
-- Both are `plan_check` inputs. `"<… id>"` marks an id to fill from a read first (`compendium_search {q: "Orc", kind: "monster"}`).
+- [`examples/toggle-and-trigger.json`](examples/toggle-and-trigger.json): a Rage row, a toggle from built-in `rage` spending it, Divine Fury requiring it, and a Luckstone switched on, all in one pass.
+- All are `plan_check` inputs. `"<… id>"` marks an id to fill from a read first (`compendium_search {q: "Orc", kind: "monster"}`).

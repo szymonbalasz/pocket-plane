@@ -237,7 +237,15 @@ describe("FR-AGENT-10 FR-AGENT-11 server answers", () => {
 describe("FR-AGENT-14 allow-list", () => {
   test("FR-AGENT-14 only the §9 routes and intents; nothing deletes; others aren't sent", async () => {
     expect(ALLOWED_ROUTES.filter((r) => r.startsWith("DELETE"))).toEqual([]);
-    expect([...ALLOWED_INTENTS].sort()).toEqual(["char.edit", "char.putRow", "sync.load"]);
+    expect([...ALLOWED_INTENTS].sort()).toEqual([
+      "char.edit",
+      "char.putRow",
+      "mod.putPreset",
+      "mod.putTrigger",
+      "mod.toggle",
+      "sync.load",
+    ]);
+    expect(ALLOWED_INTENTS.filter((i) => /delete/i.test(i))).toEqual([]);
     const { caller, reaches, hits } = fake({
       ws: (ws, f) => {
         if (f.type === "hello") ws.send(JSON.stringify(snapshot));
