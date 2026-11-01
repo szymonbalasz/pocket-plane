@@ -36,6 +36,7 @@ DM decision [#416](../decisions-log.md): items 1–4 of the [priority build list
 - Retire the replay exemptions it and BL-143–145 cover, and report the count before and after. [ADR-0060](../architecture/adr/0060-one-window-placer.md) and [ADR-0064](../architecture/adr/0064-window-memory.md) govern; a conflict goes to the DM.
 
 **4a. Linked notes spec**
+- **Overtaken at the gate (DM #440):** private and shared notes for players, no reveal, no DM-only parts, no link to tokens, the DM doesn't see private notes, live shared writing. The list below is the original plan.
 - New spec `docs/specs/linked-notes.md`, proposed prefix `NOTES`, from the template. In scope: notes, wikilinks, backlinks, reveal to players, search.
 - Out of scope, but must not be designed out: quest log, calendar and session timeline, which build on it next; NPC directory; journal sections; map pins; Obsidian import.
 - Bring to the DM's gate, each with options and a pick:
@@ -66,3 +67,20 @@ DM decision [#416](../decisions-log.md): items 1–4 of the [priority build list
 | 2026-10-31 | Frame and map fixes merged (#432). Linked notes gate: the DM reframed the feature (player notes, private and shared; no reveal); spec to be rewritten |
 | 2026-11-01 | Toast fixes merged (#437); window position memory in walkthrough |
 | 2026-11-01 | Window position memory merged (#438): failing replay cells DM 6 → 0, players 10 → 4 |
+| 2026-11-01 | Backfill BL-177 merged (#439). Stopped at the linked notes gate (#440) |
+
+## Playtest: sprint 15 fixes
+
+Restart `bun run play` in the main checkout (it backs up first, then builds). DM at 1440×900 and a player at 1280×720, in a fight.
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | Initiative ⋯ on a monster → Stat block → Attack, roll, close the tray | Stat block stays open and in place; Damage is one click |
+| 2 | Player: Fit, open Dice from the launcher, close it | The map moves aside, then returns to the same spot |
+| 3 | Player: open the tray, pan, close it | The map stays where the player put it |
+| 4 | Turn off one browser's network for 5 s | A small centred pill; Select and close buttons still click; it goes when back online |
+| 5 | Player attacks; DM opens the card, clicks a target | Card stays off the PCs, and targets stay clickable |
+| 6 | DM rolls from the tray with no card up | Roll popup stays off the PCs and doesn't jump |
+| 7 | Player: big sheet, a concentration card up, scroll the sheet | The card moves once after the scroll and sits on no button |
+| 8 | Pan PCs under the sheet's corner, close and reopen the sheet, shrink the browser, grow it back | The sheet returns to its spot; if dragged while small, it stays where dragged |
+| 9 | Use as attack on a plain roll; 4+ Pending lines; delete a used image; tick a 5etools book in a fight | One "Attack"; no half-cut row; "Used in" with no confirm; Import selected off, "End combat first" |

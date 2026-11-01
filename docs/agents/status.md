@@ -4,28 +4,28 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Now (2026-10-31)
 
-**State:** [sprint 15](sprint-15.md) running (DM kickoff 2026-10-31). The DM's real campaign runs from `bun run play` in the main checkout: never touch `%LOCALAPPDATA%/PocketPlane`, its backups or port 4090, and don't build or start servers in the main checkout. Other sessions are merging to `main`: leave their branches and worktrees alone (`build/cmp-popout`, `fix/sheet-full-text`). Test agents start with `--strict-mcp-config --mcp-config .mcp.json`, so the real campaign's MCP tools can't reach them.
+**State:** [sprint 15](sprint-15.md): items 1–3 merged and green on CI at cdaaee75. **Stopped at the linked notes gate:** the DM reframed the feature and one answer is open. The DM's real campaign runs from `bun run play` in the main checkout: never touch `%LOCALAPPDATA%/PocketPlane`, its backups or port 4090, and don't build or start servers in the main checkout. Other sessions merge to `main`: leave their branches and worktrees alone. Test agents start with `--strict-mcp-config --mcp-config .mcp.json`, so the real campaign's MCP tools can't reach them.
 
 | Track | Branch | Agent | Worktree | State |
 |---|---|---|---|---|
 | Upgrade guards | `fix/upgrade-guards` | — | — | **merged** (#424) |
 | Play fixes: toasts | `fix/s15-toasts` | — | — | **merged** (#437) |
 | Play fixes: frame and map | `fix/s15-frame` | — | — | **merged** (#432) |
-| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | **DM reframed at the gate** (player notes, private and shared; no reveal, no world builder; handouts separate; a token and a note may share a name, no link between them; the DM doesn't see private notes): waits on how live shared notes are; then the spec is rewritten |
+| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | **DM reframed at the gate (#440)**; the written spec is overtaken. Waits on how live shared notes are; then rewrite, review, DM's gate |
 | Window position memory | `fix/window-memory` | — | — | **merged** (#438) |
-| Linked notes build | split by the spec | — | — | upgrade guards are in; waits for the DM's gate |
+| Linked notes build | split by the spec | — | — | waits for the rewritten spec's gate; session-sim-18 and a notes playtest after it |
 
-**Memory (2026-10-31):** ran low once with 13 agents across sessions; the DM freed some and said carry on. Watch it before starting more.
+**Memory:** ran low once with 13 agents across sessions (Claude Code stopped a background wait); check before starting more.
 
 **Landing:** from the detached worktree `s15-integrate`: `git fetch`, `git checkout --detach origin/main`, `git merge --no-ff <branch>`, `git push origin HEAD:main`, `ci:watch` in the background. Status and decisions-log edits go the same way; the main checkout is only fast-forwarded.
 
 **Reserved requirement numbers:** frame `FR-SHELL-210`–`-219`, `FR-MAP-125` up, `FR-SYNC-41` up; toasts `FR-NOTE-80` up; window memory `FR-SHELL-220`–`-229`.
 
-**Next:** [sprint 15](sprint-15.md). Whole order: [priority build list](../roadmap.md#priority-build-list-2026-10-31). Session-sim-17 found nothing serious.
+**Next:** the DM's answer on live shared notes, then the spec rewrite. Whole order: [priority build list](../roadmap.md#priority-build-list-2026-10-31). Session-sim-17 found nothing serious.
 
 **Session-sim-17 (#414):** 18 / 19 PASS on `main` @ 7fe68b18, no leak, digest identical. Not clean: the recheck (BL-151, BL-164, BL-171 still open). New glitches BL-174–BL-177. Evidence `.verify/20261031-102757-session-sim-17/` in the main checkout.
 
-**In sprint 15:** BL-172, BL-173, BL-174, BL-175, BL-176, BL-164, BL-171, BL-151, BL-146, BL-143–145.
+**Sprint 15 done so far:** BL-172, BL-173, BL-174, BL-175, BL-176, BL-164, BL-171, BL-151, BL-143–146; backfill BL-177. New: BL-178–186.
 
 **Backlog candidates still open:** BL-124 / BL-152; kit look BL-149 / BL-150; AoE label BL-153; CI flakes BL-154 / BL-158 / BL-159; slow commands BL-142; small BL-123, BL-155–157, BL-165–170, BL-177.
 
