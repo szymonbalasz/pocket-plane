@@ -17,7 +17,7 @@ import {
   ToggleResult,
 } from "@shared/effect-modifiers/intents";
 import { builtinPreset } from "@shared/effect-modifiers/presets";
-import { hasUses, presetUses, toggleOn } from "@shared/effect-modifiers/rules";
+import { hasUses, toggleOn } from "@shared/effect-modifiers/rules";
 import {
   BUILTIN_PRESET_KEYS,
   CHARACTER_PRESETS_MAX,
@@ -143,27 +143,74 @@ const nameTaken = (what: string, who: string, name: string, id: string) =>
 
 const plannedPresetsKey = (characterId: string) => `presets:${characterId}`;
 const plannedTriggersKey = (characterId: string) => `triggers:${characterId}`;
+const plannedTogglesKey = (characterId: string) => `toggles:${characterId}`;
 const PLANNED_TRIGGER_CREATES = "trigger-creates";
 
-/** Stored rows overlaid with the planned ones (a planned replace stands in for its row). */
+/** A planned preset's row link: a row, null = cleared, absent = as stored. */
+interface PlannedPreset extends Named {
+  uses?: PlannedFeature | null;
+}
+interface PlannedToggle {
+  preset: Named;
+  on: boolean;
+  spends?: Named;
+}
+
+/** Real rows match by id, planned new ones by the call that adds them. */
+const sameRow = (a: Named, b: Named) =>
+  a.id !== null ? a.id === b.id : b.id === null && a.call === b.call;
+
+/** Stored rows overlaid with the planned ones; the last planned replace stands in for its row. */
 const overlay = <T extends Named>(stored: readonly T[], planned: readonly T[]) => [
   ...stored.filter((r) => !planned.some((p) => p.id === r.id)),
-  ...planned,
+  ...planned.filter((p, i) => p.id === null || !planned.slice(i + 1).some((q) => q.id === p.id)),
 ];
 
 function planFeatures(ctx: PlanContext, characterId: string): PlannedFeature[] {
   const sheet = ctx.world.sheets.find((x) => x.id === characterId);
   const stored = (sheet?.features ?? []).map(
-    (f): PlannedFeature => ({ id: f.id ?? null, name: f.name, usesMax: f.usesMax ?? null }),
+    (f): PlannedFeature => ({ id: f.id, name: f.name, usesMax: f.usesMax ?? null, used: f.used }),
   );
-  return overlay(stored, ctx.planned<PlannedFeature>(plannedFeaturesKey(characterId)));
+  // `char.putRow` keeps a replaced row's `used` and starts a new one at 0.
+  const planned = ctx
+    .planned<PlannedFeature>(plannedFeaturesKey(characterId))
+    .map((p) => ({ ...p, used: stored.find((r) => r.id === p.id)?.used ?? 0 }));
+  return overlay(stored, planned);
 }
 
-function planPresets(ctx: PlanContext, characterId: string): Named[] {
+function planPresets(ctx: PlanContext, characterId: string): PlannedPreset[] {
   const stored = ctx.world.presets
     .filter((p) => p.characterId === characterId)
-    .map((p): Named => ({ id: p.id, name: p.name }));
-  return overlay(stored, ctx.planned<Named>(plannedPresetsKey(characterId)));
+    .map((p): PlannedPreset => ({ id: p.id, name: p.name }));
+  return overlay(stored, ctx.planned<PlannedPreset>(plannedPresetsKey(characterId)));
+}
+
+/** The row a toggle on would spend; null = none, or a broken link (on without uses, FR-MOD-12). */
+function linkedRow(ctx: PlanContext, characterId: string, preset: PlannedPreset) {
+  const storedId = ctx.world.presets.find((p) => p.id === preset.id)?.usesFeatureId ?? null;
+  const ref = preset.uses === undefined ? { id: storedId, name: "" } : preset.uses;
+  if (ref === null || (ref.id === null && ref.call === undefined)) return null;
+  const row = planFeatures(ctx, characterId).find((r) => sameRow(ref, r));
+  return row && hasUses({ usesMax: row.usesMax ?? undefined }) ? row : null;
+}
+
+/** FR-AGENT-40: a toggle on with no uses left, counting what the plan's earlier toggles spend. */
+function planToggle(ctx: PlanContext, characterId: string, preset: PlannedPreset, on: boolean) {
+  const toggles = ctx.planned<PlannedToggle>(plannedTogglesKey(characterId));
+  const stored = ctx.world.presets.find((p) => p.id === preset.id);
+  const last = toggles.findLast((t) => sameRow(t.preset, preset));
+  const wasOn = last ? last.on : stored !== undefined && toggleOn(stored, ctx.world.effects);
+  const row = on && !wasOn ? linkedRow(ctx, characterId, preset) : null;
+  if (!row) {
+    toggles.push({ preset, on });
+    return;
+  }
+  const spent = toggles.filter((t) => t.spends && sameRow(t.spends, row)).length;
+  if ((row.usesMax ?? 0) - (row.used ?? 0) - spent <= 0) {
+    ctx.issue(["on"], `No ${row.name} uses left`);
+    return;
+  }
+  toggles.push({ preset, on, spends: row });
 }
 
 // ---- character_effects ----
@@ -265,7 +312,7 @@ const characterPutPreset = defineTool({
     "Add or replace (with `id`) an effect preset, a toggle on a player character's sheet. Custom: " +
     "name, modifiers (1–6), durationRounds (null = none), concentration, note?. Or `from` a built-in " +
     "key, which copies it and keeps it as originKey so a trigger requiring that key matches; other " +
-    "fields override. `usesFeature` names a feature row with uses that each toggle on spends. A name " +
+    "fields override, and a replace keeps its name unless you give one. `usesFeature` names a feature row with uses that each toggle on spends. A name " +
     "the character already has → conflict naming the id to replace. DM authority: locked sheets too.",
   input: PutPresetToolInput,
   write: true,
@@ -284,14 +331,7 @@ const characterPutPreset = defineTool({
       const row =
         input.usesFeature === undefined
           ? undefined
-          : orInvalid(
-              pickUsesRow(
-                featuresOf(s, c.id).map((f) => ({ ...f, id: f.id ?? null })),
-                input.usesFeature,
-                c.name,
-              ),
-              "usesFeature",
-            );
+          : orInvalid(pickUsesRow(featuresOf(s, c.id), input.usesFeature, c.name), "usesFeature");
       const r = PutPresetResult.parse(
         await s.intent(MOD_INTENTS.putPreset, {
           preset: { ...preset, ...(row ? { usesFeatureId: row.id } : {}) },
@@ -341,27 +381,27 @@ const characterPutPreset = defineTool({
     if (!before && presets.length >= CHARACTER_PRESETS_MAX) {
       ctx.issue(["characterId"], `At most ${CHARACTER_PRESETS_MAX} presets per character`);
     }
+    let uses = presets.find((p) => p.id !== null && p.id === input.id)?.uses;
     if (input.usesFeature !== undefined) {
       const p = pickUsesRow(planFeatures(ctx, e.id), input.usesFeature, e.name);
-      if (!p.ok) ctx.issue(["usesFeature"], p.message);
-    } else if (
-      typeof input.usesFeatureId === "string" &&
-      input.usesFeatureId !== before?.usesFeatureId
-    ) {
+      if (p.ok) uses = p.row;
+      else ctx.issue(["usesFeature"], p.message);
+    } else if (input.usesFeatureId === null) {
+      uses = null;
+    } else if (input.usesFeatureId !== undefined && input.usesFeatureId !== before?.usesFeatureId) {
       const f = planFeatures(ctx, e.id).find((r) => r.id === input.usesFeatureId);
-      if (!f || !hasUses({ usesMax: f.usesMax ?? undefined })) {
-        ctx.issue(["usesFeatureId"], `Not a feature row with uses on ${e.name}`);
-      }
+      if (f && hasUses({ usesMax: f.usesMax ?? undefined })) uses = f;
+      else ctx.issue(["usesFeatureId"], `Not a feature row with uses on ${e.name}`);
     }
     // A refused call adds nothing, so later calls resolve against what would really be there.
     if (!taken) {
       ctx
-        .planned<Named>(plannedPresetsKey(e.id))
-        .push({ id: input.id ?? null, name, call: ctx.call });
+        .planned<PlannedPreset>(plannedPresetsKey(e.id))
+        .push({ id: input.id ?? null, name, call: ctx.call, uses });
     }
     const from = input.from ? ` from ${input.from}` : "";
-    const uses = input.usesFeature ? `, spends "${input.usesFeature}"` : "";
-    return `character_put_preset: ${before ? "replace" : "add"} "${name}" on ${e.name}${from}${uses}`;
+    const spends = input.usesFeature ? `, spends "${input.usesFeature}"` : "";
+    return `character_put_preset: ${before ? "replace" : "add"} "${name}" on ${e.name}${from}${spends}`;
   },
 });
 
@@ -470,7 +510,7 @@ const characterPutTrigger = defineTool({
       } else if ((await ctx.world.triggers()).length + creates.length >= CAMPAIGN_TRIGGERS_MAX) {
         ctx.issue(["characterId"], `At most ${CAMPAIGN_TRIGGERS_MAX} triggers per campaign`);
       }
-      creates.push(ctx.call);
+      if (!taken) creates.push(ctx.call);
     }
     if (!taken) planned.push({ id: input.id ?? null, name: input.name, call: ctx.call });
 
@@ -486,6 +526,13 @@ const characterPutTrigger = defineTool({
         ctx.world.presets.some((p) => p.id === ref && p.characterId === null);
       if (!known) ctx.issue(["rule", "requires", "preset"], "Requires: no such preset");
     }
+    input.rule.when.forEach((f, i) => {
+      if (f.if !== "targetMarked" || f.preset === "hunters-mark") return;
+      if (!ctx.world.presets.some((p) => p.id === f.preset && p.characterId === null)) {
+        const message = "Target marked: Hunter's Mark or a campaign preset";
+        ctx.issue(["rule", "when", i, "preset"], message);
+      }
+    });
     const every = input.rule.every;
     if (typeof every === "object") {
       const f = planFeatures(ctx, e.id).find((r) => r.id === every.feature);
@@ -556,7 +603,7 @@ const characterTogglePreset = defineTool({
     const shown = input.presetName ?? input.presetId;
     if (!e) return `character_toggle_preset: "${shown}" ${state}`;
     const presets = planPresets(ctx, e.id);
-    let target: Named | undefined;
+    let target: PlannedPreset | undefined;
     if (input.presetName !== undefined) {
       const p = pickPreset(presets, input.presetName, e.name, "presetId");
       if (p.ok) target = p.row;
@@ -565,20 +612,7 @@ const characterTogglePreset = defineTool({
       target = presets.find((p) => p.id === input.presetId);
       if (!target) ctx.issue(["presetId"], `No preset ${input.presetId} on ${e.name}`);
     }
-    const stored = ctx.world.presets.find((p) => p.id === target?.id);
-    if (input.on && stored && !toggleOn(stored, ctx.world.effects)) {
-      const sheet = ctx.world.sheets.find((x) => x.id === e.id);
-      const uses = presetUses(
-        stored,
-        sheet?.features.map((f) => ({ ...f, id: f.id ?? "" })),
-      );
-      const refilled = ctx
-        .planned<PlannedFeature>(plannedFeaturesKey(e.id))
-        .some((f) => f.id === stored.usesFeatureId);
-      if (uses?.state === "ok" && uses.left <= 0 && !refilled) {
-        ctx.issue(["on"], `No ${uses.name} uses left`);
-      }
-    }
+    if (target) planToggle(ctx, e.id, target, input.on);
     return `character_toggle_preset: "${target?.name ?? shown}" ${state} on ${e.name}`;
   },
 });

@@ -77,6 +77,7 @@ export interface PlannedFeature {
   id: string | null;
   name: string;
   usesMax?: number | null;
+  used?: number;
   call?: number;
 }
 export const plannedFeaturesKey = (creatureId: string) => `features:${creatureId}`;

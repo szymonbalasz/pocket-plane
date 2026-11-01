@@ -95,6 +95,8 @@ const rowOf = (id: string, name: string) => sheetOf(id)?.features.find((f) => f.
 const presetsIn = (c: TestClient) => recordsOf<EffectPresetRecord>(c.store, EFFECT_PRESET_TYPE);
 const effectIn = (id: string) =>
   recordsOf<EffectRecord>(dm.store, EFFECT_TYPE).find((e) => e.id === id);
+const presetIdOf = (name: string) =>
+  presetsIn(dm).find((p) => p.characterId === ulfa && p.name === name)?.id;
 
 const rageRow = { name: "Rage", usesMax: 4, reset: "long" };
 const furyRule = {
@@ -272,6 +274,11 @@ describe("agent-api effect tools on a real server", () => {
         },
         preset({ name: "Early" }),
         preset({ name: "Mark", from: "hunters-mark" }),
+        // The server takes only Hunter's Mark or a campaign preset here, never the character's own.
+        trigger({
+          name: "X",
+          rule: { ...furyRule, when: [{ if: "targetMarked", preset: "no-such-preset" }] },
+        }),
       ],
     });
     expect(r.json.ok).toBe(false);
@@ -294,6 +301,7 @@ describe("agent-api effect tools on a real server", () => {
       [13, "presetId", "No preset nope on Ulfa"],
       [14, "name", 'Name "Early" is already used by call 0'],
       [15, "modifiers", CHARACTER_PRESET_EMPTY],
+      [16, "rule.when.0.preset", "Target marked: Hunter's Mark or a campaign preset"],
     ]);
   });
 
@@ -435,19 +443,38 @@ describe("agent-api effect tools on a real server", () => {
     expect(plan.json.issues[0].message).toContain(ragePresetId);
     expect(plan.json.issues[1].message).toContain(furyId);
 
-    // A disabled trigger stays disabled when replaced without `enabled`.
+    // The whole plan again, row included: refused before its first write. `character_put_row`
+    // itself doesn't refuse a repeated name, so plan_check is what stops the second row.
+    const whole = await call("plan_check", { calls: rageCalls() });
+    expect(whole.json.ok).toBe(false);
+    expect(
+      whole.json.issues.map((i: { call: number; path: string[] }) => [i.call, i.path.at(-1)]),
+    ).toEqual([
+      [1, "name"],
+      [1, "usesFeature"],
+      [2, "name"],
+    ]);
+    expect(eventCount()).toBe(before);
+
+    // A disabled, private trigger stays so when replaced without `enabled` and `public`.
     const off = await call("character_put_trigger", {
       ...trigger?.input,
       id: furyId,
       enabled: false,
+      public: false,
     });
     expect(off.json).toMatchObject({ triggerId: furyId, created: false });
     const kept = await call("character_put_trigger", { ...trigger?.input, id: furyId });
     expect(kept.isError).toBe(false);
     let read = await call("character_effects", { id: ulfa });
     expect(read.json.triggers).toHaveLength(1);
-    expect(read.json.triggers[0].enabled).toBe(false);
-    await call("character_put_trigger", { ...trigger?.input, id: furyId, enabled: true });
+    expect(read.json.triggers[0]).toMatchObject({ enabled: false, public: false });
+    await call("character_put_trigger", {
+      ...trigger?.input,
+      id: furyId,
+      enabled: true,
+      public: true,
+    });
 
     // Replacing a preset: only `note` named, the rest as stored (origin, uses link, modifiers).
     const stored = read.json.presets[0];
@@ -480,6 +507,28 @@ describe("agent-api effect tools on a real server", () => {
     });
     expect(rename.json.code).toBe("conflict");
     expect(rename.json.message).toContain(ragePresetId);
+
+    // FR-AGENT-35: `from` on a replace copies the built-in and its origin, but keeps the name.
+    const renamed = await call("character_put_preset", {
+      characterId: ulfa,
+      id: other.json.presetId,
+      name: "Battle Hymn",
+    });
+    expect(renamed.isError).toBe(false);
+    const reseeded = await call("character_put_preset", {
+      characterId: ulfa,
+      id: other.json.presetId,
+      from: "bane",
+    });
+    expect(reseeded.json).toMatchObject({ name: "Battle Hymn", created: false });
+    read = await call("character_effects", { id: ulfa });
+    expect(
+      read.json.presets.find((p: { id: string }) => p.id === other.json.presetId),
+    ).toMatchObject({
+      name: "Battle Hymn",
+      originKey: "bane",
+      modifiers: builtinPreset("bane")?.modifiers,
+    });
   });
 
   test("FR-AGENT-36 FR-AGENT-37 Divine Fury end to end: Rage off, no part; Rage on, a use spent and the radiant part offered", async () => {
@@ -644,6 +693,92 @@ describe("agent-api effect tools on a real server", () => {
     // The note and the row name never reach another player.
     expect(p2.raw()).not.toContain(NOTE);
     expect(p2.raw()).not.toContain(ROW_ENLARGE);
+  });
+
+  test("FR-AGENT-40 plan_check agrees with the server on uses: planned presets, spends earlier in the plan, a replaced row", async () => {
+    const before = eventCount();
+    const mods = [{ kind: "flat", on: { roll: "check" }, value: 1 }];
+    const newPreset = (name: string, usesFeature: string) => ({
+      tool: "character_put_preset",
+      input: {
+        characterId: ulfa,
+        name,
+        modifiers: mods,
+        durationRounds: null,
+        concentration: false,
+        usesFeature,
+      },
+    });
+    const toggle = (presetName: string, on: boolean) => ({
+      tool: "character_toggle_preset",
+      input: { characterId: ulfa, presetName, on },
+    });
+    const newRow = (name: string, usesMax: number) => ({
+      tool: "character_put_row",
+      input: { creatureId: ulfa, list: "features", row: { name, usesMax, reset: "long" } },
+    });
+    const issues = async (calls: unknown[]) =>
+      (await call("plan_check", { calls })).json.issues.map(
+        (i: { call: number; message: string }) => [i.call, i.message],
+      );
+
+    // A new preset on a row already spent: Enlarge's row is at 1 of 1 here.
+    expect(await issues([newPreset("Spent", ROW_ENLARGE), toggle("Spent", true)])).toEqual([
+      [1, `No ${ROW_ENLARGE} uses left`],
+    ]);
+    // Two presets sharing one planned use: the second toggle has none left.
+    expect(
+      await issues([
+        newRow("One Use", 1),
+        newPreset("First", "One Use"),
+        newPreset("Second", "One Use"),
+        toggle("First", true),
+        toggle("Second", true),
+      ]),
+    ).toEqual([[4, "No One Use uses left"]]);
+    // On twice spends once; on, off, on spends twice.
+    expect(
+      await issues([
+        newRow("Two Uses", 2),
+        newPreset("Twice", "Two Uses"),
+        toggle("Twice", true),
+        toggle("Twice", true),
+        toggle("Twice", false),
+        toggle("Twice", true),
+        toggle("Twice", false),
+        toggle("Twice", true),
+      ]),
+    ).toEqual([[7, "No Two Uses uses left"]]);
+
+    // `char.putRow` keeps a replaced row's `used`: the same maximum refills nothing, a higher one does.
+    const row = rowOf(ulfa, ROW_ENLARGE);
+    const replaceRow = (usesMax: number) => ({
+      tool: "character_put_row",
+      input: {
+        creatureId: ulfa,
+        list: "features",
+        row: { id: row?.id, name: ROW_ENLARGE, usesMax, reset: "long" },
+      },
+    });
+    expect(await issues([replaceRow(1), toggle("Enlarge", true)])).toEqual([
+      [1, `No ${ROW_ENLARGE} uses left`],
+    ]);
+    expect(await issues([replaceRow(2), toggle("Enlarge", true)])).toEqual([]);
+    // The same row replaced twice is one row, not an ambiguous name.
+    expect(await issues([replaceRow(2), replaceRow(3), newPreset("Once", ROW_ENLARGE)])).toEqual(
+      [],
+    );
+    // Clearing a preset's link: toggling it on spends nothing.
+    expect(
+      await issues([
+        {
+          tool: "character_put_preset",
+          input: { characterId: ulfa, id: presetIdOf("Enlarge"), usesFeatureId: null },
+        },
+        toggle("Enlarge", true),
+      ]),
+    ).toEqual([]);
+    expect(eventCount()).toBe(before);
   });
 
   test("FR-AGENT-34 FR-AGENT-37 Luckstone: flat +1 checks and saves, no duration, no uses; on stays on through a long rest", async () => {

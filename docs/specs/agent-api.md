@@ -101,12 +101,12 @@ phase: post-mvp
 |---|---|
 | FR-AGENT-33 | `character_effects {id}`: one character's `effect-preset` rows, `rule-trigger` rows (`sync.load`) and active `effect` rows, with ids, in their wire shapes. A monster → `invalid`; unknown → `not_found`. |
 | FR-AGENT-34 | `character_put_preset` → `mod.putPreset`, character presets only: no `id` adds, `id` replaces that character's preset; on a replace, absent fields are sent as stored (FR-AGENT-17). Unknown `id` on this character → `not_found`. DM authority: locked sheets too. |
-| FR-AGENT-35 | `from` (a built-in key) copies the built-in as this build ships it (FR-MOD-05) and sets `originKey`, as the sheet's Start from does, so a trigger requiring that key matches (FR-MOD-36). Other fields override the copy. `from` reads the built-in, never a campaign customisation of it. |
+| FR-AGENT-35 | `from` (a built-in key) copies the built-in as this build ships it (FR-MOD-05) and sets `originKey`, as the sheet's Start from does, so a trigger requiring that key matches (FR-MOD-36). Other fields override the copy. On a replace, the copy replaces the stored fields but the name stays unless `name` is given. `from` reads the built-in, never a campaign customisation of it. |
 | FR-AGENT-36 | `character_put_trigger` → `mod.putTrigger`, character triggers only: `rule` is the stored `TriggerRule`, no `id` adds, `id` replaces; on a replace an absent `enabled` / `public` is kept. |
 | FR-AGENT-37 | `character_toggle_preset {characterId, presetId \| presetName, on}` → `mod.toggle`, as the sheet's switch: on spends a linked use, already in that state changes nothing. No `force`, no `overspend` (the input refuses both): no uses left → the server's `conflict` is reported. |
 | FR-AGENT-38 | **One pass:** `usesFeature`, `requiresPreset` and `presetName` take names, resolved when the call runs, case-insensitive, on that character. No match, or more than one → `invalid` naming the ids, nothing sent. A row name counts rows with uses only. `plan_check` resolves them the same way, counting rows and presets planned earlier in the plan. `rule.every.feature` still takes a row id. |
-| FR-AGENT-39 | **No duplicates:** a preset or trigger name the character already has (case-insensitive, also a rename) → `conflict` naming the existing id to replace; nothing sent. `character_put_row` is unchanged and doesn't refuse a repeated row name. The check is client side, so a race can still duplicate (the server has no such rule). |
-| FR-AGENT-40 | Each write tool has a `plan` checker: target, body (`PresetInput`, `TriggerRule`, the formula for this character), names (FR-AGENT-38, -39), replace ids, the preset and trigger caps incl. planned ones, a toggle with no uses left. |
+| FR-AGENT-39 | **No duplicates:** a preset or trigger name the character already has (case-insensitive, also a rename) → `conflict` naming the existing id to replace; nothing sent. `character_put_row` is unchanged and doesn't refuse a repeated row name, so a rerun must go through `plan_check`, which refuses the plan before its first write. The check is client side, so a race can still duplicate (the server has no such rule). |
+| FR-AGENT-40 | Each write tool has a `plan` checker: target, body (`PresetInput`, `TriggerRule`, the formula for this character, preset refs in `requires` and `targetMarked`), names (FR-AGENT-38, -39), replace ids, the preset and trigger caps incl. planned ones, a toggle with no uses left, counting what the plan's earlier toggles spend (a replaced row keeps its `used`). |
 
 **Skill (slice 5)**: guidance, reviewed; §13 tests its example plan.
 
@@ -246,7 +246,7 @@ Walkthrough ids come from `characters_list` / `creatures_list` / `compendium_sea
 | On | What | Status |
 |---|---|---|
 | `@modelcontextprotocol/sdk` | stdio server, in-memory transport | OQ-AGENT-01 |
-| live-sync, campaign-management, entities, character-sheet-full, compendium | §9 routes / intents | built |
+| live-sync, campaign-management, entities, character-sheet-full, compendium, effect-modifiers | §9 routes / intents | built |
 | fixtures-adapters | bundle `agent-api` | to build |
 | Orchestrator | `package.json` (scripts, dependency), `tsconfig.json` `@mcp/*`, `biome.json`, `src/boundaries.test.ts`, AGENTS §9.1 / §9.4; `--strict-mcp-config` for main-checkout sessions (ADR D6) | ADR |
 | Integrator | Links to the old `specs/post-mvp/agent-api.md`: decisions-log #378, overview, feature-tiers, specs README, ADR-0009 / 0011 / 0016 "Affects" | at merge |

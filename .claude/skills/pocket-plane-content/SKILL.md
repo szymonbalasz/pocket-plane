@@ -113,12 +113,14 @@ Read first: `character_get` (does the feature row exist?) and `character_effects
 | Step | Call | Notes |
 |---|---|---|
 | 1. The uses | `character_put_row` `{list: "features", row: {name, usesMax, reset}}` | Only if the row isn't there: this tool does **not** refuse a repeated name, and a second row with uses makes the name ambiguous |
-| 2. The toggle | `character_put_preset` | `from` a built-in key (`bless`, `bane`, `rage`, `hunters-mark`, `guidance`, `resistance`, `shield-of-faith`, `reckless`, `dodge`), or custom: `name`, `modifiers`, `durationRounds` (null = none), `concentration`. `usesFeature`: the row name to spend |
+| 2. The toggle | `character_put_preset` | `from` a built-in key (`bless`, `bane`, `rage`, `guidance`, `resistance`, `shield-of-faith`, `reckless`, `dodge`; `hunters-mark` has no modifiers, so give `modifiers` too), or custom: `name`, `modifiers`, `durationRounds` (null = none), `concentration`. `usesFeature`: the row name to spend |
 | 3. The trigger | `character_put_trigger` | `requiresPreset`: the preset's name. Or `rule.requires.preset`: a built-in key, matched by origin, so any `from` copy counts |
 | 4. Permanent item | `character_toggle_preset` `{presetName, on: true}` | Stays on, a long rest included, until toggled off. Otherwise leave it to the table: on spends a use |
 
 - **Names** resolve when the call runs, case-insensitive, and `plan_check` counts rows and presets planned earlier. No match or two matches → refused: pass the id.
-- **No duplicates:** a preset or trigger name the character already has → `conflict` naming the id. Pass that `id` to replace; don't rename around it. There is no delete. A replace keeps what it doesn't name.
+- **No duplicates:** a preset or trigger name the character already has → `conflict` naming the id. Pass that `id` to replace; don't rename around it. There is no delete. A replace keeps what it doesn't name; with `from`, it copies the built-in's fields but keeps its name.
+- **After a plan stops halfway:** read again and drop the calls that already ran. Rerunning the row call adds a second row, so always `plan_check` first: it refuses the rerun before anything is written.
+- **Uses:** `plan_check` counts what the plan's earlier toggles spend. Replacing a row keeps its spent uses; only a higher `usesMax` gives more.
 - **Limits:** 6 presets and 6 triggers per character, 40 triggers per campaign, 1–6 modifiers per preset.
 - **No uses left:** the toggle is refused and you report it. There is no force and no overspend here: the DM does that in the DM client.
 - `rule.every`'s `{feature}` takes a row id, so that row must exist before the plan.
@@ -140,6 +142,16 @@ Read first: `character_get` (does the feature row exist?) and `character_effects
 | `hit` | `via`, `row`, `ownTurn`, `crit`, `mode`, `targetMarked`, `targetHurt`, `ask` | `{do: "damage", formula, type}` (null = the attack's type) |
 | `roll` | `roll` (exactly one), `row`, `ownTurn`, `crit`, `mode` | `{do: "part", formula}`, `{do: "mode", mode}` |
 | `turnStart` | `ownTurn` | `{do: "remind", text, value?}`; `every` must be `"each"` |
+
+| Filter | Shape |
+|---|---|
+| `via` | `{if: "via", via: "weapon"}` |
+| `row` | `{if: "row", names: ["Greataxe"]}` (at most one) |
+| `roll` | `{if: "roll", on: {roll: "attack"}}` (exactly one on a `roll` trigger) |
+| `ownTurn`, `crit`, `targetHurt` | `{if: "ownTurn"}`; `crit` on a `roll` trigger: damage rolls only |
+| `mode` | `{if: "mode", modes: ["advantage"]}` |
+| `targetMarked` | `{if: "targetMarked", preset: "hunters-mark"}` or a campaign preset's id; not the character's own |
+| `ask` | `{if: "ask", note: "Spend a Ki point?"}` |
 
 - `every`: `"each"`, `"turn"`, `"round"`, `"encounter"` or `{feature: rowId}` (hit triggers only).
 - Formula: `1d6 + floor(level(barbarian) / 2)`, `(ceil(level(rogue) / 2))d6`; vars `level`, `prof`, `str` … `cha`; calls `floor`, `ceil`, `min`, `max`, `steps`, `level(class)`. Spec: `docs/specs/effect-modifiers.md` §8.4, §8.5.
