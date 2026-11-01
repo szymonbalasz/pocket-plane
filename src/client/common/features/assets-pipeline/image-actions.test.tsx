@@ -1,10 +1,12 @@
 // ASSET §13.1 unit (client, #386): Rename / Delete beside the selected image's name
 // (FR-ASSET-66) as static renders over a fake store. The Dialogs, a delete and a refusal:
-// e2e/image-manage.e2e.ts.
+// e2e/image-manage.e2e.ts. BL-177: the refusal before any confirm.
 import { describe, expect, test } from "bun:test";
 import { sampleLibrary, sampleNamed } from "@shared/assets-pipeline/sample-library";
+import { Dialog } from "@ui/components/ui/overlays";
+import { renderToStaticMarkup } from "react-dom/server";
 import { AssetPicker } from "./AssetPicker";
-import { deleteImagePrompt } from "./ImageActions";
+import { DeleteRefused, deleteCheckOf, deleteImagePrompt } from "./ImageActions";
 import { renderInSync, stubImageForFile, tagOf } from "./picker-test-kit";
 
 stubImageForFile();
@@ -40,5 +42,29 @@ describe("rename / delete an image (FR-ASSET-66)", () => {
     expect(deleteImagePrompt("Elite Goblin")).toBe(
       "Delete Elite Goblin? Its links stop working. This can't be undone.",
     );
+  });
+
+  test("BL-177 delete of something in use: refused up front with the 'Used in' wording, Close, no Delete; unused or a failed check → the confirm", () => {
+    const uses = [
+      { kind: "overview image", name: "Sword Coast" },
+      { kind: "pause card", name: null },
+    ] as const;
+    expect(deleteCheckOf(uses)).toEqual({ state: "used", uses });
+    expect(deleteCheckOf([])).toEqual({ state: "clear" });
+    expect(deleteCheckOf(null)).toEqual({ state: "clear" });
+
+    const html = renderToStaticMarkup(
+      <Dialog open>
+        <DeleteRefused name="Scroll" noun="image" uses={uses} close={() => {}} />
+      </Dialog>,
+    );
+    expect(tagOf(html, "asset-delete-used")).toContain('role="alert"');
+    expect(html).toContain(
+      "Used in: Sword Coast (overview image), pause card. Change those first.",
+    );
+    expect(html).toContain("Scroll can&#x27;t be deleted while it&#x27;s in use.");
+    expect(html).toContain('data-testid="asset-manage-close"');
+    expect(html).not.toContain("asset-manage-confirm");
+    expect(html).not.toContain("asset-delete-prompt");
   });
 });

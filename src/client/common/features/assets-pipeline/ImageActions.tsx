@@ -2,8 +2,16 @@
 // in the picker's tag row. Rename… → Dialog with the name → `assets.rename`; Delete… → "Delete
 // ‹name›? …" → `assets.delete`. A reject shows inline in the Dialog (in use: the server names the
 // uses, FR-ASSET-64). Disabled with "Reconnecting…" while not live. *(#394)* The Assets window's
-// Sounds rows use it too (`noun` "sound", FR-ASSET-70).
-import { ASSET_MANAGE_INTENTS } from "@shared/assets-pipeline/manage";
+// Sounds rows use it too (`noun` "sound", FR-ASSET-70). BL-177 (sim-17 as03): Delete… asks
+// `assets.uses` first, so something in use is refused with its "Used in" line and no confirm; the
+// server's check stays, for a use added meanwhile or a check that failed.
+import {
+  ASSET_MANAGE_INTENTS,
+  type AssetUse,
+  type AssetUsesResult,
+  USES_CHECKING,
+  usedInText,
+} from "@shared/assets-pipeline/manage";
 import { AssetName } from "@shared/assets-pipeline/schemas";
 import { Button } from "@ui/components/ui/button";
 import {
@@ -15,8 +23,9 @@ import {
   DialogTitle,
 } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
+import { useSync } from "@ui/sync/store";
 import { PencilIcon, Trash2Icon } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Tip } from "../../components/ui/tip";
 import { RECONNECTING, useTagIntent } from "./tags/intent";
 import { Live } from "./tags/TagEditor";
@@ -84,6 +93,67 @@ export function ImageActions({
   );
 }
 
+type DeleteCheck =
+  | { state: "checking" }
+  | { state: "used"; uses: readonly AssetUse[] }
+  | { state: "clear" };
+
+/** BL-177: what Delete… shows once `assets.uses` answers. A failed check: the confirm, as before. */
+export const deleteCheckOf = (uses: readonly AssetUse[] | null): DeleteCheck =>
+  uses !== null && uses.length > 0 ? { state: "used", uses } : { state: "clear" };
+
+/** BL-177: asked once per Delete…; `assetId` null (a rename) asks nothing. */
+function useDeleteCheck(assetId: string | null): DeleteCheck {
+  const connection = useSync((s) => s.connection);
+  const [check, setCheck] = useState<DeleteCheck>({ state: "checking" });
+  useEffect(() => {
+    if (assetId === null) return;
+    let on = true;
+    connection
+      .sendIntent(ASSET_MANAGE_INTENTS.uses, { assetId })
+      .then((r) => on && setCheck(deleteCheckOf((r as AssetUsesResult).uses)))
+      .catch(() => on && setCheck(deleteCheckOf(null)));
+    return () => {
+      on = false;
+    };
+  }, [connection, assetId]);
+  return check;
+}
+
+/** BL-177: something in use, refused up front: its "Used in" line, Close, no Delete. */
+export function DeleteRefused({
+  name,
+  noun,
+  uses,
+  close,
+}: {
+  name: string;
+  noun: Noun;
+  uses: readonly AssetUse[];
+  close(): void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <DialogHeader>
+        <DialogTitle>{`Delete ${noun}`}</DialogTitle>
+        <DialogDescription>{`${name} can't be deleted while it's in use.`}</DialogDescription>
+      </DialogHeader>
+      <p
+        data-testid="asset-delete-used"
+        role="alert"
+        className="max-h-40 overflow-y-auto text-sm text-destructive"
+      >
+        {`${usedInText(uses)}. Change those first.`}
+      </p>
+      <DialogFooter>
+        <Button type="button" data-testid="asset-manage-close" onClick={close}>
+          Close
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
 function ImageChange({
   mode,
   asset,
@@ -99,11 +169,14 @@ function ImageChange({
 }) {
   const { busy, error, setError, send } = useTagIntent();
   const [name, setName] = useState(asset.name);
+  const check = useDeleteCheck(mode === "delete" ? asset.id : null);
+  const checking = mode === "delete" && check.state === "checking";
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     // React events bubble through the portal: never submit a host form (New scene, MAP §7).
     e.stopPropagation();
     if (mode === "delete") {
+      if (checking) return; // Enter before the answer: nothing to confirm yet.
       if (await send(ASSET_MANAGE_INTENTS.delete, { assetId: asset.id })) close();
       return;
     }
@@ -115,11 +188,15 @@ function ImageChange({
     if (parsed.data === asset.name) return close();
     if (await send(ASSET_MANAGE_INTENTS.rename, { assetId: asset.id, name: parsed.data })) close();
   };
+  if (mode === "delete" && check.state === "used") {
+    return <DeleteRefused name={asset.name} noun={noun} uses={check.uses} close={close} />;
+  }
   return (
     <form className="flex flex-col gap-3" onSubmit={submit}>
       <DialogHeader>
         <DialogTitle>{mode === "rename" ? `Rename ${noun}` : `Delete ${noun}`}</DialogTitle>
-        {mode === "delete" && (
+        {checking && <DialogDescription>{USES_CHECKING}</DialogDescription>}
+        {mode === "delete" && !checking && (
           <DialogDescription data-testid="asset-delete-prompt">
             {deleteImagePrompt(asset.name)}
           </DialogDescription>
@@ -150,14 +227,16 @@ function ImageChange({
         <Button type="button" variant="ghost" onClick={close}>
           Cancel
         </Button>
-        <Button
-          type="submit"
-          data-testid="asset-manage-confirm"
-          variant={mode === "delete" ? "destructive" : "default"}
-          disabled={!live || busy}
-        >
-          {mode === "delete" ? "Delete" : "Rename"}
-        </Button>
+        {!checking && (
+          <Button
+            type="submit"
+            data-testid="asset-manage-confirm"
+            variant={mode === "delete" ? "destructive" : "default"}
+            disabled={!live || busy}
+          >
+            {mode === "delete" ? "Delete" : "Rename"}
+          </Button>
+        )}
       </DialogFooter>
     </form>
   );

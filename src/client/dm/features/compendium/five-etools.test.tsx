@@ -2,10 +2,12 @@
 // apart), FR-CMPX-18's footer and badge, FR-CMPX-08's Derive form.
 import { describe, expect, test } from "bun:test";
 import type { AppType } from "@server/app";
+import { ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import {
   type BookStatus,
   bookPanelState,
   booksSummary,
+  END_COMBAT_FIRST,
   type FiveEtoolsStatus,
   type ImportResponse,
 } from "@shared/compendium/import";
@@ -52,18 +54,21 @@ const READY: FiveEtoolsStatus = {
   ],
 };
 
-const store = createStore<SyncState>()(
-  () =>
-    ({
-      state: "live",
-      lazy: {},
-      connection: { load: () => null, retryLoad: () => null },
-    }) as unknown as SyncState,
-);
+const syncWith = (records: Record<string, Record<string, unknown>>) =>
+  createStore<SyncState>()(
+    () =>
+      ({
+        state: "live",
+        lazy: {},
+        store: { records },
+        connection: { load: () => null, retryLoad: () => null },
+      }) as unknown as SyncState,
+  );
+const store = syncWith({});
 
-const render = (status: FiveEtoolsStatus, initialOpen = true) =>
+const render = (status: FiveEtoolsStatus, initialOpen = true, sync = store) =>
   renderToStaticMarkup(
-    <SyncContext.Provider value={store}>
+    <SyncContext.Provider value={sync}>
       <TooltipProvider delayDuration={0} skipDelayDuration={0}>
         <FiveEtoolsPanel api={api} status={status} reload={() => {}} initialOpen={initialOpen} />
       </TooltipProvider>
@@ -121,6 +126,24 @@ describe("FR-CMPX-17 panel states", () => {
     expect(html).not.toMatch(/<button[^>]*data-testid="cmpx-update-all"[^>]*disabled/);
     const current = render({ ...READY, books: READY.books.slice(0, 1) });
     expect(current).toMatch(/<button[^>]*data-testid="cmpx-update-all"[^>]*disabled/);
+  });
+
+  test("BL-177 FR-CMPX-12 a started encounter locks Import selected, its tooltip's wrapper saying so; planned or ended: not locked", () => {
+    const fight = (status: string) =>
+      render(READY, true, syncWith({ [ENCOUNTER_TYPE]: { e1: { id: "e1", status } } }));
+    const locked = fight("started");
+    expect(locked).toMatch(
+      /<button[^>]*data-testid="cmpx-import"[^>]*data-locked="true"[^>]*disabled/,
+    );
+    // Tip's wrapper: a disabled button takes no hover (`Tip off`).
+    expect(locked).toMatch(/<span class="inline-flex"[^>]*><button[^>]*data-testid="cmpx-import"/);
+    expect(END_COMBAT_FIRST).toBe("End combat first");
+    for (const html of [render(READY), fight("planned"), fight("ended")]) {
+      expect(html).toMatch(/<button[^>]*data-testid="cmpx-import"[^>]*data-locked="false"/);
+      expect(html).not.toMatch(
+        /<span class="inline-flex"[^>]*><button[^>]*data-testid="cmpx-import"/,
+      );
+    }
   });
 
   test("FR-CMPX-17 FR-CMPX-19 progress: Book i / N", () => {

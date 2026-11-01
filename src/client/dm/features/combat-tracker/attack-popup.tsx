@@ -27,6 +27,7 @@ import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
 import {
   APPLY_TARGETS_MAX,
+  attackPhrase,
   type CardPartRef,
   CBT_INTENTS,
   type ClearDamageResult,
@@ -668,7 +669,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
   // K8 (K6 gap 7): the to-hit line's label, the kit's "Mira · Longbow attack".
   const attackLabel = (
     <span>
-      <strong className="font-semibold">{p.attackerName}</strong> · {p.attackName} attack
+      <strong className="font-semibold">{p.attackerName}</strong> · {attackPhrase(p.attackName)}
     </span>
   );
   // An empty / non-number cell falls back to the roll; none yet → null (FR-CBT-72).

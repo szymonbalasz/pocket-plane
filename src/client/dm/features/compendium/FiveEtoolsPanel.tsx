@@ -4,11 +4,13 @@
 // **Import selected** / **Update all**
 // → confirm → one `POST /api/compendium/import` per book, one after another (FR-CMPX-12): progress
 // "Book i / N", then a Toast with the totals and warning count, an error Toast per failed book.
-// Disabled while running or not live.
+// Disabled while running or not live. BL-177 (sim-17 c03): Import selected is locked during a
+// fight, with why in a tooltip, instead of refusing per book; the server's check stays.
 import {
   type BookStatus,
   bookPanelState,
   booksSummary,
+  END_COMBAT_FIRST,
   type FiveEtoolsStatus,
   ImportResponse,
 } from "@shared/compendium/import";
@@ -19,6 +21,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@ui/compone
 import { Badge } from "@ui/components/ui/primitives";
 import { Progress } from "@ui/components/ui/progress";
 import { SearchInput } from "@ui/components/ui/search-input";
+import { Tip } from "@ui/components/ui/tip";
+import { startedIn } from "@ui/features/combat-tracker/store";
 import { refetch } from "@ui/features/compendium/nav";
 import { cn } from "@ui/lib/utils";
 import { useSync } from "@ui/sync/store";
@@ -112,6 +116,7 @@ function BookList({
   initialOpen: boolean;
 }) {
   const live = useSync((st) => st.state === "live");
+  const fight = useSync((st) => startedIn(st.store) !== null);
   const [open, setOpen] = useState(initialOpen);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -153,6 +158,19 @@ function BookList({
     if (done.length > 0) refetch(); // FR-CMP-23: the DM's own writes refetch at once.
   };
 
+  const importSelected = (
+    <Button
+      size="sm"
+      className="h-7 px-2"
+      data-testid="cmpx-import"
+      data-locked={fight}
+      disabled={chosen.length === 0 || !live || fight}
+      onClick={() => setPending({ books: chosen, action: "Import" })}
+    >
+      <DownloadIcon className="size-3.5" /> Import selected
+    </Button>
+  );
+
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="space-y-1">
       <div className="flex items-center gap-2">
@@ -172,17 +190,15 @@ function BookList({
             {statusText(status)}
           </span>
         </CollapsibleTrigger>
-        {open && !running && (
-          <Button
-            size="sm"
-            className="h-7 px-2"
-            data-testid="cmpx-import"
-            disabled={chosen.length === 0 || !live}
-            onClick={() => setPending({ books: chosen, action: "Import" })}
-          >
-            <DownloadIcon className="size-3.5" /> Import selected
-          </Button>
-        )}
+        {open &&
+          !running &&
+          (fight ? (
+            <Tip content={END_COMBAT_FIRST} off>
+              {importSelected}
+            </Tip>
+          ) : (
+            importSelected
+          ))}
         <Button
           size="sm"
           variant="outline"
