@@ -1,6 +1,6 @@
 ---
 name: pocket-plane-content
-description: Use when the DM asks to create or edit Pocket Plane content (custom creatures and NPC variants, mounts, homebrew items / spells / features / conditions / house rules, character sheets, a character's toggles and rule triggers), from pasted text, a link's text or an image, through the Pocket Plane MCP tools.
+description: Use when the DM asks to create or edit Pocket Plane content (custom creatures and NPC variants, mounts, homebrew items / spells / features / conditions / house rules, character sheets, a character's toggles and rule triggers, images for items and portraits), from pasted text, a link's text or an image, through the Pocket Plane MCP tools.
 ---
 
 # Pocket Plane content
@@ -26,6 +26,7 @@ Turn what the DM gives you (a paste, a page's text, a stat-block image, "an orc 
 | Homebrew name clashes, a clone base | `compendium_search {q, kind}`; `compendium_get {id}` |
 | Characters / players | `characters_list {q}`, `character_get {id}`, `players_list` |
 | A character's toggles, triggers, active effects | `character_effects {id}` |
+| Existing art (portraits, tokens, items) | `assets_list {q?, tag?}` (library only; item attachments aren't listed) |
 
 - Names are unique per kind, case-insensitive (creatures; homebrew per kind). Pick a new name if taken.
 - Lists return ≤ 50; pass `nextCursor` back as `cursor`.
@@ -46,6 +47,7 @@ Turn what the DM gives you (a paste, a page's text, a stat-block image, "an orc 
 | A toggle on a sheet (Rage, Enlarge, a permanent item) | `character_put_preset` | `{characterId, id?, from?, name?, modifiers?, durationRounds?, concentration?, note?, usesFeature? \| usesFeatureId?}` (§6.1) |
 | A rule trigger on a sheet (Divine Fury) | `character_put_trigger` | `{characterId, id?, name, enabled?, public?, requiresPreset?, rule}` (§6.1) |
 | Switch a toggle on or off | `character_toggle_preset` | `{characterId, presetId \| presetName, on}` |
+| An image (item art, portrait, token) | `asset_upload` | `{path \| svg, name?, context?}` → `assetId` (§4.1) |
 
 **Stat block → rows** (`rows: [{list, row}]`):
 
@@ -89,6 +91,14 @@ Turn what the DM gives you (a paste, a page's text, a stat-block image, "an orc 
 - Rider and mount are two custom creatures, linked by one line in each one's `notes` (no link record).
 - Mount = a derived SRD creature (e.g. Wolf) named "‹Rider›'s Wolf". Rider notes `Mount: ‹mount name›`; mount notes `Rider: ‹rider name›`.
 - Creature already exists → `creature_get` its notes, append the line on a new line, send the whole text in `creature_edit {id, set: {notes}}`.
+
+## 4.1 Images
+
+- **Source:** a file the DM names (absolute path; `.png` `.jpg` `.webp` `.svg`, ≤ 25 MB), or SVG text you write. A pasted image can't be handed to a tool: ask the DM to save it and give the path.
+- **No image given:** offer an SVG only for emblem-style art (a sigil, a silhouette, a rune), never as an illustration. Give it `width` / `height` (e.g. 512), keep it self-contained (no external `href`), show it to the DM before uploading.
+- **`context`:** item → `"compendium-item"` (an attachment: tagged Items, not in the library); spell / feature / rule → `"compendium"`; portrait → `"portrait"`; token → `"token"`. Portraits and tokens: try `assets_list` first.
+- **Where the id goes:** `homebrew_create` / `homebrew_edit` `imageAssetIds` (≤ 4, the first is the main image), `creature_edit` / `character_edit` `set.portraitAssetId`.
+- **Order:** uploads come first, once the DM said yes to the image; then `plan_check` the rest with the real ids (§5). The same image again returns the same id, so a rerun is free.
 
 ## 5. The plan flow
 
@@ -173,7 +183,7 @@ Read first: `character_get` (does the feature row exist?) and `character_effects
 
 ## 8. Where data goes
 
-- Database, assets and server stay on the DM's machine; tool inputs, results and pasted text / images go to the model provider, as in any Claude Code session.
+- Database, assets and server stay on the DM's machine; `asset_upload` sends a file only to the local server; tool inputs, results and pasted text / images go to the model provider, as in any Claude Code session.
 
 ## Examples
 

@@ -19,6 +19,7 @@ import "./tools/creature";
 import "./tools/homebrew";
 import "./tools/character";
 import "./tools/effects";
+import "./tools/assets";
 
 export const SERVER_NAME = "pocket-plane";
 export const SERVER_VERSION = "0.1.0";

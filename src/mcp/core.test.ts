@@ -113,6 +113,16 @@ describe("FR-AGENT-11 §11 error mapping", () => {
     expect(rest(409, { code: "conflict", message: "Name taken" })[1]).toBe("Name taken");
   });
 
+  test("FR-AGENT-48 upload refusals 413 / 415 / 422 → invalid with the server's message", () => {
+    for (const [status, message] of [
+      [413, "File over 100 MB"],
+      [415, "Unsupported image format"],
+      [422, "SVG needs width and height or a viewBox"],
+    ] as const) {
+      expect(rest(status, { code: "invalid", message })).toEqual(["invalid", message, undefined]);
+    }
+  });
+
   test("FR-AGENT-10 409 no active campaign → conflict with the next step", () => {
     expect(rest(409, { code: "conflict", message: "No active campaign" })).toEqual([
       "conflict",
@@ -328,6 +338,7 @@ describe("FR-AGENT-01 list-tools", () => {
     await Promise.all([server.connect(a), client.connect(b)]);
     const { tools } = await client.listTools();
     const writes = [
+      "asset_upload",
       "character_edit",
       "character_put_preset",
       "character_put_row",
@@ -342,6 +353,8 @@ describe("FR-AGENT-01 list-tools", () => {
       "homebrew_share",
     ];
     expect(tools.map((t) => t.name).sort()).toEqual([
+      "asset_upload",
+      "assets_list",
       "campaigns_list",
       "character_edit",
       "character_effects",
@@ -410,6 +423,9 @@ describe("FR-AGENT-01 list-tools", () => {
     );
     expect(props("creature_derive")).toEqual(["baseId", "entryId", "name", "notes", "rows", "set"]);
     expect(props("creature_edit")).toEqual(["id", "set"]);
+    // FR-AGENT-42 / -46: one flat object (exactly one of path / svg is a refinement).
+    expect(props("asset_upload")).toEqual(["context", "listed", "name", "path", "svg"]);
+    expect(props("assets_list")).toEqual(["cursor", "q", "tag"]);
     expect(
       allTools()
         .filter((t) => t.write)
