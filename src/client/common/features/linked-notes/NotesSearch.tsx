@@ -9,6 +9,7 @@ import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../../components/ui/overlays";
 import { Input, Skeleton } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { pageApi } from "../../session";
 import { useSync } from "../../sync/store";
 import { isSearch, useNoteSearch } from "./search";
@@ -47,15 +48,17 @@ export function NoteSearchBox({
         }}
       />
       {q !== "" && (
-        <button
-          type="button"
-          aria-label="Clear search"
-          data-testid="notes-search-clear"
-          className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
-          onClick={() => onChange("")}
-        >
-          <XIcon className="size-3.5" />
-        </button>
+        <Tip content="Clear search">
+          <button
+            type="button"
+            aria-label="Clear search"
+            data-testid="notes-search-clear"
+            className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+            onClick={() => onChange("")}
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        </Tip>
       )}
     </div>
   );
@@ -159,16 +162,18 @@ export function NarrowNoteSearch({ refresh }: { refresh: unknown }) {
   const [q, setQ] = useState("");
   return (
     <>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-8 shrink-0 px-2"
-        aria-label="Search notes"
-        data-testid="notes-search-narrow"
-        onClick={() => setOpen(true)}
-      >
-        <SearchIcon className="size-3.5" />
-      </Button>
+      <Tip content="Search notes">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 shrink-0 px-2"
+          aria-label="Search notes"
+          data-testid="notes-search-narrow"
+          onClick={() => setOpen(true)}
+        >
+          <SearchIcon className="size-3.5" />
+        </Button>
+      </Tip>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm" data-testid="notes-search-dialog">
           <DialogTitle>Search notes</DialogTitle>
