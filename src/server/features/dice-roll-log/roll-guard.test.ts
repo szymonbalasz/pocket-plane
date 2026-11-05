@@ -281,6 +281,32 @@ describe("FR-DICE-13 roll guard (#367)", () => {
     t.check(def(), true);
   });
 
+  test("FR-DICE-13 FR-MIR-06 in a fight: a Goblin fogged for every player (its combatant hidden, FR-FOG-14) is public through a Transparent mirror, its save and definition rolls too; a Shadow doesn't count", () => {
+    const t = setup();
+    const goblin = t.cbt("Goblin");
+    // Fogged for every player: the token's copies and combat's hidden copy (FR-FOG-14).
+    t.s.db
+      .update(token)
+      .set({ seenBy: [], fogged: true })
+      .where(eq(token.id, t.tokens.goblin))
+      .run();
+    t.s.db.update(combatant).set({ hidden: true }).where(eq(combatant.id, goblin.id)).run();
+    t.check(t.save(goblin.id, { public: true }), false);
+    t.check(t.roll({ combatantId: goblin.id }), false);
+    const mirrorId = t.run<{ mirrorId: string }>(MIR_INTENTS.create, {
+      tokenId: t.tokens.goblin,
+      col: 6,
+      row: 3,
+      mode: "transparent",
+    }).mirrorId;
+    t.check(t.save(goblin.id, { public: true }), true);
+    t.check(t.roll({ combatantId: goblin.id }), true);
+    t.check(t.roll({ tokenId: t.tokens.goblin }), true);
+    t.run(MIR_INTENTS.setMode, { mirrorId, mode: "shadow" });
+    t.check(t.save(goblin.id, { public: true }), false);
+    t.check(t.roll({ entityId: t.h.goblinId }), false);
+  });
+
   test("FR-DICE-13 hidden and renamed creature: DM-only", () => {
     const t = setup();
     t.rename(t.tokens.wolf, "Shadow");

@@ -63,8 +63,12 @@ export interface GuardWorld<T extends GuardToken, C extends GuardCombatant> {
   activeSceneId(): string | null;
   /** No player sees the token (on its scene; `hidden`, fog), nor a Visible / Transparent mirror of it. */
   tokenHidden(t: T): boolean;
-  /** Combat's visibility says the combatant is hidden from players. */
-  combatantHidden(c: C): boolean;
+  /**
+   * Combat's visibility says the combatant is hidden from players. `tokenCopy: false` leaves out
+   * its `hidden` (a bound combatant's copy of its token's, FR-FOG-14): only out of the fight or a
+   * hidden owner's companion then.
+   */
+  combatantHidden(c: C, tokenCopy?: boolean): boolean;
 }
 
 /** A roll's actor: `token` (a token id) or `entity` (a definition id) under `name`. */
@@ -94,9 +98,13 @@ function combatantGuarded<T extends GuardToken, C extends GuardCombatant>(
 ): boolean {
   if (c.kind !== "monster") return false;
   if (defName !== null && c.ownerPlayerId === null && !numberedFrom(c.name, defName)) return true;
+  const t = c.tokenId ? w.token(c.tokenId) : null;
+  // Bound to a token on the shown scene: its `hidden` copies the token's (FR-FOG-14), which knows
+  // no mirrors, so the token decides (a mirror a player sees counts, DM 2026-11-05).
+  if (t && t.sceneId === w.activeSceneId()) {
+    return w.combatantHidden(c, false) || tokenGuarded(w, t, defName);
+  }
   if (w.combatantHidden(c)) return true;
-  if (!c.tokenId) return false;
-  const t = w.token(c.tokenId);
   return t ? tokenGuarded(w, t, defName) : false;
 }
 

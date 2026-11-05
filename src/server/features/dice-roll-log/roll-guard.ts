@@ -14,11 +14,12 @@
 //   **every** instance, combatants and tokens: it may be made for any of them (K7 F1, F4 F1).
 //
 // Hidden (#371) = the existing visibility rules on the players' shown scene: a combatant per
-// `combatantVisibility`, or its token hidden; a token on the active scene that **no** player sees
-// (DM 2026-11-05, was "any player doesn't"): for each player, `tokenHiddenFor` (`hidden` or fog)
-// and none of its Visible or Transparent mirrors shown to them (`mirrorVisibility`, FR-MIR-06 / -09;
-// a Shadow is anonymous, so it never counts). A token on a scene players aren't shown never hides a
-// roll (rolls-1).
+// `combatantVisibility`, or its token hidden (bound to a token on the shown scene, the token
+// decides: its `hidden` is the token's copy, FR-FOG-14); a token on the active scene that **no**
+// player sees (DM 2026-11-05, was "any player doesn't"): for each player, `tokenHiddenFor`
+// (`hidden` or fog) and none of its Visible or Transparent mirrors shown to them
+// (`mirrorVisibility`, FR-MIR-06 / -09; a Shadow is anonymous, so it never counts). A token on a
+// scene players aren't shown never hides a roll (rolls-1).
 // Renamed = the name minus a numbering suffix (FR-MAP-16, "Goblin 2") isn't the definition's
 // name; a player-owned companion is never renamed (its owner named it, players know it).
 
@@ -113,8 +114,9 @@ function rowsWorld(
       };
       return !pids.some(sees);
     },
-    combatantHidden(c) {
-      return combatantVisibility(toCombatantRecord(c)) === "hidden";
+    combatantHidden(c, tokenCopy = true) {
+      const rec = toCombatantRecord(c);
+      return combatantVisibility(tokenCopy ? rec : { ...rec, hidden: false }) === "hidden";
     },
   };
 }

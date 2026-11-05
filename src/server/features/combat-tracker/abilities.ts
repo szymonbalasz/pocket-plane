@@ -1,6 +1,6 @@
 // `cbt.rollAbility` (FR-CBT-44, #149): the DM rolls a combatant's ability check or save from the
-// Initiative row. One roll + one `roll` entry with the encounter id; a hidden combatant's entry is
-// never public.
+// Initiative row. One roll + one `roll` entry with the encounter id; a hidden PC's entry is never
+// public, a monster's follows the roll guard (FR-DICE-13).
 import { characterRolls } from "@shared/character-sheet/logic";
 import {
   CBT_INTENTS,
@@ -47,7 +47,9 @@ export const rollAbility = defineCommand({
       dmPayload: dice.rollDmPayload([r]),
       rollIds,
       encounterId: enc.id,
-      public: c.hidden ? false : input.public,
+      // A hidden PC never public; a monster's is the roll guard's (FR-DICE-13: hidden or
+      // renamed, its mirrors counted, DM 2026-11-05), which `gameLog.append` runs on every entry.
+      public: c.hidden && c.kind !== "monster" ? false : input.public,
     });
     env.emit({
       type: CombatantRolled.type,

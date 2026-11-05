@@ -67,7 +67,8 @@ export function rollBarGuarded(input: RollBarGuardInput): boolean {
     tokenHidden: (t) =>
       (t.hidden || (t.fogged === true && t.ownerPlayerId === null)) &&
       !(input.mirrors ?? []).some((m) => m.tokenId === t.id && mirrorShown(m)),
-    combatantHidden: (c) => !c.active || c.hidden || c.ownerHidden === true,
+    combatantHidden: (c, tokenCopy = true) =>
+      !c.active || (tokenCopy && c.hidden) || c.ownerHidden === true,
   };
   let actor: GuardActor | null = null;
   if ("tokenId" in ref) {

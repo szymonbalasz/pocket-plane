@@ -104,6 +104,19 @@ describe("FR-DICE-22 roll bar guard", () => {
     expect(
       rollBarGuarded(base({ ref: { entityId: "gob" }, tokens: fogged, mirrors: [mir()] })),
     ).toBe(false);
+    // In a fight: the bound combatant's `hidden` copies its fogged token's (FR-FOG-14); the
+    // token decides. Out of the fight (`active` off) still hides it.
+    const bound = [fighter("c1", { tokenId: "t1", name: "Goblin", hidden: true })];
+    const c = (over: Partial<RollBarGuardInput>) =>
+      rollBarGuarded(
+        base({ ref: { combatantId: "c1" }, tokens: fogged, combatants: bound, ...over }),
+      );
+    expect(c({})).toBe(true);
+    expect(c({ mirrors: [mir()] })).toBe(false);
+    expect(c({ mirrors: [mir({ mode: "shadow" })] })).toBe(true);
+    expect(
+      c({ mirrors: [mir()], combatants: [{ ...(bound[0] as CombatantRecord), active: false }] }),
+    ).toBe(true);
   });
 
   test("FR-DICE-22 the definitions it needs: the token's, the combatant's entity, the ref's", () => {
