@@ -6,6 +6,7 @@
 // palette's Windows group is generated from each client's `windows.ts` (FR-SHELL-185).
 import { SP2_COMMANDS, SP2_PROVIDERS } from "../compendium/rules/palette";
 import { K7_COMMANDS } from "../entities/statblock-palette";
+import { NOTES_COMMANDS } from "../linked-notes/commands";
 import { PM2_COMMANDS } from "../party-board/commands";
 import { SP3_COMMANDS } from "../session-recap/commands";
 import { SP1_COMMANDS } from "./palette/launch";
@@ -26,6 +27,8 @@ export const COMMANDS: readonly PaletteCommand[] = [
   ...SP3_COMMANDS,
   // Kit parity K7 (build/kit-statblock): Stat block, DM (FR-KIT-100, ruling A: no launcher entry)
   ...K7_COMMANDS,
+  // Linked notes N3 (build/notes-window): Open Notes, New note (NOTES §7)
+  ...NOTES_COMMANDS,
 ];
 
 /** The search providers, one group each or more (append yours; no strongholds yet, seams S9). */

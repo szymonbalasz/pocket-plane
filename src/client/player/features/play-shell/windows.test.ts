@@ -730,6 +730,7 @@ const GOLDEN_KINDS = [
   "cmp.rules", // SP2 (seams S4, FR-CMP-63; min 340×320): appended, goldens regenerated
   "recap.session", // SP3 (S4, FR-RECAP-10): appended, goldens regenerated
   "dice.details", // FR-DICE-106: appended, goldens regenerated
+  "notes.main", // linked-notes N3 (NOTES §7, 760 × 560 per spec): appended, goldens regenerated
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

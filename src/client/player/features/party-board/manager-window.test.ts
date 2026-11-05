@@ -40,7 +40,7 @@ test("FR-SHELL-156 Party Manager registered (Player): title / label Party Manage
     absorbs: ["party.summary"],
     onAbsorb: "function",
     sizeRow: { default: all(600, 560), useful: all(440, 400), min: { w: 340, h: 360 } },
-    sets: ["P1", "P2", "P3"],
+    sets: ["P1", "P2", "P3", "P4"], // P4 = P3 + Notes (linked-notes N3 r1)
   });
   expect(r.sizeRow?.criterion).toContain("2 PC cards + their companion rows whole");
   for (const { vp, rect } of managerOpenRects(registry)) {
@@ -73,10 +73,10 @@ test("FR-SHELL-155 party.summary layout migrated (Player): a remembered, minimis
   expect(m.tab).toBe("status");
 });
 
-test("FR-SHELL-161 launcher threshold (Player): every product label shows from 1044 px (recorded: test-mode launchers out, 6 px a character; SP2 re-test measured the bar at 1010 px); below it icons only; labels and nothing in the ⋯ menu at 1280", () => {
+test("FR-SHELL-161 launcher threshold (Player): every product label shows from 1125 px (recorded: test-mode launchers out, 6 px a character; SP2 re-test measured the bar at 1010 px; NOTES N3); below it icons only; labels and nothing in the ⋯ menu at 1280", () => {
   const t = launcherThreshold(registry);
   console.log(`FR-SHELL-161 Player labels from ${t.labelsFrom}`);
-  expect(t.labelsFrom).toBe(1044); // measured; SP1 / SP2 update it after their launcher entries (S3)
+  expect(t.labelsFrom).toBe(1125); // measured; SP1 / SP2 update it after their launcher entries (S3; NOTES N3 Notes: 1044 → 1125)
   expect(t.at1280).toEqual({ compact: false, overflow: [] });
 });
 
