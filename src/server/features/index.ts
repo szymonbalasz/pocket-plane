@@ -14,6 +14,7 @@ import { entities } from "./entities";
 import { fixturesAdapters } from "./fixtures-adapters";
 import { fogOfWar } from "./fog-of-war";
 import { gems } from "./gems";
+import { linkedNotes } from "./linked-notes";
 import { liveSync } from "./live-sync";
 import { logShare } from "./log-share";
 import { notifications } from "./notifications";
@@ -65,4 +66,6 @@ export const features: readonly Feature[] = [
   overviewScenes,
   // Share to the game log (build/log-share)
   logShare,
+  // Linked notes records (build/notes-core)
+  linkedNotes,
 ];

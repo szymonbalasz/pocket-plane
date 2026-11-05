@@ -87,6 +87,7 @@ import logShare from "./log-share";
 import lootSubtractE2e from "./loot-subtract-e2e";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
+import notes from "./notes";
 import notifications from "./notifications";
 import overviewCrowd from "./overview-crowd";
 import overviewScenes from "./overview-scenes";
@@ -413,4 +414,6 @@ export const bundles: readonly Bundle[] = [
   statsDiceE2e,
   // Sheet names linking to compendium entries (build/sheet-compendium-links)
   sheetLinks,
+  // Linked notes records (build/notes-core)
+  notes,
 ];

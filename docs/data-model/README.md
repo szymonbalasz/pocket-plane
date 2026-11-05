@@ -2908,3 +2908,35 @@ New table `token_mirror` ([token-mirrors §8](../specs/token-mirrors.md#8-data-m
 |---|---|---|
 | `suppressed` | Token `hidden` or `invisible`, or no cell of the footprint on the map | FR-MIR-09 |
 | `fogged`, `seenBy` | Fog subject at the mirror's own cells; never the token's copies | FR-MIR-06 |
+
+## 154. Linked notes records (build/notes-core)
+
+From [linked-notes §8](../specs/linked-notes.md#8-data-model) ([ADR-0078](../architecture/adr/0078-note-co-writing.md), #446). **Three new tables; no existing table changes** (#416: a DB without them boots and they start empty). Protocol side: [protocol §196](../protocol/README.md#196-linked-notes-records-buildnotes-core).
+
+### Note (`note`, record type `note`) — owner [linked-notes](../specs/linked-notes.md#8-data-model)
+
+| Field | Type | Default | Rule | Source |
+|---|---|---|---|---|
+| `id`, `campaign_id` | ID, ID → Campaign | — | `ctx.ids` | FR-NOTES-01 |
+| `title`, `title_fold` | text 1–100, text | — | Trimmed; no `[[`, `]]`, `\|` or line break. `title_fold` = the shared matcher's `fold`; unique among the campaign's live notes, kept by the commands | FR-NOTES-02 |
+| `created_by_role`, `created_by_player_id` | `dm` \| `player`, ID \| null | — | Player id null for the DM | |
+| `created_at`, `updated_at` | ISO | — | `ctx.clock`. Rename and restore bump `updated_*` | |
+| `updated_by_role`, `updated_by_player_id` | as `created_by_*` | — | | |
+| `deleted_at`, `deleted_by_role`, `deleted_by_player_id` | ISO \| null, … | null | Set = in the Recycle bin; cleared by a restore | FR-NOTES-04, -05 |
+| `body`, `body_fold` | text, text | `""` | Plain text ≤ 32 KiB UTF-8; `body_fold` for search (N4). Never in the record | FR-NOTES-03 |
+| `body_version`, `version` | int, int | 0 | `body` holds the changes up to `body_version`; `version` = the latest accepted change (N2) | ADR-0078 |
+
+Index: `note_campaign_title` (`campaign_id`, `title_fold`).
+
+### Note change (`note_change`) and note link (`note_link`) — owner linked-notes
+
+| Table | Fields | Rule |
+|---|---|---|
+| `note_change` | `note_id` → Note (`ON DELETE CASCADE`), `version`, `client_id`, `changes` (JSON), `at` | PK (`note_id`, `version`). One row per accepted push (N2); last 1,000 rows or 1 MiB per note kept |
+| `note_link` | `note_id` → Note (`ON DELETE CASCADE`), `target_fold` | PK (`note_id`, `target_fold`); index `note_link_target`. One row per distinct folded link target (N5) |
+
+- **Caps:** ≤ 1,000 live and ≤ 1,000 binned notes per campaign, checked by the commands.
+- **Visibility-relevant:** only `campaign_id` (every note is the whole table's, FR-NOTES-01).
+- **Not stored:** subscriptions, who is here, cursors (N2, memory only).
+- **Fixtures:** `notes-shared`, `notes-binned`, `notes-second-campaign`; bundle `notes`. Bodies are set by `notes.seedBody`, a fixtures-only command (not an intent) until co-writing exists.
+- **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap.
