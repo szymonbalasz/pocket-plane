@@ -30,6 +30,10 @@
     "mcp:call": "bun scripts/mcp-call.ts"
   },
   "dependencies": {
+    "@codemirror/collab": "^6.1.1",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
     "@modelcontextprotocol/sdk": "1.32.1",
     "cannon-es": "~0.20.0",
     "class-variance-authority": "^0.7.1",
