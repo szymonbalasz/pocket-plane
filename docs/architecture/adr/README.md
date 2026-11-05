@@ -82,6 +82,8 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0074](0074-user-supplied-sources.md) | User-supplied compendium sources (5etools books read from `PP_5ETOOLS_DIR`, never bundled or committed) and replaced entries (`replaces`: hidden from search, still readable by id); token art copied per campaign on first placement | accepted (#395) |
 | [0076](0076-explored-memory-shapes.md) | Explored memory as exact shapes, merged with `polygon-clipping` on the server (DM, 2026-10-31) | accepted |
 | [0077](0077-token-mirrors.md) | Several floors on one map, with display-only token mirrors (DM, 2026-11-01) | accepted |
+| [0078](0078-note-co-writing.md) | Note co-writing: the server is the one authority (`@codemirror/collab`), every accepted change stored as a `note_change` row (DM, 2026-11-05) | accepted |
+| [0079](0079-no-virtual-tables-under-push.md) | No SQLite virtual tables (FTS5) in the main DB while schema push runs; search uses the shared matcher (2026-11-05) | accepted |
 | [0075](0075-overview-scenes.md) | Overview scenes: a second kind of scene on its own tables and canvas; the scene gate's resolver returns the shown overview; `sceneHooks` gains `deactivated` | accepted (#398; refines 0039, 0041) |
 
 ## Proposing a new ADR

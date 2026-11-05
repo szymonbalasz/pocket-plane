@@ -233,6 +233,10 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Party board** | Shared party window: handouts and the party inventory ([party-board](specs/party-board.md)). | Party loot |
 | **Handout** | DM-authored title + text + up to 10 images, shared with everyone or chosen players. | Note |
 | **Share / Unshare** | Making a handout visible to players or withdrawing it; "reveal" stays fog's word. Images a player already saw stay valid capabilities ([ADR-0023](architecture/adr/0023-asset-access-by-capability-id.md)). | Reveal (fog) |
+| **Note** | A shared page of text in the Notes window, written and co-edited live by everyone at the table, the DM included; nothing in notes is private ([linked-notes](specs/linked-notes.md)). Not a handout, and not session-recap's "share note". | Handout |
+| **Note link** | A link to a note by title, stored as `[[Title]]` and shown as a chip; inserted from the `@` picker or typed by hand; follows a rename. | Notation link |
+| **Backlink** | A note listed under "Linked from" because it links to the open note. | — |
+| **Recycle bin** | Where a deleted note waits, with no expiry, until anyone restores it. | — |
 | **Party inventory** | Items the party holds in common (`party-item` rows), outside any sheet. | Inventory (sheet) |
 | **Item move** | Moving an item between the party inventory and a character's sheet items (or PC → PC) in one step, logged in party loot. | — |
 | **Split** | The DM dividing the party pot's coin among the PCs: ⌊coin / n⌋ per denomination, remainder stays in the pot. | — |

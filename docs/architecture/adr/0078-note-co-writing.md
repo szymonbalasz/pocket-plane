@@ -1,6 +1,6 @@
-# Proposed — Note co-writing: the server as the one authority, every change stored
+# ADR-0078 — Note co-writing: the server as the one authority, every change stored
 
-- **Status:** proposed, with [linked-notes](../../specs/linked-notes.md) (FR-NOTES-07 to -22).
+- **Status:** accepted (DM, #446), with [linked-notes](../../specs/linked-notes.md) (FR-NOTES-07 to -22).
 - **Date:** 2026-11-05 (revised after the DM's gate, [#444](../../decisions-log.md), [#445](../../decisions-log.md) and #446: every note shared, nothing private, a Recycle bin, `@` as a picker).
 - **Keeps:**
   - [ADR-0005](0005-server-authoritative-sync.md): the server owns the text and the order.

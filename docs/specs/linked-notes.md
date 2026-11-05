@@ -1,14 +1,14 @@
 ---
 title: Linked notes
 prefix: NOTES
-status: in-review
+status: complete
 owner: spec-linked-notes
 phase: post-mvp
 ---
 
 # Linked notes
 
-> No open questions for the gate: the DM decided everything ([#444](../decisions-log.md), [#445](../decisions-log.md), #446 this round; §15). Test plan and build split: [linked-notes-build](linked-notes-build.md). How co-writing works: [proposed ADR](../architecture/adr/proposed-note-co-writing.md).
+> No open questions for the gate: the DM decided everything ([#444](../decisions-log.md), [#445](../decisions-log.md), #446 this round; §15). Test plan and build split: [linked-notes-build](linked-notes-build.md). How co-writing works: [proposed ADR](../architecture/adr/0078-note-co-writing.md).
 
 ## 1. Summary
 
@@ -69,7 +69,7 @@ A note can have the same name as a token or creature; nothing ties them together
 | FR-NOTES-11 | A rename rewrites `[[Old]]` to `[[New]]`, label kept, in every note, binned ones included, so chips follow. |
 | FR-NOTES-12 | An open note lists its backlinks: the live notes that link to it. The list refreshes ≤ 1 s after any link, title, delete or restore change, and only on connections whose list changed. |
 
-**Editor and co-writing** (mechanics in the [ADR](../architecture/adr/proposed-note-co-writing.md))
+**Editor and co-writing** (mechanics in the [ADR](../architecture/adr/0078-note-co-writing.md))
 
 | ID | Requirement |
 |---|---|
@@ -180,7 +180,7 @@ Anyone at the table may do anything to a note (FR-NOTES-01). The server checks e
 
 - **Snapshots: 0 B** (lazy), so the CON-44 ceilings don't move.
 - **Load on Notes open:** about 250 B per `note` row, binned included: ≈ 50 KB at 200 notes, ≈ 500 KB at both caps, under the 4 MiB result cap. Measured with `lazyLoadSizes`.
-- **Typing, cursors, disk and search:** [ADR](../architecture/adr/proposed-note-co-writing.md#limits-and-load).
+- **Typing, cursors, disk and search:** [ADR](../architecture/adr/0078-note-co-writing.md#limits-and-load).
 - **Editor:** its own chunk, loaded when Notes opens; measured in both bundles.
 
 ## 13. Test plan

@@ -148,6 +148,12 @@ DM picks #351 (ADR-0069), #355–#356 (Gilt & Stone default, Simple Dark; kit pa
 |---|---|---|---|
 | [Send to game log](log-share.md) | SHARE | in-review (#415) | build-log-share |
 
+## Linked notes (2026-11-05)
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Linked notes](linked-notes.md) | NOTES | complete (#446), [ADR-0078](../architecture/adr/0078-note-co-writing.md), [ADR-0079](../architecture/adr/0079-no-virtual-tables-under-push.md); build: [linked-notes-build](linked-notes-build.md) | spec-linked-notes |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.

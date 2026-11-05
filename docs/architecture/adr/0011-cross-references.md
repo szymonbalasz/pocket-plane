@@ -33,3 +33,5 @@
 ## Consequences
 
 > TODO (spec phase): fill once decided.
+
+> **Note (2026-11-05, #446):** notes link by title by design ([linked-notes](../../specs/linked-notes.md)): every note is shared and `[[Title]]` is the stored form. This ADR's model is for a future world builder.

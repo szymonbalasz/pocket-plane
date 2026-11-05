@@ -84,3 +84,4 @@ Restart `bun run play` in the main checkout (it backs up first, then builds). DM
 | 7 | Player: big sheet, a concentration card up, scroll the sheet | The card moves once after the scroll and sits on no button |
 | 8 | Pan PCs under the sheet's corner, close and reopen the sheet, shrink the browser, grow it back | The sheet returns to its spot; if dragged while small, it stays where dragged |
 | 9 | Use as attack on a plain roll; 4+ Pending lines; delete a used image; tick a 5etools book in a fight | One "Attack"; no half-cut row; "Used in" with no confirm; Import selected off, "End combat first" |
+| 2026-11-05 | Linked notes spec rewritten to the DM's reframe (#440, #442, #444, #445) and merged complete (#446): every note shared, live co-writing, Recycle bin, `@` picker. Build starts |
