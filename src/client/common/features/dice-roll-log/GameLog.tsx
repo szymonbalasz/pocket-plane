@@ -48,6 +48,7 @@ import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
 import { FOLDED_TEXT } from "@shared/log-share/kind";
 import { LOG_KIND_SHARE, type SharePayload } from "@shared/log-share/schemas";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
+import { TOKEN_MIRROR_TYPE, type TokenMirrorRecord } from "@shared/token-mirrors/schemas";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -956,6 +957,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const tokens = useRecords<TokenView>(TOKEN_TYPE);
   const encounters = useRecords<EncounterRecord>(ENCOUNTER_TYPE);
   const combatants = useRecords<CombatantRecord>(COMBATANT_TYPE);
+  const mirrors = useRecords<TokenMirrorRecord>(TOKEN_MIRROR_TYPE);
   const actors = useMemo(
     () => actorOptions(you, entities, scenes, tokens, encounters, combatants),
     [you, entities, scenes, tokens, encounters, combatants],
@@ -967,7 +969,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const { options: actorList, selected } = actorSelection(actors, actor);
   const actorRef = selected?.ref;
   // FR-DICE-22 (sprint 14 F3): the inputs of the server's roll guard (FR-DICE-13), for the eye.
-  const guardInput = { ref: actorRef, tokens, combatants, encounters, scenes };
+  const guardInput = { ref: actorRef, tokens, combatants, encounters, scenes, mirrors };
 
   const control = useRollControl({
     expressions: [expression],

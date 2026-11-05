@@ -81,6 +81,31 @@ describe("FR-DICE-22 roll bar guard", () => {
     expect(g({ ref: { combatantId: "c1" }, definitions: new Map() })).toBe(false);
   });
 
+  test("FR-DICE-22 FR-MIR-06 a token no player sees: a shown Visible or Transparent mirror un-forces the switch; a Shadow, a Hidden, a fogged Visible or a held-back mirror doesn't", () => {
+    const fogged = [tok("t1", { fogged: true })];
+    const mir = (over: Partial<NonNullable<RollBarGuardInput["mirrors"]>[number]> = {}) => ({
+      tokenId: "t1",
+      mode: "visible" as const,
+      suppressed: false,
+      fogged: false,
+      ...over,
+    });
+    const g = (mirrors: RollBarGuardInput["mirrors"]) =>
+      rollBarGuarded(base({ ref: { tokenId: "t1" }, tokens: fogged, mirrors }));
+    expect(g([])).toBe(true);
+    expect(g([mir()])).toBe(false);
+    expect(g([mir({ mode: "transparent", fogged: true })])).toBe(false);
+    expect(g([mir({ fogged: true })])).toBe(true);
+    expect(g([mir({ mode: "shadow" })])).toBe(true);
+    expect(g([mir({ mode: "hidden" })])).toBe(true);
+    expect(g([mir({ mode: "transparent", suppressed: true })])).toBe(true);
+    // Another token's mirror doesn't count; the definition roll reads its tokens too.
+    expect(g([mir({ tokenId: "t9" })])).toBe(true);
+    expect(
+      rollBarGuarded(base({ ref: { entityId: "gob" }, tokens: fogged, mirrors: [mir()] })),
+    ).toBe(false);
+  });
+
   test("FR-DICE-22 the definitions it needs: the token's, the combatant's entity, the ref's", () => {
     const input = base({});
     expect(rollBarGuardIds({ ...input, ref: { tokenId: "t1" } })).toEqual(["gob"]);

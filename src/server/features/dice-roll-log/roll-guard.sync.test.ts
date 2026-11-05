@@ -1,7 +1,8 @@
 // FR-DICE-13 roll guard (sprint 14 F4, BL-135, DM #367 / #371) over real sockets on `kit-parity`, with
 // the attack / damage / save presets public and the ambush scene shown: every roll path's DM roll
 // as a hidden, renamed, or hidden and renamed monster reaches no player (live frames, then a
-// reconnect snapshot); the unchanged public case reaches both.
+// reconnect snapshot); the unchanged public case reaches both, and so does a Goblin only one
+// player sees (DM 2026-11-05: DM-only only when no player sees the creature).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
@@ -210,7 +211,7 @@ describe("FR-DICE-13 roll guard over sockets: walkthrough F1 (kit-parity, #371)"
     }
   });
 
-  test("FR-DICE-13 #371 the Goblin fogged for Player 2 only (Fog all + a wall on y = 9, x 3–14): its Initiative save and definition attack / damage reach no player (frames, reconnect)", async () => {
+  test("FR-DICE-13 the Goblin fogged for Player 2 only (Fog all + a wall on y = 9, x 3–14): Player 1 sees it, so its save and definition attack / damage are public and reach both players (frames, reconnect)", async () => {
     const dm = await h.live(DM);
     const send = async (name: string, input: unknown) =>
       (await ack(dm, dm.intent(name, input))).result as { entryId?: string };
@@ -243,8 +244,7 @@ describe("FR-DICE-13 roll guard over sockets: walkthrough F1 (kit-parity, #371)"
 
     const p1 = await h.live(p("Player 1"));
     const p2 = await h.live(p("Player 2"));
-    const marks = [p1.raw().length, p2.raw().length];
-    const secret = [
+    const shown = [
       (
         await send("cbt.rollAbility", {
           combatantId: goblinC?.id,
@@ -258,30 +258,30 @@ describe("FR-DICE-13 roll guard over sockets: walkthrough F1 (kit-parity, #371)"
       const r = await send("dice.roll", {
         expression: "1d20+4",
         category,
-        label: `F1-FOGGED-DEF-${category}`,
+        label: `F1-SEEN-DEF-${category}`,
         actor: { entityId: goblin?.definitionId },
       });
-      secret.push(r.entryId as string);
+      shown.push(r.entryId as string);
     }
     const dmEntries = all<GameLogEntryRecord>(dm, GAME_LOG_ENTRY_TYPE);
-    expect(secret.map((id) => dmEntries.find((e) => e.id === id)?.public)).toEqual([
-      false,
-      false,
-      false,
+    expect(shown.map((id) => dmEntries.find((e) => e.id === id)?.public)).toEqual([
+      true,
+      true,
+      true,
     ]);
-    const leaks = ["F1-FOGGED-DEF", ...secret];
-    for (const [i, c] of [p1, p2].entries()) {
+    const has = (c: TestClient) => {
+      const mine = new Set(all<GameLogEntryRecord>(c, GAME_LOG_ENTRY_TYPE).map((e) => e.id));
+      return shown.map((id) => mine.has(id));
+    };
+    for (const c of [p1, p2]) {
       await barrier(c);
-      const since = c.raw().slice(marks[i]);
-      for (const leak of leaks)
-        expect({ i, leak, hit: since.includes(leak) }).toEqual({ i, leak, hit: false });
+      expect(has(c)).toEqual([true, true, true]);
     }
     for (const c of [dm, p1, p2]) c.close();
     for (const who of ["Player 1", "Player 2"]) {
       const c = await h.live(p(who));
-      const raw = c.raw();
-      for (const leak of leaks)
-        expect({ who, leak, hit: raw.includes(leak) }).toEqual({ who, leak, hit: false });
+      await barrier(c);
+      expect({ who, has: has(c) }).toEqual({ who, has: [true, true, true] });
       c.close();
     }
   }, 60_000);

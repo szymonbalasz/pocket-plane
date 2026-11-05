@@ -14,9 +14,11 @@
 //   **every** instance, combatants and tokens: it may be made for any of them (K7 F1, F4 F1).
 //
 // Hidden (#371) = the existing visibility rules on the players' shown scene: a combatant per
-// `combatantVisibility`, or its token hidden; a token on the active scene hidden for any player
-// (`tokenHiddenFor`: `hidden` or fog, per player). A token on a scene players aren't shown never
-// hides a roll (rolls-1).
+// `combatantVisibility`, or its token hidden; a token on the active scene that **no** player sees
+// (DM 2026-11-05, was "any player doesn't"): for each player, `tokenHiddenFor` (`hidden` or fog)
+// and none of its Visible or Transparent mirrors shown to them (`mirrorVisibility`, FR-MIR-06 / -09;
+// a Shadow is anonymous, so it never counts). A token on a scene players aren't shown never hides a
+// roll (rolls-1).
 // Renamed = the name minus a numbering suffix (FR-MAP-16, "Goblin 2") isn't the definition's
 // name; a player-owned companion is never renamed (its owner named it, players know it).
 
@@ -29,10 +31,13 @@ import { actorGuarded, type GuardWorld } from "@shared/dice-roll-log/roll-guard"
 import { and, eq, inArray } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
 import { combatant, entity, player, roll, token } from "../../db/schema";
+import type { Viewer } from "../../ws/records";
 import { combatantVisibility } from "../combat-tracker/records";
 import { startedEncounter, toCombatantRecord } from "../combat-tracker/rows";
 import { activeSceneOf, toTokenRecord } from "../scenes-map/rows";
 import { tokenHiddenFor } from "../scenes-map/visibility-hooks";
+import { mirrorsOfToken } from "../token-mirrors/rows";
+import { mirrorVisibility } from "../token-mirrors/visibility";
 
 export { numberedFrom } from "@shared/dice-roll-log/roll-guard";
 
@@ -95,8 +100,18 @@ function rowsWorld(
       return activeSceneId;
     },
     tokenHidden(t) {
+      const pids = players();
+      if (pids.length === 0) return false;
       const rec = toTokenRecord(t);
-      return players().some((pid) => tokenHiddenFor(rec, pid, cid));
+      const mirrors = mirrorsOfToken(env.tx, t.id).filter(
+        (m) => m.mode === "visible" || m.mode === "transparent",
+      );
+      const sees = (playerId: string) => {
+        if (!tokenHiddenFor(rec, playerId, cid)) return true;
+        const v: Viewer = { connId: "", campaignId: cid, role: "player", playerId };
+        return mirrors.some((m) => mirrorVisibility(m, v) !== "hidden");
+      };
+      return !pids.some(sees);
     },
     combatantHidden(c) {
       return combatantVisibility(toCombatantRecord(c)) === "hidden";

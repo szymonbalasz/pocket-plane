@@ -13,8 +13,9 @@
 //   **every** instance, combatants and tokens: it may be made for any of them (K7 F1, F4 F1).
 //
 // Hidden (#371) = the existing visibility rules on the players' shown scene: a combatant per
-// combat's visibility, or its token hidden; a token on the active scene hidden for players
-// (`GuardWorld.tokenHidden`). A token on a scene players aren't shown never hides a roll (rolls-1).
+// combat's visibility, or its token hidden; a token on the active scene that no player sees, itself
+// or through a Visible / Transparent mirror (`GuardWorld.tokenHidden`, DM 2026-11-05). A token on a
+// scene players aren't shown never hides a roll (rolls-1).
 // Renamed = the name minus a numbering suffix (FR-MAP-16, "Goblin 2") isn't the definition's
 // name; a player-owned companion is never renamed (its owner named it, players know it).
 
@@ -60,7 +61,7 @@ export interface GuardWorld<T extends GuardToken, C extends GuardCombatant> {
   token(tokenId: string): T | null;
   /** The scene players are shown (null = none). */
   activeSceneId(): string | null;
-  /** The token is hidden for players (on its scene; `hidden`, fog). */
+  /** No player sees the token (on its scene; `hidden`, fog), nor a Visible / Transparent mirror of it. */
   tokenHidden(t: T): boolean;
   /** Combat's visibility says the combatant is hidden from players. */
   combatantHidden(c: C): boolean;
