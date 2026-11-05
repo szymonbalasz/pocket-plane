@@ -11,7 +11,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Upgrade guards | `fix/upgrade-guards` | — | — | **merged** (#424) |
 | Play fixes: toasts | `fix/s15-toasts` | — | — | **merged** (#437) |
 | Play fixes: frame and map | `fix/s15-frame` | — | — | **merged** (#432) |
-| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | rewritten (#440, #442), reviewed, revised (b909e04d). **At the DM's gate:** 6 questions + 3 group picks |
+| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | DM answered the gate (#444): shared notes only, private comments; spec being revised, then a short final gate |
 | Window position memory | `fix/window-memory` | — | — | **merged** (#438) |
 | Linked notes build | split by the spec | — | — | waits for the rewritten spec's gate; session-sim-18 and a notes playtest after it |
 
@@ -21,7 +21,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 **Reserved requirement numbers:** frame `FR-SHELL-210`–`-219`, `FR-MAP-125` up, `FR-SYNC-41` up; toasts `FR-NOTE-80` up; window memory `FR-SHELL-220`–`-229`.
 
-**Next:** the DM's answers at the linked notes gate, then the build. Whole order: [priority build list](../roadmap.md#priority-build-list-2026-10-31). Session-sim-17 found nothing serious.
+**Next:** revise the notes spec to #444, short final gate, then the build. Whole order: [priority build list](../roadmap.md#priority-build-list-2026-10-31). Session-sim-17 found nothing serious.
 
 **Session-sim-17 (#414):** 18 / 19 PASS on `main` @ 7fe68b18, no leak, digest identical. Not clean: the recheck (BL-151, BL-164, BL-171 still open). New glitches BL-174–BL-177. Evidence `.verify/20261031-102757-session-sim-17/` in the main checkout.
 
