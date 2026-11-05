@@ -11,7 +11,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Upgrade guards | `fix/upgrade-guards` | — | — | **merged** (#424) |
 | Play fixes: toasts | `fix/s15-toasts` | — | — | **merged** (#437) |
 | Play fixes: frame and map | `fix/s15-frame` | — | — | **merged** (#432) |
-| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | DM answered the gate (#444, #445): shared notes only, nothing private; spec being revised, then a short final gate |
+| Linked notes spec | `spec/linked-notes` | `spec-linked-notes` | `spec-linked-notes` | revised to #444/#445 (55287286): every note shared, full co-writing. **At the DM's final gate:** 3 questions |
 | Window position memory | `fix/window-memory` | — | — | **merged** (#438) |
 | Linked notes build | split by the spec | — | — | waits for the rewritten spec's gate; session-sim-18 and a notes playtest after it |
 
