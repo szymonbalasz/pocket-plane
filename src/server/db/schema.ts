@@ -1886,6 +1886,70 @@ export const stronghold = sqliteTable(
   ],
 );
 
+/**
+ * Note (linked-notes, record type `note`, NOTES §8.1, data model §154): one shared note of a
+ * campaign. `deletedAt` set = in the Recycle bin (FR-NOTES-04). Live-title uniqueness on
+ * `titleFold` (the shared matcher's `fold`) and both caps are kept by the commands (FR-NOTES-02,
+ * -03, -06). `body` holds the changes up to `bodyVersion`; `version` = the latest accepted change
+ * (ADR-0078). New table only (#416).
+ */
+export const note = sqliteTable(
+  "note",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    title: text("title").notNull(),
+    titleFold: text("title_fold").notNull(),
+    createdByRole: text("created_by_role", { enum: ["dm", "player"] }).notNull(),
+    createdByPlayerId: text("created_by_player_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    updatedByRole: text("updated_by_role", { enum: ["dm", "player"] }).notNull(),
+    updatedByPlayerId: text("updated_by_player_id"),
+    deletedAt: text("deleted_at"),
+    deletedByRole: text("deleted_by_role", { enum: ["dm", "player"] }),
+    deletedByPlayerId: text("deleted_by_player_id"),
+    body: text("body").notNull().default(""),
+    bodyFold: text("body_fold").notNull().default(""),
+    bodyVersion: integer("body_version").notNull().default(0),
+    version: integer("version").notNull().default(0),
+  },
+  (t) => [index("note_campaign_title").on(t.campaignId, t.titleFold)],
+);
+
+/** One accepted co-writing push (ADR-0078): kept for the last 1,000 rows or 1 MiB per note. */
+export const noteChange = sqliteTable(
+  "note_change",
+  {
+    noteId: text("note_id")
+      .notNull()
+      .references((): AnySQLiteColumn => note.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    clientId: text("client_id").notNull(),
+    /** `ChangeSet.toJSON()` per update of the push. */
+    changes: text("changes", { mode: "json" }).$type<unknown>().notNull(),
+    at: text("at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.noteId, t.version] })],
+);
+
+/** One row per distinct folded link target of a note (FR-NOTES-07, -12); rewritten with its links. */
+export const noteLink = sqliteTable(
+  "note_link",
+  {
+    noteId: text("note_id")
+      .notNull()
+      .references((): AnySQLiteColumn => note.id, { onDelete: "cascade" }),
+    targetFold: text("target_fold").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.noteId, t.targetFold] }),
+    index("note_link_target").on(t.targetFold),
+  ],
+);
+
 /** CON-20: `seq` for reminders and strongholds (REM / HOLD §8). */
 export const reminderSeqNext = sql<number>`(select coalesce(max(${reminder.seq}), 0) + 1 from ${reminder})`;
 export const strongholdSeqNext = sql<number>`(select coalesce(max(${stronghold.seq}), 0) + 1 from ${stronghold})`;
@@ -1948,4 +2012,7 @@ export const schema = {
   stronghold,
   overview,
   overviewItem,
+  note,
+  noteChange,
+  noteLink,
 };

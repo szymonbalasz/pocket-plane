@@ -4509,3 +4509,19 @@ From [token-mirrors](../specs/token-mirrors.md) ([ADR-0077](../architecture/adr/
 - **Sight:** `rederiveScene` re-derives each mirror as a fog subject at its own cells, and `suppressed` from its token and the map rectangle.
 - **Test IDs:** `mir-token-menu-create`, `mir-pick-panel`, `mir-pick-cancel`, `mir-menu` (`data-record-id`), `mir-menu-mode-<mode>` (`data-current`), `mir-menu-delete`; canvas `mir-mirror` (id = mirror id; attrs `mode`, `off`), `mir-label` (attr `text`), `mir-outline`.
 - **Assets:** `MAX_UPLOAD_BYTES` 100 MB, `MAX_PIXELS` 100 MP, `DISPLAY_EDGE` 8192.
+
+## 196. Linked notes records (build/notes-core)
+
+From [linked-notes](../specs/linked-notes.md) FR-NOTES-01 – -06, -10, -24 (#446). **Built by `build/notes-core` (slice N1).** New lazy record type `note`, four intents, one event; one new line each in the features list and the fixture unit and bundle registries. Co-writing (`notes.open` / `push` / `close`, signals) is N2's; the rename's link rewrite N6's.
+
+| Intent (DM and players) | Payload → result | Rule | FR |
+|---|---|---|---|
+| `notes.create` | `{title, ifMissing?}` → `{noteId, created}` | Title trimmed, 1–100 characters, no `[[`, `]]`, `\|` or line break (`invalid`). A live note with the same folded title → `conflict` "A note with that title exists", or with `ifMissing` that note's id and `created: false` (no write). 1,000 live → `conflict` "Note limit reached (1,000 notes)" | FR-NOTES-02, -03, -10 |
+| `notes.rename` | `{noteId, title}` | Live notes only. Same title → ack, no event. Another live note with the folded title → `conflict` | FR-NOTES-02 |
+| `notes.delete` | `{noteId}` | To the Recycle bin (`deletedAt`, `deletedBy`). Binned already → ack, no event. 1,000 binned → `conflict` "The Recycle bin is full (1,000 notes). Restore some first." | FR-NOTES-04, -06 |
+| `notes.restore` | `{noteId}` → `{title}` | Clears `deletedAt`. Its folded title taken → "Title (restored)", "Title (restored 2)"…, cut to 100 characters. Live already → ack with its title, no event. 1,000 live → `conflict` | FR-NOTES-05 |
+
+- A note that doesn't exist or belongs to another campaign → `not_found` on every intent; a binned note → `not_found` on `notes.rename`.
+- **Record `note`:** scope `campaign`, `lazy: "all"` (in no snapshot; `sync.load {type: "note"}`), `full` for the DM and every player of the campaign. Wire `{id, campaignId, title, createdBy, updatedAt, updatedBy, deletedAt, deletedBy}`, each `…By` = `{role: "dm" | "player", playerId}` (null for the DM; `deletedBy` null while live). No body, ever.
+- **Event `NoteChanged`** (not logged, not undoable): payload `{noteId, change: created | renamed | deleted | restored}`; changes = the `note` record (before null on a create). Registered by the feature (`r.event`), its schema in `src/shared/linked-notes/events.ts`. Nothing about notes reaches the event log.
+- **Fixtures-only command `notes.seedBody {noteId, body}`** (not an intent; refused outside a fixture load): sets the body as one folded change (`version` + 1, `bodyVersion` = it, no `note_change` row).

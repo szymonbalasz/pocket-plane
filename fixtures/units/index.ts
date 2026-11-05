@@ -105,6 +105,9 @@ import gemsAwarded from "./gems/gems-awarded";
 import gemsHidden from "./gems/gems-hidden";
 import gemsOn from "./gems/gems-on";
 import gemsRolls from "./gems/gems-rolls";
+import notesBinned from "./linked-notes/notes-binned";
+import notesSecondCampaign from "./linked-notes/notes-second-campaign";
+import notesShared from "./linked-notes/notes-shared";
 import syncProbes from "./live-sync/sync-probes";
 import shareMiraRows from "./log-share/share-mira-rows";
 import kitNotices from "./notifications/kit-notices";
@@ -353,4 +356,8 @@ export const units: readonly Fixture[] = [
   shareMiraRows,
   // Sheet names linking to compendium entries (build/sheet-compendium-links)
   sheetLinksRows,
+  // Linked notes records (build/notes-core)
+  notesShared,
+  notesBinned,
+  notesSecondCampaign,
 ];
