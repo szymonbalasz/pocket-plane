@@ -27,6 +27,7 @@ import {
 } from "../../components/ui/overlays";
 import { Input, Skeleton } from "../../components/ui/primitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
+import { Tip } from "../../components/ui/tip";
 import { useLazyRecords, useSync } from "../../sync/store";
 import { useColorOf } from "../campaign-management/colors";
 import { relativeTime } from "../notifications/logic";
@@ -345,7 +346,7 @@ function NotePane({ note, gone }: { note: NoteRecord | null; gone: boolean }) {
                 key={c.key}
                 data-testid="notes-here"
                 data-player-id={c.key}
-                title={c.you ? "You" : `Go to ${p.label}`}
+                aria-label={c.you ? "You" : `Go to ${p.label}'s cursor`}
                 onClick={() => editor.current?.jumpTo(c.key)}
                 className="rounded-full border px-2 py-0.5 text-xs font-medium"
                 style={{ borderColor: p.color, color: p.color }}
@@ -522,9 +523,17 @@ export default function NotesWindow() {
             ))}
           </SelectContent>
         </Select>
-        <Button size="sm" className="h-8" disabled={!live} onClick={() => setCreating(true)}>
-          <PlusIcon className="size-3.5" />
-        </Button>
+        <Tip content="New note" off={!live}>
+          <Button
+            size="sm"
+            className="h-8"
+            aria-label="New note"
+            disabled={!live}
+            onClick={() => setCreating(true)}
+          >
+            <PlusIcon className="size-3.5" />
+          </Button>
+        </Tip>
       </div>
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-56 shrink-0 flex-col border-r p-2 @[520px]/notes:flex">
