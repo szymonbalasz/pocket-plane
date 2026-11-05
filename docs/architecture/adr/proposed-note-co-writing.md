@@ -1,7 +1,7 @@
 # Proposed — Note co-writing: the server as the one authority, every change stored
 
-- **Status:** proposed, with [linked-notes](../../specs/linked-notes.md) (FR-NOTES-05 to -21).
-- **Date:** 2026-11-05 (revised after the DM's gate, [#444](../../decisions-log.md) and "full Google Docs, no private comments": every note shared, nothing private).
+- **Status:** proposed, with [linked-notes](../../specs/linked-notes.md) (FR-NOTES-07 to -22).
+- **Date:** 2026-11-05 (revised after the DM's gate, [#444](../../decisions-log.md), [#445](../../decisions-log.md) and #446: every note shared, nothing private, a Recycle bin, `@` as a picker).
 - **Keeps:**
   - [ADR-0005](0005-server-authoritative-sync.md): the server owns the text and the order.
   - [ADR-0006](0006-persistence.md): session state survives a crash.
@@ -51,14 +51,14 @@ How `@codemirror/collab` works: a central authority accepts changes only at its 
 
 - **Direct:** `@codemirror/state`, `@codemirror/view`, `@codemirror/collab`, `@codemirror/commands` (history, `defaultKeymap`, `historyKeymap`).
 - **Pulled in:** `@codemirror/language`, `@codemirror/streamparser`, `@lezer/common`, `@lezer/lr`, `@lezer/highlight`, `crelt`, `style-mod`, `w3c-keyname`, `@marijn/find-cluster-break`. All MIT (checked on npm, 2026-11-05).
-- **Not needed:** no `@codemirror/autocomplete` (the `[[` / `@` list is a `showTooltip`), no `lang-markdown` (live preview is view decorations), no Yjs.
-- **Where:** the server imports only `@codemirror/state`. `src/shared` stays zod-only: changes travel as JSON (`ChangeSet.toJSON`). The link parser (`parseLinks(text, titleFolds)`) is plain TypeScript in `src/shared/linked-notes/`, used by both sides.
+- **Not needed:** no `@codemirror/autocomplete` (the `@` / `[[` title picker is a `showTooltip`), no `lang-markdown` (chips, die buttons and styling are view decorations; chips are `atomicRanges`), no Yjs.
+- **Where:** the server imports only `@codemirror/state`. `src/shared` stays zod-only: changes travel as JSON (`ChangeSet.toJSON`). The link parser (`parseLinks(text)`, `[[…]]` only) is plain TypeScript in `src/shared/linked-notes/`, used by both sides.
 
 ### Server
 
 - **Source of truth is the DB:** `note.body` up to `bodyVersion`, then the `note_change` rows up to `version`.
 - **In-memory session per open note:** the current `Text`, and per subscriber its bound `clientId` and the last backlinks list it was sent. A cache: refreshed after commit, rebuilt from the DB when missing.
-- **Intents** (`not_found` for an unknown or deleted note):
+- **Intents** (`not_found` for an unknown or binned note):
   - `notes.open {noteId, clientId, version?}`: subscribes and binds `clientId` (≤ 8 open notes per connection). Result `{updates}` if the client sent a `version` whose rows are still kept, else `{doc, version, backlinks}`; either way plus `here`, who has the note open.
   - `notes.push {noteId, version, updates[{clientId, changes}]}`:
     - `invalid` if `clientId` isn't the one bound to this connection.
@@ -68,14 +68,13 @@ How `@codemirror/collab` works: a central authority accepts changes only at its 
   - `notes.close {noteId}`.
 - **Delivery:** an accepted push emits `NoteEdited` (non-logged, no record changes). A listener sends `notes.updates {noteId, from, updates}` via `sendServerSignal` to the note's subscribers, the sender included; the sender treats its own `clientId` as the confirmation.
 - **A missed `notes.updates`** (signals aren't queued; resync and scene activation send snapshots): after every snapshot the client re-opens each open note with its version, and a stale push gets the missing changes back.
-- **Pruning, no timers or hooks:** every notes command first drops subscriptions whose connection isn't in `hub.connections()`, drops sessions with no subscriber, and purges notes deleted more than 7 days ago (`ctx.clock`), with their changes and links.
+- **Pruning, no timers or hooks:** every notes command first drops subscriptions whose connection isn't in `hub.connections()` and drops sessions with no subscriber.
 
 ### Links
 
-- `parseLinks` returns `[[…]]` targets and `@` matches per FR-NOTES-06 (longest folded title at a non-alphanumeric boundary). Both clients and the server call it with the same title set.
-- `note_link` keeps `wiki` rows (target title) and `at` rows (the folded text after `@` to the line's end, ≤ 100 characters), so a new or renamed title re-resolves old `@` text with no re-parse: an `at` row links to the longest live title its text starts with at a boundary.
-- **Rename rewrite:** the rename command, in its own transaction, rewrites each linking note as a server change (`clientId: "server"`, one `note_change` row each), found through `note_link`. `@Old` becomes `@New`, or `[[New]]` where `@New` would match a longer title. Concurrent pushes go stale and rebase as usual.
-- **Backlinks:** on every `NoteChanged` (create, rename, delete, restore) and every push that changed links, a listener collects the affected titles (old and new targets and titles, plus live titles that are prefixes of them, for `@`), computes each affected open note's backlinks, and sends `notes.backlinks` only where a subscriber's list differs from the last one sent.
+- `parseLinks` returns the `[[…]]` targets; `@` is only an editor gesture that inserts `[[Title]]`, so stored text has one link form. `note_link` keeps one row per distinct folded target.
+- **Rename rewrite:** the rename command, in its own transaction, rewrites each linking note as a server change (`clientId: "server"`, one `note_change` row each), found through `note_link`, binned notes included. Concurrent pushes go stale and rebase as usual.
+- **Backlinks:** on every `NoteChanged` (create, rename, delete, restore) and every push that changed links, a listener collects the affected titles (old and new targets and titles), computes each affected open note's backlinks, and sends `notes.backlinks` only where a subscriber's list differs from the last one sent.
 
 ### Presence: who is here, cursors, undo
 
@@ -88,7 +87,7 @@ How `@codemirror/collab` works: a central authority accepts changes only at its 
 ### Frames, delete, switch
 
 - **Push size:** a prefix of the unconfirmed changes, ≤ 48 KiB per frame, one push in flight, 100 ms batching. The editor stops typing at 32 KiB with a change filter; a size refusal reloads that client, keeping its text for Copy my text.
-- **Delete:** sets `deletedAt`, drops the session, and a listener sends `notes.closed {noteId}` to its subscribers. **Restore** clears it (adding " (restored)" on a title clash).
+- **Recycle bin:** delete sets `deletedAt` (refused past 1,000 binned), drops the session, and a listener sends `notes.closed {noteId}` to its subscribers. A binned note's body, links and search entry stay in the DB but are skipped by `open`, backlinks and search. **Restore** clears `deletedAt`, renaming to "Title (restored)", "(restored 2)"… on a clash. No expiry, no timer.
 - **Campaign switch:** closes every connection with 4409 first (FR-SYNC-07); the client shows the banner from that close, and the listener drops the old campaign's sessions.
 - **Campaign isolation:** every intent and the cursor `audience` check the note's `campaignId` against the connection's; subscribers are always connections of that campaign; REST search reads only the token's campaign. A future player removal ([OQ-CAMP-08](../../specs/campaign-management.md#15-open-questions)) only has to close that player's connections.
 - **Nothing about notes goes into the event log** (FR-SYNC-16 allows non-logged events per spec).
