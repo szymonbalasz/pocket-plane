@@ -147,6 +147,29 @@ describe("command layer", () => {
     expect(code(() => cmds.run("test.dm", {}, { actor: player }))).toBe("forbidden");
   });
 
+  test("FR-NOTES-14 a command sees the intent's origin connection, null when none", () => {
+    const { db, bus } = setup();
+    const seen: (string | null)[] = [];
+    const cmds = new Commands(
+      db,
+      bus,
+      () => realContext(fixedClock("2026-02-02T00:00:00Z")),
+      silentLogger,
+    );
+    cmds.register(
+      defineCommand({
+        name: "test.conn",
+        input: z.object({}),
+        execute: (_i, env) => {
+          seen.push(env.originConnId ?? null);
+        },
+      }),
+    );
+    cmds.run("test.conn", {}, { actor: dm, originConnId: "c7" });
+    cmds.run("test.conn", {}, { actor: dm });
+    expect(seen).toEqual(["c7", null]);
+  });
+
   test("event log orders by timestamp, then insertion order (ADR-0022)", () => {
     const { db, cmds } = setup();
     for (const name of ["c", "a", "b"]) cmds.run(create, { name }, { actor: dm });

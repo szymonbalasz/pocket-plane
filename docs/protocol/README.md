@@ -4525,3 +4525,27 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-01 – -06, -10, -24 (#44
 - **Record `note`:** scope `campaign`, `lazy: "all"` (in no snapshot; `sync.load {type: "note"}`), `full` for the DM and every player of the campaign. Wire `{id, campaignId, title, createdBy, updatedAt, updatedBy, deletedAt, deletedBy}`, each `…By` = `{role: "dm" | "player", playerId}` (null for the DM; `deletedBy` null while live). No body, ever.
 - **Event `NoteChanged`** (not logged, not undoable): payload `{noteId, change: created | renamed | deleted | restored}`; changes = the `note` record (before null on a create). Registered by the feature (`r.event`), its schema in `src/shared/linked-notes/events.ts`. Nothing about notes reaches the event log.
 - **Fixtures-only command `notes.seedBody {noteId, body}`** (not an intent; refused outside a fixture load): sets the body as one folded change (`version` + 1, `bodyVersion` = it, no `note_change` row).
+
+## 197. Linked notes co-writing (build/notes-collab)
+
+From [linked-notes](../specs/linked-notes.md) FR-NOTES-13 – -16, -18 – -21, -24 and [ADR-0078](../architecture/adr/0078-note-co-writing.md). **Built by `build/notes-collab` (slice N2).** Three intents, two not-logged events, three server signals, one client signal; `@codemirror/state` and `@codemirror/collab` on the server (wire schemas in `src/shared/linked-notes/collab.ts`, zod only). Core: `CommandEnv.originConnId` (optional; the sending connection, null or absent for REST, fixtures and tests). Undo (FR-NOTES-17) is client-only (N3).
+
+| Intent (DM and players, live WS only) | Payload → result | Rule | FR |
+|---|---|---|---|
+| `notes.open` | `{noteId, clientId, version?}` → `{mode: "updates", version, updates, here}` or `{mode: "doc", version, doc, here}` | Live note of the connection's campaign, else `not_found`. Subscribes this connection and binds `clientId` (1–64, not `"server"`). A re-open rebinds. The same ID bound on another connection: the same person's → moved here; anyone else's → `invalid` "That editor ID is in use". ≤ 8 notes open per connection → `conflict`. `updates` when `version` is given and the changes since it are still kept | FR-NOTES-13, -16, -18 |
+| `notes.push` | `{noteId, version, updates[1–200] {clientId, changes}}` → `{accepted: true}`, `{accepted: false, updates}` or `{accepted: false, reload: true}` | Not opened on this connection → `invalid` "Open the note first"; an update from another editor ID → `invalid`. At the note's version: applied; a change that doesn't parse or fit → `invalid`; over 32 KiB UTF-8 → `invalid` "Note is full", nothing stored. Stale: the updates since `version`; gone or ahead → `reload`. Accepted: one `note_change` row + `note.version` in the push's transaction; `updatedAt` / `updatedBy` at most once a minute (a `note` upsert); every 100 changes the body folds and rows prune to 1,000 / 1 MiB | FR-NOTES-14, -19, -21 |
+| `notes.close` | `{noteId}` | Not open → ack, no change. Another campaign's note → `not_found` | FR-NOTES-16 |
+
+- **Every notes command** first drops the campaign's subscriptions whose connection is gone (`hub.connections`), and sessions left with none.
+- **Events (not logged):** `NoteEdited {noteId, from, clientId, updates}` (changes: none, or the `note` upsert); `NotesHereChanged {noteIds}` (no changes). After-commit hook `linked-notes.edited` moves the cached text (CON-23).
+
+| Signal | Payload | Who gets it | FR |
+|---|---|---|---|
+| `notes.updates` (server) | `{noteId, from, updates}` | The note's open editors, the sender included (its own `clientId` = the confirmation); never queued, so the client re-opens after every snapshot | FR-NOTES-14, -18 |
+| `notes.here` (server) | `{noteId, here: [{role, playerId, clientId}]}` | The note's open editors, after open, close or pruning | FR-NOTES-16 |
+| `notes.closed` (server) | `{noteId, reason: "deleted"}` | The note's open editors when it is binned; its session is dropped | FR-NOTES-20 |
+| `notes.cursor` (client, DM and players) | `{noteId, clientId, version, ranges[≤ 10] {anchor, head}, left?}` | `audience`: the players with the note open + every DM connection (FR-SYNC-28). Another campaign's, a binned or a missing note → `not_found` | FR-NOTES-15 |
+
+- **Campaign switch:** every connection closes 4409 (FR-SYNC-07); a listener drops the other campaigns' sessions.
+- **Push frames:** `pushPrefix` (shared) = the longest prefix of unconfirmed updates within 48 KiB (one bigger update goes alone; the hub's 64 KiB frame limit still applies).
+- **Measured** (`fsync.slow.test.ts`, 3 typists, file DB, WAL + `synchronous = FULL`, Windows SSD): 484 commits/s sustained, 2.05 ms a push (p95 2.11 ms): ≈ 6% of the server thread at 30 pushes/s.

@@ -16,6 +16,12 @@ export interface CommandEnv {
   tx: Tx;
   ctx: CommandContext;
   actor: Actor;
+  /**
+   * The WS connection that sent the intent (`RunOptions.originConnId`); null or absent for REST,
+   * fixtures and server-internal runs (envs built by hand in tests omit it). For per-connection
+   * state such as linked notes' editor binding (FR-NOTES-14, ADR-0078).
+   */
+  originConnId?: string | null;
   /** Queue a domain event; validated + logged in this transaction, dispatched after commit. */
   emit(event: DomainEvent): void;
 }
@@ -113,7 +119,13 @@ export class Commands {
     let result: unknown;
     try {
       result = this.db.transaction((tx) => {
-        const env: CommandEnv = { tx, ctx, actor: opts.actor, emit: (e) => events.push(e) };
+        const env: CommandEnv = {
+          tx,
+          ctx,
+          actor: opts.actor,
+          originConnId: opts.originConnId ?? null,
+          emit: (e) => events.push(e),
+        };
         def.authorize?.(parsed.data, env);
         const r = def.execute(parsed.data, env);
         for (const e of events) {

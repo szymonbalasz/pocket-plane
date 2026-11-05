@@ -10,6 +10,7 @@ import { loadBundle } from "@fixtures/index";
 import { NOTES_BINNED } from "@fixtures/units/linked-notes/notes-binned";
 import { NOTES_SECOND } from "@fixtures/units/linked-notes/notes-second-campaign";
 import { NOTES_SHARED } from "@fixtures/units/linked-notes/notes-shared";
+import { NOTES_CURSOR_SIGNAL } from "@shared/linked-notes/collab";
 import { NOTE_TYPE, type NoteRecord } from "@shared/linked-notes/schemas";
 import { CloseCode } from "@shared/protocol/codes";
 import type { Credential } from "@shared/protocol/frames";
@@ -20,7 +21,9 @@ import type { Actor } from "../../events/types";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { leakScan } from "../../ws/testing/convergence";
+import { NOTES_COLLAB_INTENTS as C } from "./collab-commands";
 import { NOTES_INTENTS as N } from "./commands";
+import { Peer } from "./testing";
 
 const DM: Credential = { role: "dm", secret: TEST_SECRET };
 const MAIN_TITLES = [NOTES_SHARED.quest, NOTES_SHARED.duke, NOTES_BINNED.title, "Canary watch"];
@@ -51,7 +54,7 @@ const barrier = async (c: TestClient) => {
 const titles = (c: TestClient) =>
   (Object.values(c.store.records[NOTE_TYPE] ?? {}) as NoteRecord[]).map((n) => n.title).sort();
 
-describe("linked-notes campaign isolation (N1 records)", () => {
+describe("linked-notes campaign isolation (records N1, signals N2)", () => {
   let h: TestServer;
   let db: Db;
   let dir: string;
@@ -212,5 +215,112 @@ describe("linked-notes campaign isolation (N1 records)", () => {
       );
       c.close();
     }
+  }, 30_000);
+
+  test("FR-NOTES-01 FR-NOTES-15 FR-NOTES-16 co-writing signals stay in their campaign: updates, here, cursors; foreign IDs not_found on open, push, close and as a cursor target", async () => {
+    const main = camps["Fixture Campaign"] as string;
+    const second = camps["Second Campaign"] as string;
+    const mainLedger = noteIds(main).find(
+      (id) => db.select().from(note).where(eq(note.id, id)).get()?.title === NOTES_SHARED.ledger,
+    ) as string;
+    const secondLedger = noteIds(second)[0] as string;
+    const MAIN_TYPED = "MAIN-TYPED-7";
+    const SECOND_TYPED = "SECOND-TYPED-9";
+    const cursorOf = (p: Peer) => ({
+      noteId: p.noteId,
+      clientId: p.clientId,
+      version: p.version,
+      ranges: [{ anchor: 0, head: 3 }],
+    });
+    /** open / push / close and the cursor on another campaign's note: every one not_found. */
+    async function foreignRefused(p: Peer, noteId: string) {
+      const intents = [
+        [C.open, { noteId, clientId: p.clientId }],
+        [C.push, { noteId, version: 0, updates: [{ clientId: p.clientId, changes: [[0, "x"]] }] }],
+        [C.close, { noteId }],
+      ] as const;
+      for (const [name, payload] of intents)
+        expect([name, await p.answer(p.c.intent(name, payload))]).toMatchObject([
+          name,
+          { type: "reject", code: "not_found" },
+        ]);
+      p.c.send({ type: "signal", name: NOTES_CURSOR_SIGNAL, data: { ...cursorOf(p), noteId } });
+      expect(await p.c.next("reject")).toMatchObject({ code: "not_found" });
+    }
+    const write = async (peers: Peer[], text: string) => {
+      await Promise.all(
+        peers.map(async (p) => {
+          p.type("end", ` ${text}`);
+          await p.flush();
+          p.c.send({ type: "signal", name: NOTES_CURSOR_SIGNAL, data: cursorOf(p) });
+        }),
+      );
+      for (const p of peers) await p.settle();
+    };
+
+    // Main campaign: the DM, player-1 in two tabs, player-2, all in Burnt Ledger.
+    const mainCreds = [DM, as("Player 1"), as("Player 1"), as("Player 2")];
+    const mainPeers: Peer[] = [];
+    for (const [i, cred] of mainCreds.entries()) {
+      const p = new Peer(await h.live(cred), mainLedger, `main-${i}`);
+      await p.open();
+      mainPeers.push(p);
+    }
+    await write(mainPeers, MAIN_TYPED);
+    for (const p of mainPeers) await foreignRefused(p, secondLedger);
+
+    // Second campaign: its DM and player co-write their Burnt Ledger.
+    h.s.commands.run("campaign.activate", { id: second }, { actor: dmIn(main) });
+    for (const p of mainPeers) await p.c.closed;
+    const secondPeers: Peer[] = [];
+    for (const [i, cred] of [DM, as("Second Player")].entries()) {
+      const p = new Peer(await h.live(cred), secondLedger, `second-${i}`);
+      await p.open();
+      expect(p.doc.startsWith(NOTES_SECOND.body)).toBe(true);
+      secondPeers.push(p);
+    }
+    await write(secondPeers, SECOND_TYPED);
+    for (const p of secondPeers) await foreignRefused(p, mainLedger);
+
+    // The second campaign's clients, before the switch back closes them.
+    const secondForeign = [
+      MAIN_TYPED,
+      mainLedger,
+      ...noteIds(main),
+      NOTES_SHARED.ledgerBody,
+      NOTES_SHARED.questBody,
+      NOTES_SHARED.dukeBody,
+      NOTES_BINNED.body,
+      NOTES_SHARED.quest,
+      NOTES_SHARED.duke,
+    ];
+    for (const p of secondPeers) {
+      const raw = p.c.raw();
+      expect(secondForeign.filter((x) => raw.includes(x))).toEqual([]);
+      for (const sig of p.signals)
+        expect((sig.data as { noteId: string }).noteId).toBe(secondLedger);
+      expect(p.signals.length).toBeGreaterThan(0);
+      expect(leakScan(h.s, p.c)).toEqual([]);
+    }
+    // Back: the main table re-opens from its versions, intact.
+    h.s.commands.run("campaign.activate", { id: main }, { actor: dmIn(second) });
+    for (const p of secondPeers) await p.c.closed;
+    const before = mainPeers.map((p) => p.c);
+    for (const [i, p] of mainPeers.entries()) {
+      p.c = await h.live(mainCreds[i] as Credential);
+      expect((await p.open()).mode).toBe("updates");
+      await p.settle();
+      expect(p.doc).toContain(MAIN_TYPED);
+    }
+
+    const mainForeign = [NOTES_SECOND.body, SECOND_TYPED, secondLedger, NOTES_BINNED.body];
+    for (const c of before) expect(mainForeign.filter((x) => c.raw().includes(x))).toEqual([]);
+    for (const p of mainPeers) {
+      const raw = p.c.raw();
+      expect(mainForeign.filter((x) => raw.includes(x))).toEqual([]);
+      for (const sig of p.signals) expect((sig.data as { noteId: string }).noteId).toBe(mainLedger);
+      expect(leakScan(h.s, p.c)).toEqual([]);
+    }
+    for (const p of mainPeers) p.c.close();
   }, 30_000);
 });
