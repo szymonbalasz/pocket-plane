@@ -4,10 +4,12 @@
 // The client signal `notes.cursor` reaches the players with the note open and the DM's
 // connections (ADR-0033 audience); another campaign's note, or a binned one, is `not_found`.
 import {
+  NOTES_BACKLINKS_SIGNAL,
   NOTES_CLOSED_SIGNAL,
   NOTES_CURSOR_SIGNAL,
   NOTES_HERE_SIGNAL,
   NOTES_UPDATES_SIGNAL,
+  NoteBacklinksSignal,
   NoteClosedSignal,
   NoteCursorSignal,
   NoteHereSignal,
@@ -23,6 +25,7 @@ import type { Actor } from "../../events/types";
 import type { Services } from "../../services";
 import { defineServerSignal, defineSignal } from "../../ws/signals";
 import type { NotesRuntime } from "./collab";
+import { backlinksKey, backlinksOf } from "./links";
 import { getNoteRow } from "./rows";
 
 export const noteUpdatesSignal = defineServerSignal({
@@ -99,6 +102,7 @@ export function notesListener(s: Services, rt: NotesRuntime): Listener {
         from: p.from,
         updates: p.updates,
       });
+      if (p.linksChanged) refreshBacklinks(s, rt, cid, fromOf(meta.actor));
     } else if (event.type === NotesHereChanged.type) {
       for (const noteId of NotesHereChanged.payload.parse(event.payload).noteIds) {
         const session = rt.sessions.get(noteId);
@@ -110,14 +114,44 @@ export function notesListener(s: Services, rt: NotesRuntime): Listener {
       }
     } else if (event.type === NoteChanged.type) {
       const p = NoteChanged.payload.parse(event.payload);
-      if (p.change !== "deleted") return;
-      const session = rt.sessions.get(p.noteId);
-      rt.sessions.delete(p.noteId);
-      if (!session) return;
-      toEditors(s, cid, new Set(session.subs.keys()), NOTES_CLOSED_SIGNAL, fromOf(meta.actor), {
-        noteId: p.noteId,
-        reason: "deleted",
-      });
+      if (p.change === "deleted") {
+        const session = rt.sessions.get(p.noteId);
+        rt.sessions.delete(p.noteId);
+        if (session)
+          toEditors(s, cid, new Set(session.subs.keys()), NOTES_CLOSED_SIGNAL, fromOf(meta.actor), {
+            noteId: p.noteId,
+            reason: "deleted",
+          });
+      }
+      // N5: a create, rename, delete or restore can change any open note's backlinks.
+      refreshBacklinks(s, rt, cid, fromOf(meta.actor));
     }
   };
 }
+
+/**
+ * FR-NOTES-12 (N5): every open note of the campaign gets its backlinks recomputed; an editor is
+ * sent `notes.backlinks` only when its list differs from the one it was last sent.
+ */
+function refreshBacklinks(s: Services, rt: NotesRuntime, cid: string, from: SignalFrom): void {
+  for (const session of rt.sessions.values()) {
+    if (session.campaignId !== cid) continue;
+    const backlinks = backlinksOf(s.db, cid, session.noteId);
+    const key = backlinksKey(backlinks);
+    const stale = new Set<string>();
+    for (const sub of session.subs.values()) {
+      if (sub.backlinks === key) continue;
+      sub.backlinks = key;
+      stale.add(sub.connId);
+    }
+    toEditors(s, cid, stale, NOTES_BACKLINKS_SIGNAL, from, {
+      noteId: session.noteId,
+      backlinks,
+    });
+  }
+}
+
+export const noteBacklinksSignal = defineServerSignal({
+  name: NOTES_BACKLINKS_SIGNAL,
+  schema: NoteBacklinksSignal,
+});

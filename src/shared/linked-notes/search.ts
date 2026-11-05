@@ -3,6 +3,7 @@
 // (`src/shared/search/`, ADR-0079); up to 50 results, each with its title and a snippet.
 import { z } from "zod";
 import { fold, TEXT_MATCH_MIN, wordForms } from "../search/match";
+import { parseLinks } from "./links";
 
 /** FR-NOTES-22: results per search. */
 export const NOTE_SEARCH_LIMIT = 50;
@@ -44,14 +45,15 @@ export type NoteSearchResponse = z.infer<typeof NoteSearchResponse>;
 const RAW_WORD = /[\p{L}\p{N}\p{M}'’]+/gu;
 const PLAIN = /^[a-z0-9]+$/;
 
-/** A link as stored (FR-NOTES-07): `[[Title]]` or `[[Title|label]]`. */
-const LINK = /\[\[([^[\]|\n]+)(?:\|([^[\]\n]*))?\]\]/g;
-
-/** Text as the editor shows it: each link as its chip reads, the label else the title. */
-export function linkText(text: string): string {
-  return text.replace(LINK, (_m, title: string, label?: string) =>
-    label !== undefined && label.trim() !== "" ? label : title,
-  );
+/** Text as the editor shows it: each link (`parseLinks`) as its chip reads, the label else the title. */
+export function chipText(text: string): string {
+  let out = "";
+  let at = 0;
+  for (const l of parseLinks(text)) {
+    out += text.slice(at, l.from) + (l.label ?? l.target);
+    at = l.to;
+  }
+  return out + text.slice(at);
 }
 
 /** A raw word as `fold` sees it (lower-cased, folded), cheaply for plain words. */
@@ -96,7 +98,7 @@ function clip(text: string, start: number): string {
 
 /**
  * FR-NOTES-22 snippet of a body for the query `words` (`queryWords(q)`), links shown as their
- * chips read (`linkText`): up to 140 characters from a little before the first word a query word
+ * chips read (`chipText`): up to 140 characters from a little before the first word a query word
  * (≥ 3 letters, either plural form) starts, those words marked; when none does (a title match),
  * the body's first non-blank line, plain. Whitespace runs collapse; cuts fall on spaces, with "…".
  */
@@ -104,7 +106,7 @@ export function noteSnippet(
   body: string,
   words: readonly string[],
 ): { snippet: string; marks: [number, number][] } {
-  const text = linkText(body);
+  const text = chipText(body);
   const forms = words.filter((w) => w.length >= TEXT_MATCH_MIN).flatMap((w) => wordForms(w));
   const at = forms.length > 0 ? firstHit(text, forms) : -1;
   if (at === -1) {

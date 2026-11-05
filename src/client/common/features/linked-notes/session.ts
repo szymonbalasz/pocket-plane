@@ -24,6 +24,7 @@ import {
   NOTE_NOT_OPEN,
   NOTES_CURSOR_RANGES_MAX,
   NOTES_CURSOR_SIGNAL,
+  type NoteBacklink,
   type NoteCursorSignal,
   type NoteHere,
   type NoteUpdate,
@@ -144,6 +145,8 @@ export class NoteSession {
   status: NoteStatus = "loading";
   banner: NoteBanner | null = null;
   here: NoteHere[] = [];
+  /** FR-NOTES-12: the live notes linking here ("Linked from"). */
+  backlinks: NoteBacklink[] = [];
   readonly cursors = new Map<string, RemoteCursor>();
   /** Accepted changes by version (for mapping remote cursors), the newest `CURSOR_MAX_LAG`. */
   private past: { version: number; changes: ChangeSet }[] = [];
@@ -270,6 +273,7 @@ export class NoteSession {
         this.receive(r.version - r.updates.length, r.updates);
       }
       this.here = r.here;
+      this.backlinks = r.backlinks ?? [];
       this.opened = true;
       this.everOpened = true;
       if (this.banner?.kind === "gone" || this.banner?.kind === "deleted") this.banner = null;
@@ -345,6 +349,7 @@ export class NoteSession {
       if (this.closed || r.mode !== "doc") return;
       this.host.setState(this.freshState(r.doc, r.version));
       this.here = r.here;
+      this.backlinks = r.backlinks ?? [];
       this.opened = true;
     } catch (err) {
       this.rejected(err as Rejection);
@@ -401,6 +406,13 @@ export class NoteSession {
   }
 
   /** `notes.here`. */
+  /** `notes.backlinks` (N5, FR-NOTES-12). */
+  onBacklinks(d: { noteId: string; backlinks: NoteBacklink[] }): void {
+    if (d.noteId !== this.noteId) return;
+    this.backlinks = d.backlinks;
+    this.changed();
+  }
+
   onHere(d: { noteId: string; here: NoteHere[] }): void {
     if (d.noteId !== this.noteId) return;
     // r2 (late joiner): a new editor in the note gets our caret again, if we have shown one,

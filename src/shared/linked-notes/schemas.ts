@@ -5,6 +5,8 @@ import { z } from "zod";
 import { isNoteTitle, NOTE_TITLE_MAX } from "./titles";
 
 export const NOTE_TYPE = "note";
+/** FR-NOTES-23: a roll from a note's die button is labelled this, never the note's title. */
+export const NOTE_ROLL_LABEL = "Note";
 
 /** FR-NOTES-03: live notes per campaign. */
 export const NOTE_LIVE_MAX = 1_000;

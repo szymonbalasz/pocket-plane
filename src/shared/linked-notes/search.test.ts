@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { queryWords } from "../search/match";
 import {
-  linkText,
+  chipText,
   NOTE_SEARCH_Q_MAX,
   NOTE_SNIPPET_MARKS_MAX,
   NOTE_SNIPPET_MAX,
@@ -47,11 +47,11 @@ describe("FR-NOTES-22 snippet", () => {
   });
 
   test("FR-NOTES-22 links read as their chips: the label, else the title", () => {
-    expect(linkText("See [[Quest log]] and [[Burnt Ledger|the ledger]].")).toBe(
+    expect(chipText("See [[Quest log]] and [[Burnt Ledger|the ledger]].")).toBe(
       "See Quest log and the ledger.",
     );
-    expect(linkText("[[Duke Varen|]] [[not a link] [[a|b|c]]")).toBe(
-      "Duke Varen [[not a link] b|c",
+    expect(chipText("[[Duke Varen|]] [[not a link] [[a|b|c]]")).toBe(
+      "Duke Varen [[not a link] [[a|b|c]]",
     );
     expect(snip("Keeps [[Burnt Ledger|the ledger]] close.", "ledger")).toBe(
       "Keeps the ledger close.",
