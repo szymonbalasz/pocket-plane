@@ -43,8 +43,15 @@ import {
   STATUS_TEXT,
 } from "./logic";
 import { type EditorHandle, NoteEditor } from "./NoteEditor";
-import { NarrowNoteSearch, NoteSearchBox, NoteSearchResults } from "./NotesSearch";
-import { isSearch } from "./search";
+import {
+  NarrowNoteSearch,
+  NoteSearchBox,
+  NoteSearchResults,
+  SearchingLine,
+  showsResults,
+  useNotesApi,
+} from "./NotesSearch";
+import { useNoteSearch } from "./search";
 import { notesUi } from "./ui";
 
 const LOST = "Connection lost — check the note before trying again";
@@ -528,6 +535,9 @@ export default function NotesWindow() {
     }
   }, [newRequest]);
   const live_ = useMemo(() => liveNotes(rows), [rows]);
+  const notesApi = useNotesApi();
+  const search = useNoteSearch(notesApi, q, live_);
+  const results = showsResults(q, search);
   const bin = useMemo(() => binnedNotes(rows), [rows]);
   const current = selected ? (rows.find((n) => n.id === selected) ?? null) : null;
   const loaded = state === "ready";
@@ -547,7 +557,8 @@ export default function NotesWindow() {
         </Button>
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col gap-0.5 py-1" hidden={isSearch(q)}>
+        <SearchingLine q={q} search={search} />
+        <div className="flex flex-col gap-0.5 py-1" hidden={results}>
           {state === "loading" && [0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
           {loaded && live_.length === 0 && (
             <p className="px-2 py-1 text-sm text-muted-foreground" data-testid="notes-empty">
@@ -558,13 +569,9 @@ export default function NotesWindow() {
             <NoteRow key={n.id} note={n} selected={n.id === selected} now={now} />
           ))}
         </div>
-        {isSearch(q) && (
+        {results && (
           <div className="py-1">
-            <NoteSearchResults
-              q={q}
-              refresh={live_}
-              onPick={(id) => notesUi.getState().select(id)}
-            />
+            <NoteSearchResults search={search} onPick={(id) => notesUi.getState().select(id)} />
           </div>
         )}
       </ScrollArea>
@@ -616,7 +623,7 @@ export default function NotesWindow() {
         {loaded && <NarrowBin rows={bin} now={now} />}
       </div>
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-56 shrink-0 flex-col border-r p-2 @[520px]/notes:flex">
+        <aside className="hidden w-60 shrink-0 flex-col border-r p-2 @[520px]/notes:flex">
           {list}
         </aside>
         {selected ? (

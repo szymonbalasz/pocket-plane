@@ -1,7 +1,7 @@
 // e2e-bundle: notes
 // Thin flow of the Notes window's search (NOTES N4, FR-NOTES-22): a player types a new word into
-// Quest log; the DM's search finds it at once (the open note's live text) with a snippet, and a
-// click opens the note; clearing the box brings the list back. Another player: a note they bin
+// Quest log; the DM's search finds it at once (the open note's live text) with a marked snippet
+// that follows the player's further typing, and a click opens the note; clearing the box brings the list back. Another player: a note they bin
 // stops being a hit, the other campaign's canary never is one; a body word finds Burnt Ledger. Ranking,
 // limits, auth and isolation: bun test.
 import { expect, type Page, test } from "@playwright/test";
@@ -37,12 +37,35 @@ test("FR-NOTES-22 search finds titles, bodies and an open note's live text; a cl
   // The DM's search finds it, with a snippet; the list gives way to the results.
   const dmWin = await openWindow(dm, "notes.main");
   await expect(dmWin.getByTestId("notes-list-item").first()).toBeVisible();
-  await dmWin.getByTestId("notes-search").fill("zephyr");
+  // r1: a plain text box (one ×, the kit's) whose whole placeholder fits.
+  const dmBox = dmWin.getByTestId("notes-search");
+  await expect(dmBox).toHaveAttribute("type", "text");
+  const fit = await dmBox.evaluate((el) => {
+    const input = el as HTMLInputElement;
+    const cs = getComputedStyle(input);
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) return { text: 0, room: 0 };
+    ctx.font = cs.font;
+    const room =
+      input.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight);
+    return { text: ctx.measureText(input.placeholder).width, room };
+  });
+  expect(fit.text).toBeGreaterThan(0);
+  expect(fit.text).toBeLessThanOrEqual(fit.room);
+  await dmBox.fill("zephyr");
   const hit = dmWin.getByTestId("notes-search-result");
   await expect(hit).toHaveCount(1);
   await expect(hit).toContainText("Quest log");
-  await expect(hit.getByTestId("notes-search-snippet")).toContainText("zephyrstone vault");
+  const snippet = hit.getByTestId("notes-search-snippet");
+  await expect(snippet).toContainText("zephyrstone vault");
+  await expect(snippet.getByTestId("notes-search-mark")).toHaveText(["zephyrstone"]);
   await expect(dmWin.getByTestId("notes-list-item").first()).toBeHidden();
+
+  // r1: results on screen follow others' typing, with no re-typing.
+  await p1.keyboard.type(" zephyrglass", { delay: 15 });
+  await expect(p1Win.getByTestId("notes-status")).toHaveText("Saved");
+  await expect(snippet).toContainText("zephyrglass", { timeout: 8_000 });
+  await expect(snippet.getByTestId("notes-search-mark")).toHaveText(["zephyrstone", "zephyrglass"]);
   await hit.click();
   await expect(dmWin.getByTestId("notes-title")).toHaveText("Quest log");
   await expect(dmWin.getByTestId("notes-status")).toHaveText("Saved");

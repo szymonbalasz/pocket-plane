@@ -101,10 +101,15 @@ describe("FR-NOTES-22 note search", () => {
         {
           id: idOf(NOTES_SHARED.ledger),
           title: NOTES_SHARED.ledger,
-          snippet: "Found in [[Duke Varen]]'s office. Roll 2d6 to search it. See [[Quest log]].",
+          // Links read as their chips; the matching word marked.
+          snippet: "Found in Duke Varen's office. Roll 2d6 to search it. See Quest log.",
+          marks: [[22, 28]],
         },
       ]);
       expect(office.more).toBe(false);
+      // A title hit whose body lacks the word: the body's first line, plain.
+      const duke = (await search("duke", auth)).results.find((r) => r.title === NOTES_SHARED.duke);
+      expect(duke).toMatchObject({ snippet: "Keeps the ledger close.", marks: [] });
       // Every word must match the title or the body.
       expect(await titles("ledger office", auth)).toEqual([NOTES_SHARED.ledger]);
       expect(await titles("nothing-here", auth)).toEqual([]);

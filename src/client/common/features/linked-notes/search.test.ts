@@ -9,7 +9,7 @@ describe("FR-NOTES-22 notes search client", () => {
   test("FR-NOTES-22 GET /api/notes/search?q= with the page's credential, answer parsed", async () => {
     const seen: { url: string; auth: string | null }[] = [];
     const answer = {
-      results: [{ id: "n1", title: "Burnt Ledger", snippet: "Found in…" }],
+      results: [{ id: "n1", title: "Burnt Ledger", snippet: "Found in…", marks: [] }],
       more: false,
     };
     const api = hc<AppType>("http://127.0.0.1:1", {

@@ -16,11 +16,20 @@ export const NOTE_SNIPPET_LEAD = 40;
 export const NoteSearchQuery = z.strictObject({ q: z.string().max(NOTE_SEARCH_Q_MAX) });
 export type NoteSearchQuery = z.infer<typeof NoteSearchQuery>;
 
+/** Highlighted words of a snippet: `[start, end)` UTF-16 offsets, in order, not overlapping. */
+export const NOTE_SNIPPET_MARKS_MAX = 20;
+export const SnippetMark = z.tuple([z.int().min(0), z.int().min(0)]);
+
 export const NoteSearchHit = z.strictObject({
   id: z.string(),
   title: z.string(),
-  /** Body text around the first matching word (the body's start for a title match). */
+  /**
+   * Body text, links shown as their chips read (`[[T|label]]` → `label`, `[[T]]` → `T`): around
+   * the first matching word, or the body's first line when only the title matched.
+   */
   snippet: z.string(),
+  /** The snippet's words a query word starts (none for a first line). */
+  marks: z.array(SnippetMark).max(NOTE_SNIPPET_MARKS_MAX),
 });
 export type NoteSearchHit = z.infer<typeof NoteSearchHit>;
 
@@ -35,31 +44,47 @@ export type NoteSearchResponse = z.infer<typeof NoteSearchResponse>;
 const RAW_WORD = /[\p{L}\p{N}\p{M}'’]+/gu;
 const PLAIN = /^[a-z0-9]+$/;
 
-/** Index in `text` of the first word some form starts (as `fold` sees it), or 0. */
+/** A link as stored (FR-NOTES-07): `[[Title]]` or `[[Title|label]]`. */
+const LINK = /\[\[([^[\]|\n]+)(?:\|([^[\]\n]*))?\]\]/g;
+
+/** Text as the editor shows it: each link as its chip reads, the label else the title. */
+export function linkText(text: string): string {
+  return text.replace(LINK, (_m, title: string, label?: string) =>
+    label !== undefined && label.trim() !== "" ? label : title,
+  );
+}
+
+/** A raw word as `fold` sees it (lower-cased, folded), cheaply for plain words. */
+const folded = (w: string): string => {
+  const lower = w.toLowerCase();
+  return PLAIN.test(lower) ? lower : fold(w);
+};
+
+/** Index in `text` of the first word some form starts (as `fold` sees it), or -1. */
 function firstHit(text: string, forms: readonly string[]): number {
   RAW_WORD.lastIndex = 0;
   for (let m = RAW_WORD.exec(text); m !== null; m = RAW_WORD.exec(text)) {
-    const lower = m[0].toLowerCase();
-    const w = PLAIN.test(lower) ? lower : fold(m[0]);
+    const w = folded(m[0]);
     for (const f of forms) if (w.startsWith(f)) return m.index;
   }
-  return 0;
+  return -1;
 }
 
-/**
- * FR-NOTES-22 snippet: up to 140 characters of `text` from a little before the first word that
- * a query word (`queryWords(q)`, ≥ 3 letters, either plural form) starts; the text's start when
- * none does (a title match). Whitespace runs collapse; cuts fall on spaces, marked with "…".
- */
-export function noteSnippet(text: string, words: readonly string[]): string {
-  if (text.trim() === "") return "";
-  const forms = words.filter((w) => w.length >= TEXT_MATCH_MIN).flatMap((w) => wordForms(w));
-  const at = forms.length > 0 ? firstHit(text, forms) : 0;
-  let start = Math.max(0, at - NOTE_SNIPPET_LEAD);
-  if (start > 0) {
-    const space = text.slice(start, at).search(/\s/);
-    start = space === -1 ? at : start + space + 1;
+/** The words of `snippet` some form starts. */
+function marksOf(snippet: string, forms: readonly string[]): [number, number][] {
+  const out: [number, number][] = [];
+  if (forms.length === 0) return out;
+  RAW_WORD.lastIndex = 0;
+  for (let m = RAW_WORD.exec(snippet); m !== null; m = RAW_WORD.exec(snippet)) {
+    const w = folded(m[0]);
+    if (forms.some((f) => w.startsWith(f))) out.push([m.index, m.index + m[0].length]);
+    if (out.length === NOTE_SNIPPET_MARKS_MAX) break;
   }
+  return out;
+}
+
+/** `text` cut to the snippet length at a space, "…" where cut. */
+function clip(text: string, start: number): string {
   let end = Math.min(text.length, start + NOTE_SNIPPET_MAX);
   if (end < text.length) {
     const cut = text.slice(start, end).search(/\s\S*$/);
@@ -67,4 +92,30 @@ export function noteSnippet(text: string, words: readonly string[]): string {
   }
   const body = text.slice(start, end).replace(/\s+/g, " ").trim();
   return `${start > 0 ? "…" : ""}${body}${end < text.length ? "…" : ""}`;
+}
+
+/**
+ * FR-NOTES-22 snippet of a body for the query `words` (`queryWords(q)`), links shown as their
+ * chips read (`linkText`): up to 140 characters from a little before the first word a query word
+ * (≥ 3 letters, either plural form) starts, those words marked; when none does (a title match),
+ * the body's first non-blank line, plain. Whitespace runs collapse; cuts fall on spaces, with "…".
+ */
+export function noteSnippet(
+  body: string,
+  words: readonly string[],
+): { snippet: string; marks: [number, number][] } {
+  const text = linkText(body);
+  const forms = words.filter((w) => w.length >= TEXT_MATCH_MIN).flatMap((w) => wordForms(w));
+  const at = forms.length > 0 ? firstHit(text, forms) : -1;
+  if (at === -1) {
+    const line = text.split("\n").find((l) => l.trim() !== "") ?? "";
+    return { snippet: clip(line, 0), marks: [] };
+  }
+  let start = Math.max(0, at - NOTE_SNIPPET_LEAD);
+  if (start > 0) {
+    const space = text.slice(start, at).search(/\s/);
+    start = space === -1 ? at : start + space + 1;
+  }
+  const snippet = clip(text, start);
+  return { snippet, marks: marksOf(snippet, forms) };
 }

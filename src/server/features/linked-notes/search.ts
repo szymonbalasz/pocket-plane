@@ -216,7 +216,7 @@ export function runNoteSearch(s: Services, cid: string, q: string): NoteSearchRu
   const results: NoteSearchHit[] = top.map(({ h }) => ({
     id: h.id,
     title: h.title,
-    snippet: noteSnippet(texts.get(h.id) ?? "", words),
+    ...noteSnippet(texts.get(h.id) ?? "", words),
   }));
   return { response: { results, more: hits.length > top.length }, scanned: heads.length };
 }

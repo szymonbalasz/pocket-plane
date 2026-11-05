@@ -17,30 +17,47 @@ export async function searchNotes(api: Api, q: string): Promise<NoteSearchRespon
 /** A query the box searches for: some word survives folding (else the list shows, no request). */
 export const isSearch = (q: string): boolean => queryWords(q).length > 0;
 
+/** While a query is shown, it is searched again this often (others' typing reaches no event here). */
+export const NOTE_SEARCH_REFRESH_MS = 3_000;
+
 export interface NoteSearch {
-  /** Results of the latest settled request for the current query, else null. */
+  /**
+   * The latest settled results while the box holds a query: kept while the next request runs
+   * (no blank while typing) and after an error; null before the first answer or with no query.
+   */
   page: NoteSearchResponse | null;
   state: "idle" | "loading" | "ready" | "error";
 }
 
+const visible = (): boolean =>
+  typeof document === "undefined" || document.visibilityState !== "hidden";
+
 /**
- * Debounced search: one request `debounceMs` after `q` (or `refresh`: the note list changed)
- * last changed; a stale answer is dropped. Not a search (`isSearch`) → `idle`, no request.
- * `retry` re-sends the current query.
+ * Debounced search: one request `debounceMs` after `q` or `refresh` (the note list: a title, a
+ * new note, the bin) last changed, and again every `refreshMs` while the page is visible, so
+ * results on screen follow others' typing. A stale answer is dropped. No query (`isSearch`) →
+ * `idle`, no request, results cleared. `retry` re-sends the current query.
  */
 export function useNoteSearch(
   api: Api,
   q: string,
   refresh: unknown,
-  debounceMs = NOTE_SEARCH_DEBOUNCE_MS,
+  { debounceMs = NOTE_SEARCH_DEBOUNCE_MS, refreshMs = NOTE_SEARCH_REFRESH_MS } = {},
 ): NoteSearch & { retry(): void } {
   const [out, setOut] = useState<NoteSearch>({ page: null, state: "idle" });
-  const [attempt, setAttempt] = useState(0);
+  const [tick, setTick] = useState(0);
   const query = q.trim();
   const active = isSearch(query);
   useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => {
+      if (visible()) setTick((n) => n + 1);
+    }, refreshMs);
+    return () => clearInterval(t);
+  }, [active, refreshMs]);
+  useEffect(() => {
     void refresh;
-    void attempt;
+    void tick;
     if (!active) {
       setOut({ page: null, state: "idle" });
       return;
@@ -50,13 +67,13 @@ export function useNoteSearch(
     const t = setTimeout(() => {
       searchNotes(api, query).then(
         (page) => live && setOut({ page, state: "ready" }),
-        () => live && setOut({ page: null, state: "error" }),
+        () => live && setOut((o) => ({ page: o.page, state: "error" })),
       );
     }, debounceMs);
     return () => {
       live = false;
       clearTimeout(t);
     };
-  }, [api, query, active, refresh, attempt, debounceMs]);
-  return { ...out, retry: () => setAttempt((n) => n + 1) };
+  }, [api, query, active, refresh, tick, debounceMs]);
+  return { ...out, retry: () => setTick((n) => n + 1) };
 }
