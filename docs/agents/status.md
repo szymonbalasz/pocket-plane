@@ -13,7 +13,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Play fixes: frame and map | `fix/s15-frame` | — | — | **merged** (#432) |
 | Linked notes spec | `spec/linked-notes` | — | — | **merged, complete** (#446) |
 | Window position memory | `fix/window-memory` | — | — | **merged** (#438) |
-| Linked notes build | `build/notes-core` → collab → window → links ∥ search → rename → `fix/notes-sim` | `build-notes-core` | `build-notes-core` (slot 0) | N1 (#447), N2 (#448) **merged**; N3 Notes window next |
+| Linked notes build | `build/notes-core` → collab → window → links ∥ search → rename → `fix/notes-sim` | `build-notes-core` | `build-notes-core` (slot 0) | N1 (#447), N2 (#448), N3 (#449) **merged**; N4 search ∥ N5 links next |
 
 **Memory:** ran low once with 13 agents across sessions (Claude Code stopped a background wait); check before starting more.
 

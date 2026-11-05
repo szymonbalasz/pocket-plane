@@ -80,7 +80,7 @@ A note can have the same name as a token or creature; nothing ties them together
 | FR-NOTES-17 | Undo and redo (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y) undo only your own changes in this tab, adjusted for what others typed since. |
 | FR-NOTES-18 | After every snapshot (reconnect, resync, server restart), each open note re-opens from the client's version, and anything typed meanwhile, offline included, is sent rebased. The status shows "Saved", "Saving…" or "Offline". |
 | FR-NOTES-19 | Each accepted change is stored in the transaction that accepts it. **A server crash loses nothing the server accepted.** |
-| FR-NOTES-20 | If a note is deleted, or the campaign switches, while someone has it open, they see "This note was deleted" (or "…is no longer available"), with **Copy my text** and, for a delete, **Restore**. |
+| FR-NOTES-20 | If a note is deleted, or the campaign switches, while someone has it open, they see "This note was deleted" (or "…is no longer available"), with **Copy my text** and, for a delete, **Restore**. *(2026-11-05, #449: players go straight to the wait screen on a switch, since FR-SYNC-07 closes their connection; the banner is the DM's.)* |
 | FR-NOTES-21 | Typing stops at 32 KiB ("Note is full"). If two people's typing together goes over, the server refuses the push and that client reloads the note, with Copy my text. |
 
 **Search and the rest**
