@@ -39,7 +39,7 @@ test("FR-SHELL-156 Party Manager registered (DM): title / label Party Manager, o
     absorbs: ["party.summary"],
     onAbsorb: "function",
     sizeRow: { default: all(600, 560), useful: all(440, 400), min: { w: 340, h: 360 } },
-    sets: ["D1", "D2", "D3"],
+    sets: ["D1", "D2", "D3", "D4"], // D4 = D1 + Notes (linked-notes N3 r1)
   });
   expect(r.sizeRow?.criterion).toContain("2 PC cards + their companion rows whole");
   for (const { vp, rect } of managerOpenRects(registry)) {

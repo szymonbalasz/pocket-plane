@@ -99,6 +99,8 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
         "dice.details", // FR-DICE-106
       ],
     },
+    // Linked notes N3 r1 (2026-11-05, ruling B): D1 + Notes, so D1's pinned trips keep their story.
+    { name: "D4", viewer: "dm", kinds: [...D1, "stats.board", "notes.main"] },
   ],
   player: [
     // PM2 (FR-SHELL-160); RS2 (S4, FR-SHELL-171); SP2 (S4): cmp.rules untouched; SP3 (S4, FR-RECAP-10)
@@ -116,6 +118,19 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
       name: "P3",
       viewer: "player-2",
       kinds: ["char.sheet", "cbt.initiative", "dice.log", "stats.board", "party.board"], // PM2
+    },
+    // Linked notes N3 r1 (2026-11-05, ruling B): P3 + Notes, so P3's pinned trips keep their story.
+    {
+      name: "P4",
+      viewer: "player-2",
+      kinds: [
+        "char.sheet",
+        "cbt.initiative",
+        "dice.log",
+        "stats.board",
+        "party.board",
+        "notes.main",
+      ],
     },
   ],
 };
