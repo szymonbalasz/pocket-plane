@@ -1,7 +1,7 @@
 # Proposed — No SQLite virtual tables in the main DB while schema push runs
 
-- Status: proposed, with OQ-NOTES-12 in [linked-notes](../../specs/linked-notes.md)
-- Date: 2026-10-31
+- Status: proposed, with [linked-notes](../../specs/linked-notes.md) (FR-NOTES-23, search)
+- Date: 2026-10-31; re-checked 2026-11-05 against `push.ts` after the merge
 - Extends: [#416](../../decisions-log.md) (schema push stays until release), [ADR-0001](0001-tech-stack.md)
 - Affects: any later search feature; [world-builder](../../specs/post-mvp/world-builder.md) ("SQLite FTS" pick); [ADR-0009](0009-entity-content-model.md) (full-text indexing deferred); `src/server/db/push.ts`; [fixtures-adapters](../../specs/fixtures-adapters.md) (reset), `state:digest`
 
@@ -25,14 +25,14 @@ The server compares `schema.ts` with the live DB at every start. Would an FTS5 t
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. No virtual tables in the main DB while push runs; search with the shared matcher in server memory** | No schema risk; same results as compendium and pickers; incremental per note, filled per viewer's visible set, so a player can't time hidden notes; no corpus statistics | First-search fill (DM: 235 ms at 2,000 × 2,000 chars); no stemming beyond the plural rule |
-| A2. Same rule, with a plain `note_word` table instead of memory | No cold start; survives push (ordinary table); filter by join | Roughly 600,000 rows at the cap (an estimate); each save rewrites its rows; backups and digest grow; `searchTier`'s tiers to redo in SQL |
-| B. FTS5 in an attached sidecar file | Real FTS; survives push | A second DB file for backup, reset, digest, Windows locks; a different matcher; BM25 ranking could reflect hidden notes unless filtered per viewer |
+| **A. No virtual tables in the main DB while push runs; search with the shared matcher on the server** | No schema risk; same results as compendium and pickers; reads only the searcher's readable notes (shared + own private, two indexed reads), so other people's private notes can't change results or time | Folds every readable body per search (≤ ~1,300 notes × 32 KiB at the caps; ~1–2 MB typical); no stemming beyond the plural rule |
+| A2. Same rule, with a plain `note_word` table | Survives push (ordinary table); filter by join | Hundreds of thousands of rows at the caps (an estimate); each save rewrites its rows; `searchTier`'s tiers to redo in SQL |
+| B. FTS5 in an attached sidecar file | Real FTS; survives push | A second DB file for backup, reset, digest, Windows locks; a different matcher; BM25 corpus statistics include other people's private notes |
 | C. Teach `push.ts` to ignore virtual tables and shadows | FTS5 in one file | Shared-core change on the path every real upgrade takes; the rename prompt returns with each later table; the guard must parse `sqlite_master` |
 
 ## Decision
 
-> Undecided: the DM's gate (OQ-NOTES-12). Suggested: **A**.
+> Suggested: **A** (technical; no product effect).
 
 ## Consequences (if A)
 
