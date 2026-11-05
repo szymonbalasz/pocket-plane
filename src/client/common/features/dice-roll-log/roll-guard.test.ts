@@ -81,7 +81,7 @@ describe("FR-DICE-22 roll bar guard", () => {
     expect(g({ ref: { combatantId: "c1" }, definitions: new Map() })).toBe(false);
   });
 
-  test("FR-DICE-22 FR-MIR-06 a token no player sees: a shown Visible or Transparent mirror un-forces the switch; a Shadow, a Hidden, a fogged Visible or a held-back mirror doesn't", () => {
+  test("FR-DICE-22 FR-MIR-06 a token no player sees: a seen Visible or Transparent mirror un-forces the switch; a Shadow, a Hidden, a fogged or a held-back mirror doesn't", () => {
     const fogged = [tok("t1", { fogged: true })];
     const mir = (over: Partial<NonNullable<RollBarGuardInput["mirrors"]>[number]> = {}) => ({
       tokenId: "t1",
@@ -94,7 +94,9 @@ describe("FR-DICE-22 roll bar guard", () => {
       rollBarGuarded(base({ ref: { tokenId: "t1" }, tokens: fogged, mirrors }));
     expect(g([])).toBe(true);
     expect(g([mir()])).toBe(false);
-    expect(g([mir({ mode: "transparent", fogged: true })])).toBe(false);
+    expect(g([mir({ mode: "transparent" })])).toBe(false);
+    // #442: a mirror no player has sight to doesn't count, Transparent too.
+    expect(g([mir({ mode: "transparent", fogged: true })])).toBe(true);
     expect(g([mir({ fogged: true })])).toBe(true);
     expect(g([mir({ mode: "shadow" })])).toBe(true);
     expect(g([mir({ mode: "hidden" })])).toBe(true);

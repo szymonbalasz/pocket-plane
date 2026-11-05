@@ -18,8 +18,8 @@ export const MIRRORS_PER_SCENE_MAX = 200;
 export const MIRRORS_PER_CAMPAIGN_MAX = 2000;
 
 /**
- * FR-MIR-06: `hidden` nobody; `visible` a normal look, for whoever has sight to it; `transparent`
- * and `shadow` every player, walls and fog ignored.
+ * FR-MIR-06: `hidden` nobody; `visible` a normal look, `transparent` faint, `shadow` a dark
+ * shape: each for whoever has sight to it, walls and fog per player (DM 2026-11-05, #442).
  */
 export const MIRROR_MODES = ["hidden", "visible", "transparent", "shadow"] as const;
 export const MirrorMode = z.enum(MIRROR_MODES);
@@ -46,7 +46,7 @@ export const TokenMirrorRecord = z.object({
   shape: TokenShape,
   /** FR-MIR-09: the source is hidden or Invisible, or the mirror is off the map: nobody sees it. */
   suppressed: z.boolean(),
-  /** FR-MIR-06: `visible` mode's sight copies (FR-FOG-10). */
+  /** FR-MIR-06: its sight copies (FR-FOG-10); every shown mode reads them. */
   fogged: z.boolean(),
   /** Server only (never on a wire). */
   seenBy: z.array(z.string()).nullable().optional(),
@@ -70,7 +70,7 @@ export type PlayerTokenMirrorRecord = z.infer<typeof PlayerTokenMirrorRecord>;
 
 /** What a client draws: the player's copy plus what only the DM receives. */
 export type MirrorView = PlayerTokenMirrorRecord &
-  Partial<Pick<TokenMirrorRecord, "tokenId" | "suppressed" | "seq">>;
+  Partial<Pick<TokenMirrorRecord, "tokenId" | "suppressed" | "fogged" | "seq">>;
 
 export const CreateMirrorInput = z.strictObject({
   tokenId: Id,

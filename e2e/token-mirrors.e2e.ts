@@ -73,13 +73,13 @@ test("FR-MIR-01 FR-MIR-06 FR-MIR-15 FR-MIR-16 mirror a token, switch its mode, i
   await live(dm);
   await live(p1);
 
-  // The fixture's Transparent mirror: labelled for the DM, the plain name for the player.
+  // The fixture's Transparent mirror, on the far side: out of every player's sight (foggable,
+  // #442), so the DM's label says Fog and the player has none.
   await expect.poll(async () => (await mirrors(dm)).length).toBe(1);
   await expect
     .poll(async () => (await mirrors(dm))[0]?.label)
-    .toBe("Mirror · Goblin Sneak · Transparent");
-  await expect.poll(async () => (await mirrors(p1))[0]?.label).toBe("Goblin Sneak");
-  expect((await mirrors(p1))[0]?.listening).toBe(false);
+    .toBe("Mirror · Goblin Sneak · Transparent · Fog");
+  expect(await mirrors(p1)).toHaveLength(0);
 
   // Token menu → Mirror → a cell.
   await expect
@@ -108,6 +108,13 @@ test("FR-MIR-01 FR-MIR-06 FR-MIR-15 FR-MIR-16 mirror a token, switch its mode, i
   await dm.mouse.move(clear.x, clear.y, { steps: 8 });
   await dm.mouse.up();
   await expect.poll(async () => (await mirrors(p1)).find((m) => m.id === start.id)?.x).toBe(4 * 70);
+  // In sight: labelled for the DM, the plain name for the player, who can't pick it.
+  await expect
+    .poll(async () => byLabel(await mirrors(dm), "Goblin Sneak")?.label)
+    .toBe("Mirror · Goblin Sneak · Transparent");
+  const inSight = (await mirrors(p1)).find((m) => m.id === start.id);
+  expect(inSight?.label).toBe("Goblin Sneak");
+  expect(inSight?.listening).toBe(false);
   await p1.screenshot({ path: test.info().outputPath("transparent-player.png") });
 
   // Right-click → Shadow: the player gets a dark shape with no name.

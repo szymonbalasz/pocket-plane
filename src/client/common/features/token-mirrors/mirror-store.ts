@@ -32,10 +32,14 @@ export function mirrorOpacity(m: Pick<MirrorView, "mode" | "suppressed">): numbe
 /** FR-MIR-15: the shadow is a dark shape: players hold no art for it, the DM sees the same. */
 export const drawsAsShadow = (m: Pick<MirrorView, "mode">): boolean => m.mode === "shadow";
 
-/** FR-MIR-15: the DM's clear label. `Mirror · Goblin · Transparent`. */
-export function dmLabel(m: Pick<MirrorView, "mode" | "suppressed" | "name">): string {
+/**
+ * FR-MIR-15: the DM's clear label. `Mirror · Goblin · Transparent`; `· Fog` while it is shown but
+ * no player has sight to it (FR-MIR-06, #442), as a token's Fog badge (FR-FOG-20).
+ */
+export function dmLabel(m: Pick<MirrorView, "mode" | "suppressed" | "fogged" | "name">): string {
   const state = m.suppressed === true ? "Hidden with its token" : labelOf(m.mode);
-  return `Mirror · ${m.name ?? ""} · ${state}`;
+  const fog = !offForPlayers(m) && m.fogged === true ? " · Fog" : "";
+  return `Mirror · ${m.name ?? ""} · ${state}${fog}`;
 }
 
 /** FR-MIR-15: a player's label: the name, none on a shadow (they don't have it). */

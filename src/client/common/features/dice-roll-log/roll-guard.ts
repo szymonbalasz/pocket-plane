@@ -5,8 +5,8 @@
 // actor as the server resolves it (`dice.roll`: a token as itself; a combatant as its entity under
 // its name; a definition under its name) and the visibility facts the DM holds. Hidden for players
 // here = seen by no player, as on the server (DM 2026-11-05): `hidden`, or fogged for every player
-// (`fogged`), and none of its Visible or Transparent mirrors shown to a player (not `suppressed`;
-// a Visible one not `fogged`, FR-MIR-06 / -09). A Shadow never counts.
+// (`fogged`), and none of its Visible or Transparent mirrors shown to a player (not `suppressed`,
+// not `fogged`, FR-MIR-06 / -09, #442). A Shadow never counts.
 
 import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
 import { actorGuarded, type GuardActor, type GuardWorld } from "@shared/dice-roll-log/roll-guard";
@@ -18,10 +18,13 @@ import type { ActorOption } from "./logic";
 type GuardTokenView = TokenView & { fogged?: true };
 type GuardMirror = Pick<TokenMirrorRecord, "tokenId" | "mode" | "suppressed" | "fogged">;
 
-/** FR-MIR-06 / -09: a Visible or Transparent mirror some player is shown (a Shadow is anonymous). */
+/**
+ * FR-MIR-06 / -09: a Visible or Transparent mirror some player has sight to (every mode is
+ * foggable, #442; a Shadow is anonymous).
+ */
 function mirrorShown(m: GuardMirror): boolean {
-  if (m.suppressed) return false;
-  return m.mode === "transparent" || (m.mode === "visible" && !m.fogged);
+  if (m.suppressed || m.fogged) return false;
+  return m.mode === "transparent" || m.mode === "visible";
 }
 
 export interface RollBarGuardInput {

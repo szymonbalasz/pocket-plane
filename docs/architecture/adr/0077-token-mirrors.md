@@ -23,7 +23,7 @@
 **C.** A mirror is its own record, not a token.
 
 - **Own table, not a linked token.** Combat binds the next unbound token of a creature, and caps, menus and selection all read tokens. A separate table keeps every one of them out by construction.
-- **Modes decide sight.** Visible is an ordinary fog subject at the mirror's own cells, so the common case (a yard goblin seen from the roof) needs nothing new. Transparent and Shadow ignore walls: that is how looking up works, since a mirror drawn over the inn's interior sits behind its walls.
+- **Modes decide sight.** Visible is an ordinary fog subject at the mirror's own cells, so the common case (a yard goblin seen from the roof) needs nothing new. Transparent and Shadow ignore walls: that is how looking up works, since a mirror drawn over the inn's interior sits behind its walls. *(Amended 2026-11-05, [#442](../../decisions-log.md): every shown mode is a fog subject like Visible; the DM places the mirror where the watchers' sight reaches.)*
 - **Copies on the record.** Name, art and size are copied so visibility reads only the record, and a Shadow's are removed from the player's copy.
 - **Fail safe.** A hidden or Invisible token holds its mirrors back; a teleport sets them to Hidden, because the old distance would put them somewhere wrong.
 - **Image limits rise** to 100 MB, 100 MP and 8192 px shown: players get the `display` copy, so 4096 px would blur a sheet of floors.
@@ -31,6 +31,6 @@
 ## Consequences
 
 - Fog's scene re-derive gains one subject type; a token-changed hook keeps mirrors with their token; scene copy copies them.
-- Transparent and Shadow reach every player, including one who pans to that part of the map (accepted by the DM).
+- ~~Transparent and Shadow reach every player, including one who pans to that part of the map (accepted by the DM).~~ Amended (#442): only players with sight to the mirror.
 - An 8192 px map may take around 270 MB in each browser. Not measured on a weak device.
 - Teleport leaves no trail (FR-MAP-123): it is a stealth option, and fog decides who sees its smoke.
