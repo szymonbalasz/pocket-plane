@@ -82,6 +82,9 @@ import { useDmMap, useViewedScene } from "./view-state";
 
 export const SCENES_KIND = "map.scenes";
 
+/** Indent per nesting level (24px), shared by the nested list and the drop line so they line up. */
+const NEST_STEP_REM = 1.5;
+
 const fail = (err: unknown) => {
   toast.error(err instanceof Error ? err.message : "Something went wrong");
 };
@@ -306,7 +309,7 @@ function FolderNode({
           <ContextActions actions={actions} />
         </ContextMenu>
         <CollapsibleContent>
-          <ul className="ml-3 flex flex-col gap-0.5">
+          <ul className="flex flex-col gap-0.5" style={{ marginLeft: `${NEST_STEP_REM}rem` }}>
             <TreeNodes nodes={items} parentId={folder.id} depth={depth + 1} tree={tree} />
           </ul>
         </CollapsibleContent>
@@ -801,7 +804,7 @@ export function ScenesBody() {
                     data-parent={line.parentId ?? ""}
                     data-before={line.beforeId ?? ""}
                     className="pointer-events-none absolute right-0 z-30 h-0.5 -translate-y-1/2 rounded bg-primary"
-                    style={{ top: line.y, left: `${line.depth * 0.75}rem` }}
+                    style={{ top: line.y, left: `${line.depth * NEST_STEP_REM}rem` }}
                   />
                 )}
               </ul>
