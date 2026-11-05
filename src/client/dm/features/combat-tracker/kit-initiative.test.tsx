@@ -452,6 +452,8 @@ describe("FR-KIT-21 pending list", () => {
     expect(line).not.toContain("data-variant");
     expect(line).toContain("h-8");
     expect(line).toContain("text-sm");
+    // BL-177: the flex list never squeezes a line (the block's height counts whole lines).
+    expect(line).toContain("shrink-0");
     expect(list).toMatch(
       /data-testid="cbt-init-card"[^>]*>[\s\S]*?text-muted-foreground[\s\S]*?Mira: 21 to hit/,
     );

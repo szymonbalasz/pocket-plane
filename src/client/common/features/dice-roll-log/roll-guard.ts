@@ -4,16 +4,25 @@
 // (`@shared/dice-roll-log/roll-guard`); this module only feeds it the DM's store: the roll bar's
 // actor as the server resolves it (`dice.roll`: a token as itself; a combatant as its entity under
 // its name; a definition under its name) and the visibility facts the DM holds. Hidden for players
-// here = `hidden`, or fogged for every player (`fogged`); a token only some players see is DM-only
-// on the server without the switch showing it (per-player `seenBy` never leaves it, FR-FOG-44).
+// here = seen by no player, as on the server (DM 2026-11-05): `hidden`, or fogged for every player
+// (`fogged`), and none of its Visible or Transparent mirrors shown to a player (not `suppressed`;
+// a Visible one not `fogged`, FR-MIR-06 / -09). A Shadow never counts.
 
 import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
 import { actorGuarded, type GuardActor, type GuardWorld } from "@shared/dice-roll-log/roll-guard";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import type { SceneView, TokenView } from "@shared/scenes-map/schemas";
+import type { TokenMirrorRecord } from "@shared/token-mirrors/schemas";
 import type { ActorOption } from "./logic";
 
 type GuardTokenView = TokenView & { fogged?: true };
+type GuardMirror = Pick<TokenMirrorRecord, "tokenId" | "mode" | "suppressed" | "fogged">;
+
+/** FR-MIR-06 / -09: a Visible or Transparent mirror some player is shown (a Shadow is anonymous). */
+function mirrorShown(m: GuardMirror): boolean {
+  if (m.suppressed) return false;
+  return m.mode === "transparent" || (m.mode === "visible" && !m.fogged);
+}
 
 export interface RollBarGuardInput {
   ref: ActorOption["ref"] | undefined;
@@ -21,6 +30,8 @@ export interface RollBarGuardInput {
   combatants: readonly CombatantRecord[];
   encounters: readonly Pick<EncounterRecord, "id" | "status">[];
   scenes: readonly Pick<SceneView, "id" | "active">[];
+  /** The DM's mirrors (the active scene's); absent = none. */
+  mirrors?: readonly GuardMirror[];
   /** The definitions the store holds (campaign + loaded imported), by id. */
   definitions: ReadonlyMap<string, Pick<DefinitionRecord, "name" | "kind">>;
 }
@@ -53,8 +64,11 @@ export function rollBarGuarded(input: RollBarGuardInput): boolean {
     tokensOf: (entityId) => tokens.filter((t) => t.definitionId === entityId),
     token: (id) => tokens.find((t) => t.id === id) ?? null,
     activeSceneId: () => input.scenes.find((s) => s.active)?.id ?? null,
-    tokenHidden: (t) => t.hidden || (t.fogged === true && t.ownerPlayerId === null),
-    combatantHidden: (c) => !c.active || c.hidden || c.ownerHidden === true,
+    tokenHidden: (t) =>
+      (t.hidden || (t.fogged === true && t.ownerPlayerId === null)) &&
+      !(input.mirrors ?? []).some((m) => m.tokenId === t.id && mirrorShown(m)),
+    combatantHidden: (c, tokenCopy = true) =>
+      !c.active || (tokenCopy && c.hidden) || c.ownerHidden === true,
   };
   let actor: GuardActor | null = null;
   if ("tokenId" in ref) {

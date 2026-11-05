@@ -37,6 +37,7 @@ import { AssetImg } from "../assets-pipeline/AssetImg";
 import { colorHex, colorKeyOf } from "../campaign-management/colors";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import { ActionsTab } from "./ActionsTab";
+import { SheetLinks } from "./compendium-links";
 import { useBusy } from "./fields";
 import { MainTab } from "./MainTab";
 import { FeaturesTab, InventoryTab, NotesTab } from "./MoreTabs";
@@ -417,15 +418,17 @@ function NameRow({
         <SheetName picker={picker} />
         <span
           data-testid="char-sheet-level"
-          className="mt-1 inline-block max-w-full align-top text-sm [overflow-wrap:anywhere] text-muted-foreground @min-[560px]/sheet:text-base"
+          className="mt-1 inline-block max-w-full overflow-x-clip align-top text-sm [overflow-wrap:anywhere] text-muted-foreground @min-[560px]/sheet:text-base"
         >
-          <LevelParts parts={[...sub.split(" · "), ...(species ? [species] : [])]} />
-          {background && (
-            <span className="hidden @min-[560px]/sheet:inline">
-              {" "}
-              <span className="inline-block max-w-full">· {background}</span>
-            </span>
-          )}
+          <span className="-ml-[0.55em] block">
+            <LevelParts parts={[...sub.split(" · "), ...(species ? [species] : [])]} />
+            {background && (
+              <span className="hidden @min-[560px]/sheet:inline">
+                {" "}
+                <LevelPart dot>{background}</LevelPart>
+              </span>
+            )}
+          </span>
         </span>
       </div>
       {full && (
@@ -439,21 +442,31 @@ function NameRow({
 }
 
 /**
- * The level line's parts ("Level 1 Fighter", "Human"; "CR 1/4", "50 XP"): a later part keeps its
- * "·" and its words together, so the line wraps between parts, never right after a "·" (K11). A
- * part longer than the column wraps inside itself on its own line instead of being cut.
+ * One part of the level line, whole unless longer than the column (then it wraps inside itself).
+ * Its "·" hangs in the margin before it: a part that starts a line has its dot clipped by the
+ * level line, so no line begins with one and none ends with one (K11).
  */
-function LevelParts({ parts }: { parts: readonly string[] }) {
-  return parts.map((p, i) =>
-    i === 0 ? (
-      <span key={p}>{p}</span>
-    ) : (
-      <span key={p}>
-        {" "}
-        <span className="inline-block max-w-full">· {p}</span>
-      </span>
-    ),
+function LevelPart({ dot, children }: { dot?: boolean; children: ReactNode }) {
+  return (
+    <span className="relative ml-[0.55em] inline-block max-w-[calc(100%-0.55em)]">
+      {dot && (
+        <>
+          <span className="absolute right-full w-[0.55em] text-center">·</span>{" "}
+        </>
+      )}
+      {children}
+    </span>
   );
+}
+
+/** The level line's parts ("Level 1 Fighter", "Human"; "CR 1/4", "50 XP"). */
+function LevelParts({ parts }: { parts: readonly string[] }) {
+  return parts.map((p, i) => (
+    <span key={p}>
+      {i > 0 && " "}
+      <LevelPart dot={i > 0}>{p}</LevelPart>
+    </span>
+  ));
 }
 
 /** FR-KIT-85 chips line: the badges, then the `header` sections (effect chips, brain menu). */
@@ -781,107 +794,114 @@ export function SheetView({
   );
   return (
     <SheetContext.Provider value={ctx}>
-      <SheetOverridesProvider value={overrides}>
-        <Card
-          ref={bodyRef}
-          data-testid="char-sheet"
-          data-record-id={creature.id}
-          data-editing={ctx.editing ? "true" : "false"}
-          className="@container/sheet flex h-full flex-col overflow-hidden border-0 bg-transparent p-1 shadow-none"
-        >
-          {/* FR-CHARX-48: the pinned part stays, only the content box scrolls. Compact: the name
+      <SheetLinks
+        client={client}
+        sheet={sheet}
+        attacks={creature.statBlock.attacks}
+        off={ctx.editing}
+      >
+        <SheetOverridesProvider value={overrides}>
+          <Card
+            ref={bodyRef}
+            data-testid="char-sheet"
+            data-record-id={creature.id}
+            data-editing={ctx.editing ? "true" : "false"}
+            className="@container/sheet flex h-full flex-col overflow-hidden border-0 bg-transparent p-1 shadow-none"
+          >
+            {/* FR-CHARX-48: the pinned part stays, only the content box scrolls. Compact: the name
             row (with the picker and the actions) + tab strip are pinned; the chips line scrolls
             with the content. Nothing outside the content box may shrink (an overflow-x box would
             collapse to 0 px). */}
-          {chipsHost && createPortal(<ChipsLine />, chipsHost)}
-          <Tabs
-            value={current}
-            onValueChange={openTab}
-            className="flex min-h-0 flex-1 flex-col gap-2"
-          >
-            <div
-              ref={headerRef}
-              data-testid="charx-header"
-              data-pinned="true"
-              data-pinned-part={part}
-              className="flex shrink-0 flex-col gap-2"
+            {chipsHost && createPortal(<ChipsLine />, chipsHost)}
+            <Tabs
+              value={current}
+              onValueChange={openTab}
+              className="flex min-h-0 flex-1 flex-col gap-2"
             >
-              <div className="flex flex-col gap-1.5">
-                <NameRow
-                  picker={picker}
-                  full={!compact}
-                  chipsHost={chipsHost}
-                  editing={ctx.editing}
-                  setEditing={setEditing}
-                />
-                {!compact && hintEl}
-              </div>
-              <TabStrip>
-                <TabsList className="h-auto w-max p-0">
-                  {tabs.map(([v, label]) => {
-                    const n = counts.get(v) ?? null;
-                    return (
-                      <TabsTrigger
-                        key={v}
-                        value={v}
-                        data-testid="charx-tab"
-                        data-value={v}
-                        data-count={n ?? undefined}
-                        className={TAB}
-                      >
-                        {label}
-                        {n !== null && (
-                          <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
-                            {n}
-                          </Badge>
-                        )}
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
-              </TabStrip>
-            </div>
-            <div
-              ref={contentRef}
-              data-testid="charx-content"
-              className="min-h-0 flex-1 overflow-y-auto [overflow-anchor:none]"
-            >
-              {compact && (
-                <div
-                  ref={restRef}
-                  data-testid="charx-header-rest"
-                  className="mb-2 flex flex-col gap-1.5"
-                >
-                  <ChipsSlot host={chipsHost} />
-                  {hintEl}
+              <div
+                ref={headerRef}
+                data-testid="charx-header"
+                data-pinned="true"
+                data-pinned-part={part}
+                className="flex shrink-0 flex-col gap-2"
+              >
+                <div className="flex flex-col gap-1.5">
+                  <NameRow
+                    picker={picker}
+                    full={!compact}
+                    chipsHost={chipsHost}
+                    editing={ctx.editing}
+                    setEditing={setEditing}
+                  />
+                  {!compact && hintEl}
                 </div>
-              )}
-              <TabsContent value="main">
-                <SheetWide.Provider value={wide}>
-                  <MainTab />
-                </SheetWide.Provider>
-              </TabsContent>
-              <TabsContent value="actions">
-                <ActionsTab />
-              </TabsContent>
-              <TabsContent value="features">
-                <FeaturesTab />
-              </TabsContent>
-              <TabsContent value="inventory">
-                <InventoryTab />
-              </TabsContent>
-              <TabsContent value="notes">
-                <NotesTab />
-              </TabsContent>
-              {sectionTabs.map((s) => (
-                <TabsContent key={s.id} value={`section:${s.id}`}>
-                  <SectionView section={s} creatureId={creature.id} client={client} />
+                <TabStrip>
+                  <TabsList className="h-auto w-max p-0">
+                    {tabs.map(([v, label]) => {
+                      const n = counts.get(v) ?? null;
+                      return (
+                        <TabsTrigger
+                          key={v}
+                          value={v}
+                          data-testid="charx-tab"
+                          data-value={v}
+                          data-count={n ?? undefined}
+                          className={TAB}
+                        >
+                          {label}
+                          {n !== null && (
+                            <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                              {n}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+                </TabStrip>
+              </div>
+              <div
+                ref={contentRef}
+                data-testid="charx-content"
+                className="min-h-0 flex-1 overflow-y-auto [overflow-anchor:none]"
+              >
+                {compact && (
+                  <div
+                    ref={restRef}
+                    data-testid="charx-header-rest"
+                    className="mb-2 flex flex-col gap-1.5"
+                  >
+                    <ChipsSlot host={chipsHost} />
+                    {hintEl}
+                  </div>
+                )}
+                <TabsContent value="main">
+                  <SheetWide.Provider value={wide}>
+                    <MainTab />
+                  </SheetWide.Provider>
                 </TabsContent>
-              ))}
-            </div>
-          </Tabs>
-        </Card>
-      </SheetOverridesProvider>
+                <TabsContent value="actions">
+                  <ActionsTab />
+                </TabsContent>
+                <TabsContent value="features">
+                  <FeaturesTab />
+                </TabsContent>
+                <TabsContent value="inventory">
+                  <InventoryTab />
+                </TabsContent>
+                <TabsContent value="notes">
+                  <NotesTab />
+                </TabsContent>
+                {sectionTabs.map((s) => (
+                  <TabsContent key={s.id} value={`section:${s.id}`}>
+                    <SectionView section={s} creatureId={creature.id} client={client} />
+                  </TabsContent>
+                ))}
+              </div>
+            </Tabs>
+          </Card>
+        </SheetOverridesProvider>
+      </SheetLinks>
     </SheetContext.Provider>
   );
 }

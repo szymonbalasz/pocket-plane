@@ -41,7 +41,7 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 ## 2. Next, in order
 
 
-**Now: [sprint 15](sprint-15.md) (DM #416):** upgrade guards, play fixes, window position memory, then **linked notes with backlinks** (the next big feature, #413): spec, the DM's gate, build. **Then** the quest log, in-game calendar, session timeline and NPC directory. The whole order is the [priority build list](../roadmap.md#priority-build-list-2026-10-31). Backlog candidates are in status.md. Work on the CI loop (AGENTS §9.4.1).
+**Now: [sprint 15](sprint-15.md) (DM #416):** upgrade guards, play fixes and window position memory are merged. **Linked notes with backlinks** was reframed by the DM at the gate (#440): rewrite the spec once the DM picks how live shared notes are, then gate, build. **Then** the quest log, in-game calendar, session timeline and NPC directory, which now need re-reading against #440. The whole order is the [priority build list](../roadmap.md#priority-build-list-2026-10-31). Backlog candidates are in status.md. Work on the CI loop (AGENTS §9.4.1).
 
 *(Done, #366–#381.)* Sprint 14 on the CI test loop: fix pack F1–F4, Spell FX pulled in (#374), AoE cell origin, Map effects default Full; Agent / MCP API in a parallel session.
 
@@ -57,6 +57,15 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 *(Done, #335–#337.)* **Sprint 8, DM decisions #333–#334: [sprint-8](sprint-8.md).** Tracks WF (window-frame pass: one placement path proven by a session-replay layout harness; at small screens PCs stay clear first, then shrink, then put away; BL-52, -53, -59, -60, -61, -64, -65, -66, -70), TT (table tools: saved macros / custom roll buttons, DM roll requests, pause / intermission screen, DM-added alert sounds), SB (stats tier B: kill-feed toasts, trophy case, dice luck tracker, end-of-combat summary), CB (combat polish: drag to reorder initiative, current-turn token highlight, party HP / AC summary for players). Phase A specs (all four at once) → seams → two reviews → **one DM gate** → Phase B builds per the hotspot table → session-sim-12 → "Playtest: sprint 8 features" → pause and recap. Backlog backfill in idle slots (#286).
 
 **Idle slots (#204, #205, #286, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill)):** the goal is the sprint's milestones. When an agent slot is idle and nothing in the sprint queue can start (DM #286: "pull more stories from the backlog when there are idle agents"), pick one small eligible item from [backlog](backlog.md) without asking (max two at once; sprint work always wins the next slot); stop picking once the last sprint slices are in flight. If nothing fits, ask the DM.
+
+Lessons from sprint 15 (2026-10-31/11-01), on top of the ones below:
+- **Never chain a push after a merge with `;`:** a conflicted merge went on to commit and push conflict markers to `main` (scenes-map.md, fixed forward within minutes). Land through one script that aborts on a conflict or a marker and pushes nothing.
+- **Several sessions pushing to `main` cancel each other's CI runs:** `ci:watch <sha>` keeps saying superseded. Wait for the first finished, non-cancelled run on a commit that contains your merge (`git merge-base --is-ancestor`).
+- **`waitrep.sh` can miss a finished agent** (no "copy reply" in its output now) and a builder sits `done` with a CI watch in the background: wait on a report file's mtime with the agent not working.
+- **Test agents with `--strict-mcp-config --mcp-config .mcp.json`** load only the Playwright servers. Once the DM runs a real campaign, this keeps its MCP tools out of reach.
+- **A premise from an old stub can overtake a whole spec:** linked notes' world-builder framing survived a spec and a review and only fell at the DM's gate (15 questions, mostly moot). For a feature the DM hasn't described in their own words, ask one framing question before the spec agent starts.
+- A builder rebuilding `dist/` during a walkthrough gives stale-chunk 404s: hold builder work on a branch while its walkthrough runs. Walkthrough briefs copied from a builder's harness rects can fail on layouts play never produces.
+- A safety hook held an `rm` in a chained command, so nothing in the chain ran: check the result before reporting steps as done.
 
 Lessons from sprint 14 (2026-10-28/29), on top of the ones below:
 - **The CI loop works**: builders push and run `ci:watch` in the background; merges don't wait for CI; `main` went red once (a CI-only flake) and was fixed first on `fix/ci-<slug>` within an hour. Three builders at once were fine with heavy tests in CI; still one walkthrough server at a time.

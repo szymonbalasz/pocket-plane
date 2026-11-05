@@ -38,9 +38,11 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["fog", 30],
       ["scn-templates", 35],
       ["vfx-under", 38],
+      ["mirrors", 39],
       ["tokens", 40],
       ["vfx-over", 43],
       ["labels", 45],
+      ["scn-template-labels", 47],
       ["scn-edit", 48],
       ["teleport-pick", 49],
       ["pointers", 50],
@@ -58,9 +60,11 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["fog"],
       ["scn-templates"],
       ["vfx-under"],
+      ["mirrors"],
       ["tokens"],
       ["vfx-over"],
       ["labels"],
+      ["scn-template-labels"],
       ["scn-edit"],
       ["teleport-pick"],
       ["pointers"],
@@ -79,14 +83,21 @@ describe("FR-SCN-02/03 canvas layers", () => {
     expect(named("dm")).toEqual([
       ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],
       ["map-layer-fog", ["fog"]],
-      ["map-layer-objects", ["scn-templates", "vfx-under", "tokens", "vfx-over", "labels"]],
-      ["map-layer-top", ["scn-edit", "teleport-pick", "pointers"]],
+      [
+        "map-layer-objects",
+        ["scn-templates", "vfx-under", "mirrors", "tokens", "vfx-over", "labels"],
+      ],
+      ["map-layer-top", ["scn-template-labels", "scn-edit", "teleport-pick", "pointers"]],
     ]);
     expect(named("player")).toEqual([
       ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],
       ["map-layer-fog", ["fog"]],
-      ["map-layer-objects", ["scn-templates", "vfx-under", "tokens", "vfx-over", "labels"]],
-      ["map-layer-top", ["pointers"]],
+      [
+        "map-layer-objects",
+        ["scn-templates", "vfx-under", "mirrors", "tokens", "vfx-over", "labels"],
+      ],
+      // FR-SCN-59: the templates' label pills, over the tokens and their labels.
+      ["map-layer-top", ["scn-template-labels", "pointers"]],
     ]);
     // Konva warns above 5; the budget is 4 on both clients, whatever the switches say.
     for (const client of ["dm", "player"] as const) {

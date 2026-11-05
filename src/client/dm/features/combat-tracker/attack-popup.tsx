@@ -20,14 +20,17 @@
 // AC chip, Hit, multiplier, preview; Remove on hover), footer Dismiss · card actions · Apply.
 // Sprint 15 (FR-CBT-174, -176; #385): the "Use roll" step before a card made from a logged roll
 // (Attacker, a Type per untyped damage roll, Make card / Cancel), in the same panel; a crit card
-// completed from a logged roll says its dice weren't doubled (OQ-CBT-104 A).
+// completed from a logged roll says its dice weren't doubled (OQ-CBT-104 A). FR-CBT-178 (#428):
+// Clear on the damage line takes a card's damage off; the next roll fills the emptied fields.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
 import {
   APPLY_TARGETS_MAX,
+  attackPhrase,
   type CardPartRef,
   CBT_INTENTS,
+  type ClearDamageResult,
   type CombatantView,
   CRIT_CHANGED_TEXT,
   critChanged,
@@ -87,6 +90,7 @@ import {
   intentForRoll,
   type UseRollType,
 } from "@ui/features/combat-tracker/use-roll-action";
+import { pcScreenBoxes, pcTokenIds } from "@ui/features/notifications/pc-boxes";
 import { hideToast } from "@ui/features/notifications/toasts";
 import {
   EDGE_GAP,
@@ -96,9 +100,17 @@ import {
 } from "@ui/features/play-shell/geometry";
 import { cn } from "@ui/lib/utils";
 import { IntentRejected } from "@ui/sync/connection";
-import { useRecords, useSync } from "@ui/sync/store";
+import { SyncContext, useRecords, useSync } from "@ui/sync/store";
 import { EyeOffIcon, PlusIcon, XIcon } from "lucide-react";
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LinkHintNote } from "../combat-extras/link-hint";
 import {
   AcCell,
@@ -115,6 +127,7 @@ import {
 import { useDefinitions } from "./data";
 import {
   blurField,
+  clearShown,
   FIELD_EMPTY,
   type FieldDraft,
   fieldValue,
@@ -656,7 +669,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
   // K8 (K6 gap 7): the to-hit line's label, the kit's "Mira · Longbow attack".
   const attackLabel = (
     <span>
-      <strong className="font-semibold">{p.attackerName}</strong> · {p.attackName} attack
+      <strong className="font-semibold">{p.attackerName}</strong> · {attackPhrase(p.attackName)}
     </span>
   );
   // An empty / non-number cell falls back to the roll; none yet → null (FR-CBT-72).
@@ -841,6 +854,19 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
       setApplying(false);
     }
   };
+  // FR-CBT-178 (#428): off the card (a typed total alone needs no intent), then every damage field
+  // and the old roll's trigger picks are the DM's no longer, so the next roll fills them.
+  const clearDamage = async () => {
+    if (disabled) return;
+    if (p.damage) {
+      const r = await send<ClearDamageResult>(CBT_INTENTS.clearDamage, {
+        cardId: card.id,
+        damageRollId: p.damage.rollId,
+      });
+      if (r === undefined) return;
+    }
+    edit(() => ({ damage: FIELD_EMPTY, extra: [], parts: {} }));
+  };
   const dismiss = async () => {
     const r = await send("note.dismiss", { id: card.id });
     if (r !== undefined) {
@@ -1005,6 +1031,20 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
               placeholder={p.damage ? undefined : "Total"}
               onEdit={(next) => edit(() => ({ damage: next }))}
             />
+            {clearShown(p, isTyped(draft.damage)) && (
+              <Tooltip content="Clear the damage: the next roll fills it">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-1.5 text-xs"
+                  data-testid="cbt-popup-damage-clear"
+                  disabled={disabled}
+                  onClick={clearDamage}
+                >
+                  Clear
+                </Button>
+              </Tooltip>
+            )}
           </div>
         </div>
         {extraParts.map((x, i) => (
@@ -1394,6 +1434,7 @@ function PopupFrame({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const sync = useContext(SyncContext);
   // Top-left once placed (FR-CBT-55/56, over its notification FR-CBT-75) or dragged (FR-CBT-76);
   // null before the first layout. Client memory until the popup closes.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -1411,7 +1452,9 @@ function PopupFrame({
       const r = el.getBoundingClientRect();
       return { w: r.width, h: r.height };
     };
-    const at = measurePlacement(tiers, size(), origin);
+    // FR-NOTE-81: off the PCs, read at open like the tiers.
+    const store = sync?.getState().store;
+    const at = measurePlacement(tiers, size(), origin, pcScreenBoxes(pcTokenIds(store), store));
     setSide(at.side);
     setPos({ x: at.x, y: at.y ?? at.top });
     const reclamp = () => {

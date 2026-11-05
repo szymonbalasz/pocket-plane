@@ -313,15 +313,15 @@ describe("FR-ASSET-23 drop + refusals", () => {
     expect(h.sent).toHaveLength(2);
   });
 
-  test("FR-ASSET-23 refusals: .txt → Unsupported file type, 26 MB → File over 25 MB, nothing sent", () => {
+  test("FR-ASSET-23 refusals: .txt → Unsupported file type, 101 MB → File over 100 MB, nothing sent", () => {
     const h = harness();
     handleDrop(
-      dropEvent([file("notes.txt", "text/plain"), file("huge.png", PNG, 26 * 1024 * 1024)]),
+      dropEvent([file("notes.txt", "text/plain"), file("huge.png", PNG, 101 * 1024 * 1024)]),
       h.gate(),
     );
     expect(h.status().errors).toEqual([
       "notes.txt: Unsupported file type",
-      "huge.png: File over 25 MB",
+      "huge.png: File over 100 MB",
     ]);
     expect(h.sent).toHaveLength(0);
     expect(h.queue.pending).toBe(0);

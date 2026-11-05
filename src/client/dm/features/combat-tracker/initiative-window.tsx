@@ -1216,8 +1216,10 @@ function AbilityAnchors({ check, save }: { check: RollControl; save: RollControl
 /**
  * FR-KIT-21 (K9, K6 gap 4): a Pending row is one compact line in body type with a muted icon, the
  * same box for both kinds (`data-slot="init-pending"`), never a stone button.
+ * `shrink-0` (BL-177, sim-17 s04): a row with an action button shrank in the capped list, so part
+ * of the next row showed at the foot; `pendingMaxH` counts whole 32-px lines.
  */
-const PENDING_LINE = "flex h-8 w-full items-center gap-1.5 rounded-md border px-2 text-sm";
+const PENDING_LINE = "flex h-8 w-full shrink-0 items-center gap-1.5 rounded-md border px-2 text-sm";
 
 /**
  * FR-CBT-79 (G9): one Pending row per linked notification. A damage card opens the popup; another

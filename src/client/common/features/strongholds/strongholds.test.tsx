@@ -2,11 +2,14 @@
 // and static renders of the Strongholds tab and the Stronghold window over a fake sync store, with
 // `hold-greystone`'s rows (DM full, player-1 redacted by the shared FR-HOLD-08 function). Clicks,
 // live frames and layout: `e2e/hold-ui.e2e.ts` and walkthrough RS-H.
+
 import { afterEach, describe, expect, test } from "bun:test";
 import type { You } from "@shared/protocol/frames";
 import { lazyAfterSnapshot, markLoaded } from "@shared/protocol/lazy";
 import { emptyStore, type RecordMap } from "@shared/protocol/store";
+import { REMINDER_TEXT_MAX } from "@shared/reminders/schemas";
 import {
+  FACILITY_EFFECT_MAX,
   indexOf,
   redactIndex,
   redactStronghold,
@@ -26,6 +29,7 @@ import { createPartyMemory, createTabState, tabKey } from "../party-board/seen";
 import { createWindowRegistry } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { BANDS, SIZE_TABLE } from "../play-shell/size-table";
+import { draftError } from "../reminders/logic";
 import { prefillDraft } from "./HoldReminders";
 import { RemindersWithLinks } from "./links";
 import {
@@ -565,9 +569,16 @@ describe("Pure rules (FR-HOLD-17, -19, -25, -26, -27, -29, -31, -32, -33)", () =
     expect(reminderGroups("tower", GREY.facilities, REMINDERS)).toEqual([]);
     const steam = GREY.facilities[4];
     if (!steam) throw new Error("fixture");
+    // Make reminder never cuts unseen: the editor gets the whole effect and refuses to save it
+    // until the DM trims it to a reminder's limit.
+    const long = reminderPrefill(GREY, { ...steam, effect: "x".repeat(FACILITY_EFFECT_MAX) });
+    expect(FACILITY_EFFECT_MAX).toBeGreaterThan(REMINDER_TEXT_MAX);
+    expect(draftError(prefillDraft(long), { role: "dm", playerId: null })).toContain(
+      `at most ${REMINDER_TEXT_MAX}`,
+    );
     expect(reminderPrefill(GREY, { ...steam, effect: "x".repeat(600) })).toEqual({
       target: { kind: "party" },
-      text: "x".repeat(500),
+      text: "x".repeat(600),
       source: "Greystone Keep: Steam Rooms",
       strongholdId: "grey",
       facilityId: "steam",

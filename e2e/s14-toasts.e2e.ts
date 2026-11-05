@@ -3,7 +3,7 @@
 // player's own attack card, pending on the DM, is listed under "Waiting" in their Notifications,
 // never under History. BL-131: Initiative squeezed to 380 high with its Pending cards keeps a
 // two-row list (Pending lines capped, the rest scroll). BL-137: Next turn scrolls the
-// row list to the active row.
+// row list to the active row. BL-177: no Pending line cut in half at the block's foot.
 // Rules: bun test (`alerts-fold.test.ts`, `keep-out-s14.test.ts`, `popup-place.test.ts`,
 // combat-tracker `pending-cap.test.ts`, server `waiting-leak.test.ts`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
@@ -44,6 +44,20 @@ async function rowsInView(init: Locator): Promise<{ rows: number; listH: number 
   }
   return { rows, listH: Math.round(list.height) };
 }
+
+/**
+ * BL-177 (sim-17 s04): the Pending lines' heights, and the lines the block's foot cuts in half
+ * (scrolled to the top): a line with an action button used to shrink, so a fourth line showed.
+ */
+const pendingFit = (lines: Locator) =>
+  lines.evaluate((ul) => {
+    const foot = ul.getBoundingClientRect().bottom;
+    const rows = [...ul.children].map((li) => li.getBoundingClientRect());
+    return {
+      heights: [...new Set(rows.map((r) => Math.round(r.height)))],
+      cut: rows.filter((r) => r.top < foot - 1 && r.bottom > foot + 1).length,
+    };
+  });
 
 test("BL-137 BL-131 FR-NOTE-17 FR-CBT-77: Player 1's card waits under Waiting; Initiative at 380 high keeps a 112-px row list (2 names) beside its Pending lines and scrolls to the turn's row", async ({
   browser,
@@ -91,6 +105,20 @@ test("BL-137 BL-131 FR-NOTE-17 FR-CBT-77: Player 1's card waits under Waiting; I
       '[data-testid="note-history-closed"] [data-testid="note-history-row"][data-state="pending"]',
     ),
   ).toHaveCount(0);
+
+  // BL-177 (sim-17 s04): Mira, concentrating on Bless, takes 1: "Waiting for Mira" joins the cards
+  // with its Roll save, the row kind that shrank. All 32 px, the foot between two lines.
+  const mira = init.getByTestId("cbt-init-row").filter({
+    has: dm.locator('[data-testid="cbt-init-row-name"][data-value="Mira"]'),
+  });
+  await mira.first().getByTestId("cbt-init-row-menu").click();
+  await dm.getByTestId("cbt-init-row-hp-adjust").click();
+  await dm.getByTestId("cbt-hp-amount").fill("1");
+  await dm.getByTestId("cbt-hp-damage").click();
+  const block = init.getByTestId("cbt-init-pending-lines");
+  await expect(block.getByTestId("cbt-init-pending-action").first()).toBeVisible();
+  expect(await block.locator("> li").count()).toBeGreaterThan(3);
+  expect(await pendingFit(block)).toEqual({ heights: [32], cut: 0 });
 
   // BL-131: Initiative squeezed to 380 high: ≤ 2 Pending lines, 2 combatant rows whole.
   const h = (await rect(init)).height;

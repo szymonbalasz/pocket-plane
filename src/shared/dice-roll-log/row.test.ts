@@ -283,6 +283,15 @@ describe("FR-KIT-44 outcome", () => {
       "Scimitar attack vs Mira — Overkill!",
     );
   });
+
+  test("BL-177 a used plain roll's card, applied: 'Attack vs Mira', one 'attack'", () => {
+    const p0 = ATTACK.payload as Record<string, unknown>;
+    const named = (attackName: string) =>
+      rowAction({ ...ATTACK, payload: { ...p0, attackName } }).text;
+    expect(named("Attack")).toBe("Attack vs Mira");
+    expect(named("Sneak attack")).toBe("Sneak attack vs Mira");
+    expect(named("Attack of Opportunity")).toBe("Attack of Opportunity attack vs Mira");
+  });
 });
 
 describe("FR-KIT-46 copy", () => {

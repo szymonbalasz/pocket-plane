@@ -9,6 +9,8 @@ import {
   ASSET_MANAGE_INTENTS,
   type AssetUse,
   type AssetUsesResult,
+  USES_CHECKING,
+  usedInText,
 } from "@shared/assets-pipeline/manage";
 import type { AssetRecord } from "@shared/assets-pipeline/schemas";
 import type { CampaignRecord } from "@shared/campaign-management/schemas";
@@ -29,13 +31,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { SOUND_ACCEPT, uploadSound } from "../campaign-management/AlertSoundsSection";
 
 export const ASSETS_KIND = "asset.library";
-
-/** FR-ASSET-69: "Used in" text for a use list. */
-export function usedInText(uses: readonly AssetUse[]): string {
-  if (uses.length === 0) return "Not used anywhere: it can be deleted.";
-  const names = uses.map((u) => (u.name === null ? u.kind : `${u.name} (${u.kind})`));
-  return `Used in: ${names.join(", ")}`;
-}
 
 /** FR-ASSET-70: the alerts that pick a sound, by their labels ("Your turn, Pause"). */
 export function soundUsedBy(picks: AlertSounds | undefined, id: string): string[] {
@@ -80,7 +75,7 @@ function UsedIn({ asset }: { asset: AssetRecord }) {
         ? usedInText(uses.uses)
         : uses.state === "error"
           ? "Couldn't check where it's used."
-          : "Checking where it's used…"}
+          : USES_CHECKING}
     </p>
   );
 }

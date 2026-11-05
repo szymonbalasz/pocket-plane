@@ -28,13 +28,23 @@ export const ALLOWED_ROUTES = [
   "POST /api/compendium/derive-monster",
   "POST /api/compendium/entries",
   "PUT /api/compendium/entries/:id",
+  "POST /api/assets",
 ] as const;
 export type AllowedRoute = (typeof ALLOWED_ROUTES)[number];
-export const ALLOWED_INTENTS = [SYNC_LOAD, "char.putRow", "char.edit"] as const;
+export const ALLOWED_INTENTS = [
+  SYNC_LOAD,
+  "char.putRow",
+  "char.edit",
+  "mod.putPreset",
+  "mod.putTrigger",
+  "mod.toggle",
+] as const;
 export type AllowedIntent = (typeof ALLOWED_INTENTS)[number];
 
 /** FR-AGENT-06: no answer within this → `server_stopped`. */
 export const CALL_TIMEOUT_MS = 10_000;
+/** FR-AGENT-48: an upload's timeout (sharp processing a large image). */
+export const UPLOAD_TIMEOUT_MS = 60_000;
 
 /** stderr only (FR-AGENT-02). */
 export interface Log {
@@ -59,6 +69,10 @@ export interface RestRequest {
   id?: string;
   query?: Record<string, string>;
   body?: unknown;
+  /** Multipart body instead of JSON `body` (`POST /api/assets`, FR-AGENT-42). */
+  form?: FormData;
+  /** Overrides the call timeout (FR-AGENT-48). */
+  timeoutMs?: number;
   /** Picks the `server_stopped` wording (FR-AGENT-06). */
   write?: boolean;
 }
@@ -116,6 +130,16 @@ export class Caller {
     schema: S,
   ): Promise<z.output<S>> {
     const server = this.locate();
+    return (await this.send(server.http, route, req, schema)).data;
+  }
+
+  /** As `rest`, with the answer's status (an upload's 201 created / 200 existing). */
+  async restStatus<S extends z.ZodType>(
+    route: AllowedRoute,
+    req: RestRequest,
+    schema: S,
+  ): Promise<{ status: number; data: z.output<S> }> {
+    const server = this.locate();
     return this.send(server.http, route, req, schema);
   }
 
@@ -124,7 +148,7 @@ export class Caller {
     route: AllowedRoute,
     req: RestRequest,
     schema: S,
-  ): Promise<z.output<S>> {
+  ): Promise<{ status: number; data: z.output<S> }> {
     if (!(ALLOWED_ROUTES as readonly string[]).includes(route)) {
       throw new AgentError("internal", `Route not allowed: ${route}`);
     }
@@ -146,8 +170,13 @@ export class Caller {
           authorization: `Bearer ${this.opts.dmSecret}`,
           ...(req.body === undefined ? {} : { "content-type": "application/json" }),
         },
-        ...(req.body === undefined ? {} : { body: JSON.stringify(req.body) }),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        // FormData sets its own multipart content type and boundary.
+        ...(req.form !== undefined
+          ? { body: req.form }
+          : req.body === undefined
+            ? {}
+            : { body: JSON.stringify(req.body) }),
+        signal: AbortSignal.timeout(req.timeoutMs ?? this.timeoutMs),
       });
       text = await res.text();
     } catch (err) {
@@ -168,7 +197,7 @@ export class Caller {
     if (!res.ok) throw restError(res.status, json, route);
     const parsed = schema.safeParse(json);
     if (!parsed.success) throw new AgentError("internal", `Unexpected answer from ${route}.`);
-    return parsed.data;
+    return { status: res.status, data: parsed.data };
   }
 
   /** One WS for one call (FR-AGENT-09): hello → snapshot → `run` → close 1000. */

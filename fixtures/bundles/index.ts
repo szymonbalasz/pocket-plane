@@ -109,6 +109,8 @@ import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
 import s14KitE2e from "./s14-kit-e2e";
 import s14ToastsE2e from "./s14-toasts-e2e";
+import s15FrameE2e from "./s15-frame-e2e";
+import s15ToastsE2e from "./s15-toasts-e2e";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
@@ -122,6 +124,7 @@ import sessionSim11 from "./session-sim-11";
 import sessionSim12 from "./session-sim-12";
 import sessionSim13 from "./session-sim-13";
 import sessionSim17 from "./session-sim-17";
+import sheetLinks from "./sheet-links";
 import spPalette from "./sp-palette";
 import spPaletteE2e from "./sp-palette-e2e";
 import spRules from "./sp-rules";
@@ -151,12 +154,14 @@ import tableToolsPausedE2e from "./table-tools-paused-e2e";
 import themeGilt from "./theme-gilt";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
+import tokenMirrors from "./token-mirrors";
 import tplMenu from "./tpl-menu";
 import trayAttacks from "./tray-attacks";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
 import visualKit from "./visual-kit";
+import wallKinds from "./wall-kinds";
 import wfFrame from "./wf-frame";
 import wfFrameE2e from "./wf-frame-e2e";
 import windowsS5 from "./windows-s5";
@@ -366,6 +371,8 @@ export const bundles: readonly Bundle[] = [
   visualKit,
   // Spell FX core (fix/vfx-core): Cast, hit cues and auras walkthrough + spell-fx e2e
   spellFx,
+  // Token mirrors (build/token-mirrors)
+  tokenMirrors,
   // Agent / MCP API (build/agent-core): read tools, plan_check, mcp:call walkthroughs
   agentApi,
   // Rest buttons (fix/rest-buttons): char.rest e2e
@@ -394,8 +401,16 @@ export const bundles: readonly Bundle[] = [
   diceLogMenuE2e,
   // Full session simulation after sim-16 (fix/housekeeping-sim)
   sessionSim17,
+  // Sprint 15 frame (fix/s15-frame): its e2e on a server of its own
+  s15FrameE2e,
   // Send to game log (build/log-share)
   logShare,
+  // Sprint 15 (fix/s15-toasts): toasts off the PCs and sheet buttons e2e alias of session-sim-13
+  s15ToastsE2e,
+  // Windows and one-way walls (build/wall-kinds): `vision` in its own server
+  wallKinds,
   // The Luck tab's d20 chart e2e alias of stats-b (build/luck-d20-chart)
   statsDiceE2e,
+  // Sheet names linking to compendium entries (build/sheet-compendium-links)
+  sheetLinks,
 ];

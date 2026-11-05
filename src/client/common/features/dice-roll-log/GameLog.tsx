@@ -48,6 +48,7 @@ import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
 import { FOLDED_TEXT } from "@shared/log-share/kind";
 import { LOG_KIND_SHARE, type SharePayload } from "@shared/log-share/schemas";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
+import { TOKEN_MIRROR_TYPE, type TokenMirrorRecord } from "@shared/token-mirrors/schemas";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -96,7 +97,7 @@ import { Badge, Input, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
-import { colorHex } from "../campaign-management/colors";
+import { colorHex, colorText } from "../campaign-management/colors";
 import { useDefinitions } from "../compendium/definitions";
 import { MarkdownLite } from "../compendium/MarkdownLite";
 import { DieShape } from "../dice-extras/DieShape";
@@ -296,7 +297,7 @@ export function EntryDetails({ e }: { e: GameLogEntryView }) {
   const shown = useMemo(() => (landed ? segments : heldSegments(segments)), [segments, landed]);
   const look = useRollerLooks()(e);
   const color = rollerColorKey(useColorKeyOf(), e);
-  const nameColor = color ? colorHex(color) : null;
+  const nameColor = color ? colorText(color) : null;
   const line = useLandingFade<HTMLSpanElement>(landed);
   return (
     <div data-testid="dice-log-entry-details" className="flex max-w-96 flex-col gap-0.5">
@@ -452,7 +453,7 @@ function Entry({
   // The boxes' numbers fade in at the landing (`data-landing`), as the line's did.
   const li = useLandingFade<HTMLLIElement>(landed);
   const hidden = isDm && !e.public;
-  const nameColor = color ? colorHex(color) : null;
+  const nameColor = color ? colorText(color) : null;
   // FR-DICE-65: an undone line that is also superseded reads "undone" (its badge) only.
   const rerolled = e.supersededBy !== null && !e.undone ? e.supersededBy : null;
   // FR-DICE-65: struck through, and dimmed when rerolled.
@@ -538,7 +539,12 @@ function Entry({
       {/* FR-KIT-41: the actor's portrait, else its initial on its name colour (FR-DICE-60),
           else neutral. */}
       {row.actor !== null ? (
-        <Medallion name={row.actor} imageAssetId={portrait} colour={nameColor} size="md" />
+        <Medallion
+          name={row.actor}
+          imageAssetId={portrait}
+          colour={color ? colorHex(color) : null}
+          size="md"
+        />
       ) : (
         <span aria-hidden className="size-7" />
       )}
@@ -951,6 +957,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const tokens = useRecords<TokenView>(TOKEN_TYPE);
   const encounters = useRecords<EncounterRecord>(ENCOUNTER_TYPE);
   const combatants = useRecords<CombatantRecord>(COMBATANT_TYPE);
+  const mirrors = useRecords<TokenMirrorRecord>(TOKEN_MIRROR_TYPE);
   const actors = useMemo(
     () => actorOptions(you, entities, scenes, tokens, encounters, combatants),
     [you, entities, scenes, tokens, encounters, combatants],
@@ -962,7 +969,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const { options: actorList, selected } = actorSelection(actors, actor);
   const actorRef = selected?.ref;
   // FR-DICE-22 (sprint 14 F3): the inputs of the server's roll guard (FR-DICE-13), for the eye.
-  const guardInput = { ref: actorRef, tokens, combatants, encounters, scenes };
+  const guardInput = { ref: actorRef, tokens, combatants, encounters, scenes, mirrors };
 
   const control = useRollControl({
     expressions: [expression],

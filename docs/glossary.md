@@ -76,6 +76,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Scene folder** | DM-only grouping of scenes in the scene list, nesting up to 5 levels. Never sent to players. | — |
 | **Grid calibration** | Setting cell size/offset so the grid aligns with the map image. | — |
 | **Token** | A movable piece on a scene: an instance of a creature definition, optionally bound to a combatant. | Combatant |
+| **Mirror** | A display-only copy of a token at another place on the same map, for battles on several floors. Has a mode: Hidden, Visible, Transparent or Shadow. No sight, no combat, can't be targeted. | Token, Miniature |
 | **Token owner** | The one player (or none) who may move a token. Defaults from the character's owner; the DM reassigns it (decisions #124). A companion's token follows its owner ([ADR-0056](architecture/adr/0056-companion-visibility.md)). | Character's owner |
 | **Reveal refit** | A player's map re-frames once when tokens they see for the first time land under a window or off-screen, unless they moved the camera; a pan cancels it, a drag defers it ([scenes-map](specs/scenes-map.md) FR-MAP-82). | Fit |
 | **Hidden token** | Token visible only to the DM (shown translucent to DM) until revealed with the hide/reveal button. MVP. | — |
@@ -103,11 +104,13 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Sees invisible** | DM-only sheet sense (truesight, See Invisibility). | — |
 | **Fog-hidden** | A record a given player can't see (not in their sight or clear area): not in that player's `seenBy`, so they don't receive it (owned / party tokens excepted). `fogged` = seen by no player. | Hidden token |
 | **Reveal all / Fog all** | DM fog actions that clear or cover a whole scene. | — |
-| **AoE template** | A shape (cone, sphere, cylinder, cube, line) placed on a scene to show an area of effect, placed freely (Ctrl) or snapped; its affected squares are the cells more than half inside it; ephemeral unless kept ([scene-tools](specs/scene-tools.md)). | Freehand drawing (out of scope) |
+| **AoE template** | A shape (cone, sphere, cube, line) placed on a scene to show an area of effect, placed freely (Ctrl) or snapped; its affected squares are the cells more than half inside it; ephemeral unless kept ([scene-tools](specs/scene-tools.md)). | Freehand drawing (out of scope) |
 | **Affected squares** | The grid cells more than half inside an AoE template ([scene-tools](specs/scene-tools.md)). | — |
 | **Ephemeral template** | An AoE template sent as a live signal, gone when cleared or its placer leaves; **Keep** saves it as a record. | AoE template |
 | **Prop** | A DM-placed image object on a scene's objects layer (barrel, table). | Token |
-| **Wall** | A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight. | Door |
+| **Wall** | A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight. | Door, Window, One-way wall |
+| **Window** | A wall that blocks player token moves but not sight. | Wall |
+| **One-way wall** | A wall that blocks player token moves both ways and sight one way: its arrows show the way sight passes. Used for elevation. | Wall |
 | **Wall hint** | The red piece of the first wall crossed, shown while a player drags a token (from a server dry-run check). | — |
 | **Door** | A wall segment the DM sets open, closed or locked; closed / locked doors block sight; hidden from a player until a point beside it is in their sight. | Wall |
 | **Structure** | A scene's walls and doors, stored as one record per scene. | — |

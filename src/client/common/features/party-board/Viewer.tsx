@@ -112,7 +112,10 @@ export function HandoutArticle({ loaded, extras }: { loaded: LoadedHandout; extr
         data-record-id={header.id}
         className="flex flex-col gap-3 p-3"
       >
-        <h2 data-testid="party-handout-title" className="text-base font-semibold break-words">
+        <h2
+          data-testid="party-handout-title"
+          className="text-base font-semibold [overflow-wrap:anywhere]"
+        >
           {header.title}
         </h2>
         {extras}
@@ -120,7 +123,10 @@ export function HandoutArticle({ loaded, extras }: { loaded: LoadedHandout; extr
           <HandoutImage key={id} id={id} title={header.title} index={i} />
         ))}
         {body.body !== "" && (
-          <p data-testid="party-handout-body" className="text-sm leading-relaxed break-words">
+          <p
+            data-testid="party-handout-body"
+            className="text-sm leading-relaxed [overflow-wrap:anywhere]"
+          >
             <DiceText text={body.body} context={{ label: header.title, category: "other" }} />
           </p>
         )}

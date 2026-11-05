@@ -8,29 +8,84 @@ import {
   type DoorState,
   SCN_INTENTS,
   type Segment,
+  type Wall,
+  type WallKind,
 } from "@shared/scene-tools/schemas";
 import type { StructureView } from "./structure-view";
 import type { UndoStep } from "./undo";
 import { recordUndo, type Send, scnUndo, type UndoStore } from "./undo-store";
 
-/** FR-SCN-08 Wall: one polyline. Undo removes the segments that were new (n ≥ the old nextN). */
+/**
+ * The steps that re-add walls as they were, one `scn.addWalls` per kind: never `replace`, so they
+ * can't cut what they land on, and each kind dedupes only against itself (FR-SCN-07).
+ */
+function restoreWalls(sceneId: string, walls: readonly Wall[]): UndoStep[] {
+  return [...new Set(walls.map((w) => w[5]))].map((kind) => {
+    const same = walls.filter((w) => w[5] === kind);
+    return {
+      name: SCN_INTENTS.addWalls,
+      input: {
+        sceneId,
+        segments: same.map((w) => [w[1], w[2], w[3], w[4]]),
+        ...(kind === undefined ? {} : { kind }),
+      },
+      recreates: { ns: same.map((w) => w[0]) },
+    };
+  });
+}
+
+/**
+ * FR-SCN-08 Wall, FR-SCN-61 Window / One-way: one polyline. Undo removes the segments that were
+ * new (n ≥ the old nextN). FR-SCN-62: a polyline that replaced wall gets that wall back first, so
+ * the scene is never open between the steps.
+ */
 export async function addWallsEdit(
   send: Send,
   sceneId: string,
   view: StructureView,
   segments: Segment[],
   undo: UndoStore = scnUndo,
+  kind?: WallKind,
 ): Promise<number[]> {
   const nextN = view.full?.nextN ?? 1;
-  const { ns } = AddWallsResult.parse(await send(SCN_INTENTS.addWalls, { sceneId, segments }));
+  const {
+    ns,
+    replaced = [],
+    pieces = [],
+  } = AddWallsResult.parse(
+    await send(SCN_INTENTS.addWalls, {
+      sceneId,
+      segments,
+      replace: true,
+      ...(kind === undefined ? {} : { kind }),
+    }),
+  );
   const added = [...new Set(ns.filter((n) => n >= nextN))];
   if (added.length > 0) {
     recordUndo(
-      { sceneId, steps: [{ name: SCN_INTENTS.removeSegments, input: { sceneId, ns: added } }] },
+      {
+        sceneId,
+        steps: [
+          ...restoreWalls(sceneId, replaced),
+          { name: SCN_INTENTS.removeSegments, input: { sceneId, ns: [...added, ...pieces] } },
+        ],
+      },
       undo,
     );
   }
   return ns;
+}
+
+/** FR-SCN-63: reverses one-way walls. Undo reverses them again. */
+export async function flipEdit(
+  send: Send,
+  sceneId: string,
+  ns: number[],
+  undo: UndoStore = scnUndo,
+): Promise<void> {
+  if (ns.length === 0) return;
+  await send(SCN_INTENTS.flipWalls, { sceneId, ns });
+  recordUndo({ sceneId, steps: [{ name: SCN_INTENTS.flipWalls, input: { sceneId, ns } }] }, undo);
 }
 
 /**
@@ -49,14 +104,7 @@ export async function addDoorEdit(
     replaced = [],
     pieces = [],
   } = AddDoorResult.parse(await send(SCN_INTENTS.addDoor, { sceneId, segment, state }));
-  const steps: UndoStep[] = [];
-  if (replaced.length > 0) {
-    steps.push({
-      name: SCN_INTENTS.addWalls,
-      input: { sceneId, segments: replaced.map((w) => [w[1], w[2], w[3], w[4]]) },
-      recreates: { ns: replaced.map((w) => w[0]) },
-    });
-  }
+  const steps = restoreWalls(sceneId, replaced);
   steps.push({ name: SCN_INTENTS.removeSegments, input: { sceneId, ns: [n, ...pieces] } });
   recordUndo({ sceneId, steps }, undo);
   return n;
@@ -81,7 +129,7 @@ export async function setDoorEdit(
 
 /**
  * FR-SCN-08 Erase / door menu Delete. Undo re-adds them with the same coordinates (walls in one
- * `scn.addWalls`, each door with its state); the acks remap the old `n`s.
+ * `scn.addWalls` per kind, each door with its state); the acks remap the old `n`s.
  */
 export async function removeEdit(
   send: Send,
@@ -95,14 +143,7 @@ export async function removeEdit(
   const walls = view.walls.filter((w) => gone.has(w[0]));
   const doors = view.doors.filter((d) => gone.has(d.n));
   await send(SCN_INTENTS.removeSegments, { sceneId, ns: [...gone] });
-  const steps: UndoStep[] = [];
-  if (walls.length > 0) {
-    steps.push({
-      name: SCN_INTENTS.addWalls,
-      input: { sceneId, segments: walls.map((w) => [w[1], w[2], w[3], w[4]]) },
-      recreates: { ns: walls.map((w) => w[0]) },
-    });
-  }
+  const steps = restoreWalls(sceneId, walls);
   for (const d of doors) {
     steps.push({
       name: SCN_INTENTS.addDoor,

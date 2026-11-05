@@ -24,7 +24,7 @@ import { withoutDmOnly } from "../../scene-tools/layer-switches";
 import { useCanvas } from "../canvas-context";
 import { decorateToken, type MergedDecoration } from "../decorations";
 import { CROSS_OPACITY, crossGeometry } from "../label";
-import { CASING_COLOR, CASING_EXTRA_PX, CASING_NAME } from "../mark-colors";
+import { CASING_EXTRA_PX, CASING_NAME, casingOf } from "../mark-colors";
 import { artBackdropOf, containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape";
 import {
   barGeometry,
@@ -42,6 +42,9 @@ import { DragPaths } from "./DragPaths";
 import { toneColor } from "./tone";
 
 const INSET = TOKEN_INSET;
+
+/** What the art needs (a token, or a mirror's copy of one, FR-MIR-08). */
+type BodyToken = Pick<TokenView, "shape" | "creatureType" | "name">;
 
 /** Backdrop per shape: a disc (round) or a rounded square inset like the outline. */
 function Backdrop({
@@ -70,7 +73,7 @@ function Backdrop({
 }
 
 /** FR-ENT-28: the type's glyph (white, ≈ 65 % of the footprint) on its colour per shape. */
-function CreatureArt({ t, side, type }: { t: TokenView; side: number; type: CreatureType }) {
+function CreatureArt({ t, side, type }: { t: BodyToken; side: number; type: CreatureType }) {
   const { colors } = useCanvas();
   const glyph = CREATURE_ART[type];
   const box = glyphRect(side);
@@ -97,12 +100,12 @@ function CreatureArt({ t, side, type }: { t: TokenView; side: number; type: Crea
 }
 
 /** Token art per shape (FR-MAP-35); creature-type art or initials when there is no image (yet). */
-function TokenBody({
+export function TokenBody({
   t,
   side,
   image,
 }: {
-  t: TokenView;
+  t: BodyToken;
   side: number;
   image: HTMLImageElement | null;
 }) {
@@ -244,7 +247,7 @@ export const TurnRingMark = memo(function TurnRingMark(p: {
         // FR-MAP-72: the dark casing first, without the glow.
         ctx.save();
         ctx.setAttr("shadowColor", "rgba(0,0,0,0)");
-        ctx.setAttr("strokeStyle", CASING_COLOR);
+        ctx.setAttr("strokeStyle", casingOf(p.color));
         ctx.setAttr("lineWidth", g.casingWidth);
         ctx.setLineDash(g.dash ?? []);
         path(ctx);
@@ -465,7 +468,7 @@ function TokenCueMark({ t, side, cue }: { t: TokenView; side: number; cue: Token
         x={g.ring.x}
         y={g.ring.y}
         radius={g.ring.radius}
-        stroke={CASING_COLOR}
+        stroke={casingOf(accent)}
         strokeWidth={g.ring.strokeWidth + CASING_EXTRA_PX / cam.scale}
       />
       <Circle

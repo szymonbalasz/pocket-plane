@@ -9,8 +9,11 @@ import { templateContextMenu } from "../scene-tools/aoe-store";
 import { ScnEditLayer } from "../scene-tools/layers/EditLayer";
 import { ScnPropsLayer } from "../scene-tools/layers/PropsLayer";
 import { ScnStructureLayer } from "../scene-tools/layers/StructureLayer";
+import { ScnTemplateLabelsLayer } from "../scene-tools/layers/TemplateLabelsLayer";
 import { ScnTemplatesLayer } from "../scene-tools/layers/TemplatesLayer";
 import { VFX_LAYER_SWITCH, VfxOverLayer, VfxUnderLayer, vfxContextMenu } from "../spell-fx/layers";
+import { MirrorsLayer } from "../token-mirrors/MirrorsLayer";
+import { mirrorContextMenu } from "../token-mirrors/mirror-store";
 import { LAYER_ORDER, type LayerDef, orderLayers } from "./layers";
 import { GridLayer } from "./layers/GridLayer";
 import { LabelsLayer } from "./layers/LabelsLayer";
@@ -52,6 +55,14 @@ export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
     // FR-SCN-48 / -51: right-click menu on a kept template (FR-MAP-71 step 4).
     contextMenu: templateContextMenu,
   },
+  // FR-SCN-59: the templates' label pills, over the tokens and their labels (no toggle: the
+  // Templates switch unmounts the layer above, which removes its pills).
+  {
+    id: "scn-template-labels",
+    order: LAYER_ORDER.scnTemplateLabels,
+    layer: "top",
+    component: ScnTemplateLabelsLayer,
+  },
   {
     id: "scn-edit",
     order: LAYER_ORDER.scnEdit,
@@ -84,6 +95,14 @@ export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
     layer: "objects",
     component: VfxUnderLayer,
     contextMenu: vfxContextMenu,
+  },
+  // token-mirrors (FR-MIR-15): display-only copies; the DM's right-click menu (FR-MIR-16).
+  {
+    id: "mirrors",
+    order: LAYER_ORDER.mirrors,
+    layer: "objects",
+    component: MirrorsLayer,
+    contextMenu: mirrorContextMenu,
   },
   {
     id: "vfx-over",

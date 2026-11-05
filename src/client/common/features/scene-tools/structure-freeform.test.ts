@@ -93,6 +93,7 @@ describe("FR-SCN-08 freeform gestures", () => {
             [4, 9, 5.44, 10.33],
             [5.44, 10.33, 7, 9],
           ],
+          replace: true,
         },
       ],
     ]);

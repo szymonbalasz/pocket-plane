@@ -14,6 +14,7 @@ export const SCN_INTENTS = {
   addDoor: "scn.addDoor",
   setDoor: "scn.setDoor",
   removeSegments: "scn.removeSegments",
+  flipWalls: "scn.flipWalls",
   placeProp: "scn.placeProp",
   updateProp: "scn.updateProp",
   setPropHidden: "scn.setPropHidden",
@@ -26,7 +27,11 @@ export const SCN_INTENTS = {
   setDiagonalRule: "scn.setDiagonalRule",
 } as const;
 
-export const SCN_SIGNALS = { template: "scn.template" } as const;
+export const SCN_SIGNALS = {
+  template: "scn.template",
+  /** FR-SCN-58: the DM asks another connection to clear its ephemeral. */
+  templateClear: "scn.templateClear",
+} as const;
 
 /** FR-SCN-38: the wall move guard's name, the `guard` of its `map.checkMove` hint. */
 export const WALL_GUARD = "scene-tools.walls";
@@ -92,8 +97,24 @@ export const Segment = z.tuple([SegCoord, SegCoord, SegCoord, SegCoord]);
 export type Segment = z.infer<typeof Segment>;
 
 const SegmentN = Int.min(1);
-/** Wall `[n, x1, y1, x2, y2]` (JSON leaf). */
-export const Wall = z.tuple([SegmentN, SegCoord, SegCoord, SegCoord, SegCoord]);
+/**
+ * FR-SCN-61: what a wall lets sight do; absent = a plain wall (blocks sight both ways). Every kind
+ * blocks player moves both ways (FR-SCN-10). A window never blocks sight; a one-way wall blocks it
+ * only for a viewer on the left of its direction `(x1, y1)` → `(x2, y2)`, as seen on screen.
+ */
+export const WALL_WINDOW = 1;
+export const WALL_ONE_WAY = 2;
+export const WallKind = z.union([z.literal(WALL_WINDOW), z.literal(WALL_ONE_WAY)]);
+export type WallKind = z.infer<typeof WallKind>;
+/** Wall `[n, x1, y1, x2, y2, kind?]` (JSON leaf); plain walls leave `kind` off (CON-44). */
+export const Wall = z.tuple([
+  SegmentN,
+  SegCoord,
+  SegCoord,
+  SegCoord,
+  SegCoord,
+  WallKind.optional(),
+]);
 export type Wall = z.infer<typeof Wall>;
 /** Door `[n, x1, y1, x2, y2, state, f]`; `f` = server-written fog flag (FR-SCN-36). */
 export const Door = z.tuple([
@@ -298,6 +319,10 @@ export interface TemplateGeometry {
 export const AddWallsInput = z.strictObject({
   sceneId: Id,
   segments: z.array(Segment).min(1).max(ADD_WALLS_MAX),
+  /** FR-SCN-61: absent = a plain wall. */
+  kind: WallKind.optional(),
+  /** FR-SCN-62: the drawing tool: each segment replaces the differing wall under it. */
+  replace: z.boolean().optional(),
 });
 export type AddWallsInput = z.input<typeof AddWallsInput>;
 export const AddDoorInput = z.strictObject({
@@ -312,11 +337,22 @@ export const RemoveSegmentsInput = z.strictObject({
   sceneId: Id,
   ns: z.array(SegmentN).min(1).max(REMOVE_SEGMENTS_MAX),
 });
+/** FR-SCN-63: one-way walls whose direction reverses, by `n`. */
+export const FlipWallsInput = z.strictObject({
+  sceneId: Id,
+  ns: z.array(SegmentN).min(1).max(REMOVE_SEGMENTS_MAX),
+});
 /**
- * `scn.addWalls` ack: one `n` per input segment, in order; a segment identical to one already
- * there (or earlier in the batch) gets that one's `n` (FR-SCN-07 dedupe). Undo remaps by position.
+ * `scn.addWalls` ack: one `n` per input segment, in order; a segment identical to one of the same
+ * kind already there, or to a door (or earlier in the batch), gets that one's `n` (FR-SCN-07
+ * dedupe). Undo remaps by position. FR-SCN-62, only when it replaced wall: the walls as they were
+ * and the `n`s of the pieces left of them, for undo.
  */
-export const AddWallsResult = z.object({ ns: z.array(SegmentN) });
+export const AddWallsResult = z.object({
+  ns: z.array(SegmentN),
+  replaced: z.array(Wall).optional(),
+  pieces: z.array(SegmentN).optional(),
+});
 export type AddWallsResult = z.infer<typeof AddWallsResult>;
 /**
  * `scn.addDoor` ack. FR-SCN-56, only when the door replaced wall: the walls as they were and the
@@ -424,3 +460,14 @@ export const TemplateSignalEnd = z.strictObject({
 });
 export const TemplateSignalData = z.union([TemplateSignalEnd, TemplateSignalPlace]);
 export type TemplateSignalData = z.infer<typeof TemplateSignalData>;
+
+/**
+ * FR-SCN-58: signal `scn.templateClear` (DM only): the connection whose ephemeral has this `key`
+ * ends it, as its own Clear would. `playerId` = the player it belongs to; absent = a DM tab's.
+ */
+export const TemplateClearData = z.strictObject({
+  sceneId: Id,
+  key: z.string().min(1).max(64),
+  playerId: Id.optional(),
+});
+export type TemplateClearData = z.infer<typeof TemplateClearData>;

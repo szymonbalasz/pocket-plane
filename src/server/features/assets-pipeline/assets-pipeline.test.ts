@@ -92,10 +92,10 @@ describe("ingest (FR-ASSET-01, -03, -04, -06, -08)", () => {
     const big = new Uint8Array(MAX_UPLOAD_BYTES + 1024);
     big.set(await testPng(3));
     const cases: [Uint8Array, string, number, string][] = [
-      [big, "huge.png", 413, "File over 25 MB"],
+      [big, "huge.png", 413, "File over 100 MB"],
       [new TextEncoder().encode("hello"), "notes.png", 415, "Unsupported file type"],
       [svgBytes(""), "nosize.svg", 422, "SVG needs width and height or a viewBox"],
-      [svgBytes('width="10000" height="6000"'), "huge.svg", 422, "Image over 50 megapixels"],
+      [svgBytes('width="20000" height="6000"'), "huge.svg", 422, "Image over 100 megapixels"],
       [(await testPng(4)).subarray(0, 40), "cut.png", 422, "Image is corrupt or unreadable"],
     ];
     for (const [bytes, filename, status, message] of cases) {

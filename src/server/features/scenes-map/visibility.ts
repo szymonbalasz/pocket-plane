@@ -51,6 +51,7 @@ export function redactToken(r: TokenRecord, v: Viewer): PlayerTokenRecord {
     fogged,
     invisible: _invisible,
     seenBy: _seenBy,
+    sizeOverridden: _sizeOverridden,
     trail,
     ...rest
   } = r;

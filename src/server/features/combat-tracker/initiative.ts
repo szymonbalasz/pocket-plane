@@ -137,7 +137,8 @@ export function rollInitiativeFor(
         dmPayload: dice.rollDmPayload([r]),
         rollIds: dice.rollIdsOf(r),
         encounterId,
-        public: c.hidden ? false : c.kind === "monster" ? opts.public === true : opts.public,
+        // A hidden PC never public; a hidden monster's is the roll guard's (FR-DICE-13).
+        public: c.kind === "monster" ? opts.public === true : c.hidden ? false : opts.public,
       }),
     );
   }

@@ -90,6 +90,10 @@ const STATUS_CODE: Record<number, PassThrough> = {
   403: "forbidden",
   404: "not_found",
   409: "conflict",
+  // FR-AGENT-48: an upload refused for its size, format or content.
+  413: "invalid",
+  415: "invalid",
+  422: "invalid",
 };
 
 /** A REST error answer (not 401: the caller latches that, FR-AGENT-08). `what` = the route. */

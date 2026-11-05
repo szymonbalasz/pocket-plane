@@ -25,6 +25,7 @@ import { SheetShare } from "../log-share/SheetShare";
 import { RowFxPicker, suggestedFx } from "../spell-fx/FxPicker";
 import { BOX_LABEL, Box } from "./boxes";
 import { SheetRoll } from "./CharacterSheet";
+import { CompendiumName } from "./compendium-links";
 import {
   IntField,
   OverrideControl,
@@ -356,7 +357,9 @@ function AttackLine({ a }: { a: Attack }) {
     return (
       <div className="flex flex-col">
         <span className="flex items-baseline justify-between gap-2">
-          <span className="min-w-0 [overflow-wrap:anywhere] text-[15px] font-bold">{v.name}</span>
+          <span className="min-w-0 [overflow-wrap:anywhere] text-[15px] font-bold">
+            <CompendiumName list="attacks" name={v.name} rowId={a.id} />
+          </span>
           {v.badge && (
             <Badge data-testid="charx-attack-bonus" data-value={a.bonus} variant="outline">
               {v.badge}
@@ -372,7 +375,7 @@ function AttackLine({ a }: { a: Attack }) {
   return (
     <div className="flex flex-col text-sm">
       <span className="flex items-center gap-1.5">
-        {v.name}{" "}
+        <CompendiumName list="attacks" name={v.name} rowId={a.id} />{" "}
         {v.badge && (
           <Badge data-testid="charx-attack-bonus" data-value={a.bonus} variant="secondary">
             {v.badge}
@@ -859,7 +862,7 @@ function SpellRowView({
               scope === "main" && "text-[15px] font-bold",
             )}
           >
-            {s.name}
+            <CompendiumName list="spells" name={s.name} rowId={s.id} />
           </span>
           <span className="text-[10px] text-muted-foreground">{marks(s)}</span>
         </div>

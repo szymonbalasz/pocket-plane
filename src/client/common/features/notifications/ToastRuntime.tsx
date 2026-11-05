@@ -18,12 +18,11 @@
 // the summary. *(Sprint 11, F2)* BL-115: the stack settles: a layout change refolds once it held
 // still, the stack holds its drawn spot while the fold steps, tokens are read as footprints.
 // FR-NOTE-78 (BL-108): off windows' headings and first records first; off the damage-card popup.
-// *(Kit parity K3)* FR-KIT-55–59: card rows (lead · text block · actions · close), the summary in
+// *(Sprint 15)* FR-NOTE-83 (BL-151): a player's stack leaves its corner when that sits on a window's
+// content or a dialog (`keep-out-player.ts`). *(Kit parity K3)* FR-KIT-55–59: card rows (lead · text block · actions · close), the summary in
 // the same row, "+N more" as a pill, the DM's turn card first in the stack.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { toastClassOf } from "@shared/notifications/toast-class";
-import { recordsOf } from "@shared/protocol/store";
-import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { ListTodoIcon, XIcon } from "lucide-react";
 import {
   useCallback,
@@ -43,7 +42,6 @@ import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { EDGE_GAP, LAUNCHER_CLEAR, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
-import { pcBoxes } from "../play-shell/placement";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import {
   DM_TOAST_TOP,
@@ -51,10 +49,11 @@ import {
   PLAYER_TOAST_BOTTOM,
   reportShownStack,
 } from "../play-shell/toast-region";
-import { isPlacementPc, tokenScreenBoxes } from "../play-shell/token-boxes";
+import { tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, TurnCard, useAlertToasts } from "./alert-toasts";
 import { useDialogRects, usePopupIds, usePopupRects } from "./dialog-rects";
 import { COMPACT_W, dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
+import { playerHome, playerStackSpot } from "./keep-out-player";
 import {
   actionButton,
   classify,
@@ -78,6 +77,7 @@ import {
   useNoteActions,
   useNoteStripe,
 } from "./parts";
+import { pcScreenBoxes, pcTokenIds } from "./pc-boxes";
 import { useStackHeight } from "./stack-height";
 import { useHistoryOpen, useStackInputs } from "./stack-inputs";
 import {
@@ -188,7 +188,7 @@ interface KonvaLayerLike {
  * P3 E1: bumps 300 ms after the map canvas last redrew or the viewport last resized (a resize
  * refit, a pan, a zoom), so the stack re-reads the token boxes once the map has settled.
  */
-function useMapSettled(on: boolean): number {
+export function useMapSettled(on: boolean): number {
   const [n, setN] = useState(0);
   useEffect(() => {
     if (!on || typeof window === "undefined") return;
@@ -240,18 +240,11 @@ function useAvoidTokens(
 
 /**
  * FR-NOTE-77: the player characters' token ids (a character with an owner, as play-shell's PC
- * rule counts them), sorted; a slide beside a window never covers one. DM only.
+ * rule counts them), sorted; a slide beside a window never covers one.
  */
-function usePcTokens(isDm: boolean): string[] {
+function usePcTokens(): string[] {
   const store = useSync((s) => s.store);
-  return useMemo(() => {
-    if (!isDm) return [];
-    type Tok = { id: string; ownerPlayerId: string | null; characterId: string | null };
-    return recordsOf<Tok>(store, TOKEN_TYPE)
-      .filter((t) => isPlacementPc(t))
-      .map((t) => t.id)
-      .sort();
-  }, [isDm, store]);
+  return useMemo(() => pcTokenIds(store), [store]);
 }
 
 /**
@@ -421,20 +414,20 @@ export function ToastRuntime({
     state.toasts.some((t) => !folded || (t.kind !== "summary" && classOfToast(t) !== "card"));
   const { initiative, windows: windowRects, hard, rows: firstRows } = useStackInputs(isDm, showing);
   // Walkthrough T4, FR-NOTE-76: an open modal dialog keeps the DM stack off it like Initiative.
-  const dialogs = useDialogRects(isDm && showing);
+  const dialogs = useDialogRects(showing);
   // FR-NOTE-78 (BL-108): and off an open non-modal popup (the damage-card popup) like Initiative.
   const popups = usePopupRects(isDm && showing);
   const vp = useViewport();
-  const stackH = useStackHeight(stackRef, isDm, showing);
+  const stackH = useStackHeight(stackRef, true, showing);
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
   // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
   // BL-115: as footprints (play-shell's PC rule), not drawn boxes: a pulsing cue ring, a turn
   // ring or a label grows a token's drawn box frame by frame, and each re-read moved the stack.
   const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
-  const pcKey = usePcTokens(isDm).join(",");
+  const pcKey = usePcTokens().join(",");
   // P3 E1: token boxes re-read once the map settles (resize refit, pan, zoom), not while the
   // pointer is on the stack (FR-NOTE-51: only while; every other input re-places at once).
-  const settled = useMapSettled(isDm && showing);
+  const settled = useMapSettled(showing);
   const frozen = useRef(settled);
   if (!state.hovered) frozen.current = settled;
   const tick = frozen.current;
@@ -454,42 +447,40 @@ export function ToastRuntime({
   const compact = compactable && settle.fold.compact === true;
   const width = compact ? COMPACT_W : STACK_W;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the live token boxes
-  const at = useMemo(
-    () =>
-      dmStackSpot(
-        vp,
-        initiative,
-        stackH,
-        width,
-        tokenScreenBoxes(avoidKey ? avoidKey.split(",") : [], sync?.getState().store),
-        windowRects,
-        hard,
-        firstRows,
-        dialogs,
-        pcBoxes(
-          tokenScreenBoxes(pcKey ? pcKey.split(",") : [], sync?.getState().store).map((b) => ({
-            ...b,
-            pc: true,
-          })),
-        ),
-        popups,
-      ),
-    [
+  const at = useMemo(() => {
+    const store = sync?.getState().store;
+    const pcs = pcScreenBoxes(pcKey ? pcKey.split(",") : [], store);
+    // FR-NOTE-83: a player's stack from its corner.
+    if (!isDm) return playerStackSpot(vp, stackH, windowRects, hard, dialogs, pcs);
+    return dmStackSpot(
       vp,
       initiative,
       stackH,
       width,
-      avoidKey,
-      pcKey,
+      tokenScreenBoxes(avoidKey ? avoidKey.split(",") : [], store),
       windowRects,
       hard,
       firstRows,
       dialogs,
+      pcs,
       popups,
-      tick,
-      sync,
-    ],
-  );
+    );
+  }, [
+    isDm,
+    vp,
+    initiative,
+    stackH,
+    width,
+    avoidKey,
+    pcKey,
+    windowRects,
+    hard,
+    firstRows,
+    dialogs,
+    popups,
+    tick,
+    sync,
+  ]);
 
   // P3 E3: the stack always fits the viewport: while it is taller than the room (DM: below the
   // top row, above the launcher; player: above its corner, below the top bar), one more toast
@@ -532,7 +523,8 @@ export function ToastRuntime({
   // Walkthrough WF4: likewise while the DM stack can only sit on a window's body (its controls).
   // FR-NOTE-77: down to no card at all while the summary shows (its Open stays one click away);
   // one step per measured height (`foldCap`), so a card that fits the chosen spot stays.
-  const covers = isDm && at.covers > 0;
+  // FR-NOTE-83: a player's too, while it covers row buttons.
+  const covers = at.covers > 0;
   const minCap = isDm && !folded && state.toasts.some((t) => t.kind === "summary") ? 0 : 1;
   const foldable = shown.filter((t) => t.kind !== "summary" && classOfToast(t) !== "alert").length;
   // BL-130 (K3: summary + 3 "Saved …" alerts on a Compendium record): once the cards and info
@@ -581,6 +573,10 @@ export function ToastRuntime({
   ]);
   // FR-NOTE-70: the drawn spot (`data-left` / `data-top`, the style and the FR-SHELL-59 report).
   const pos = settle.hold && settle.drawn ? settle.drawn : { left: at.left, top: at.top };
+  // FR-NOTE-83: a player's stack off its corner is placed like the DM's; at home it stays anchored
+  // to the corner, so it grows upwards with no measure.
+  const corner = playerHome(vp, stackH);
+  const moved = !isDm && stackH > 0 && (pos.left !== corner.left || pos.top !== corner.top);
   // BL-118: the fold is done: no hold, and no step due on this height (`foldCap`).
   const resting =
     !settle.hold &&
@@ -650,8 +646,8 @@ export function ToastRuntime({
       aria-label="Notifications"
       data-testid="note-toasts"
       data-placement={isDm ? "top-center" : "bottom-right"}
-      data-left={isDm ? pos.left : undefined}
-      data-top={isDm ? pos.top : undefined}
+      data-left={isDm || moved ? pos.left : undefined}
+      data-top={isDm || moved ? pos.top : undefined}
       // BL-118: the fold rests (the FR-SHELL-59 report carries only a resting stack).
       data-settled={isDm ? resting : undefined}
       // FR-NOTE-79: the summary drawn compact (`COMPACT_W` wide).
@@ -667,7 +663,7 @@ export function ToastRuntime({
       style={{
         zIndex: TOAST_STACK_Z,
         ...(compact && { width: COMPACT_W }),
-        ...(isDm
+        ...(isDm || moved
           ? { left: pos.left, top: pos.top }
           : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }),
       }}

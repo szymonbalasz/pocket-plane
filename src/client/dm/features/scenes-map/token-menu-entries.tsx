@@ -1,7 +1,13 @@
-// scenes-map's token menu entries (FR-MAP-18): rename, image, shape (FR-MAP-35), owner,
-// hide/reveal, teleport (FR-MAP-121), duplicate, delete (no confirm). No size entry (#120). Each sends one `map.*` intent; the server decides.
+// scenes-map's token menu entries (FR-MAP-18): rename, image, shape (FR-MAP-35), size (FR-MAP-150),
+// owner, hide/reveal, teleport (FR-MAP-121), duplicate, delete (no confirm). Each sends one `map.*` intent; the server decides.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
-import { MAP_INTENTS, TokenName, type TokenShape } from "@shared/scenes-map/schemas";
+import {
+  MAP_INTENTS,
+  TOKEN_SIZES,
+  TokenName,
+  type TokenShape,
+  type TokenSize,
+} from "@shared/scenes-map/schemas";
 import {
   DropdownMenuItem,
   DropdownMenuRadioGroup,
@@ -12,20 +18,24 @@ import {
   DropdownMenuSubTrigger,
 } from "@ui/components/ui/menus";
 import { AssetPickerDialog } from "@ui/features/assets-pipeline/AssetPicker";
+import { useDefinitions } from "@ui/features/compendium/definitions";
 import { toastReject, useMapIntent } from "@ui/features/scenes-map/intents";
-import { startTeleport } from "@ui/features/scenes-map/teleport-tool";
+import { startMirrorPick, startTeleport } from "@ui/features/scenes-map/teleport-tool";
 import { useRecords } from "@ui/sync/store";
 import {
   CopyIcon,
   EyeIcon,
   EyeOffIcon,
+  FlipHorizontal2Icon,
   ImageIcon,
   PencilIcon,
+  ScalingIcon,
   ShapesIcon,
   Trash2Icon,
   UserIcon,
   WandSparklesIcon,
 } from "lucide-react";
+import { useMemo } from "react";
 import { NameFormDialog } from "./NameFormDialog";
 import { setMapSelection } from "./selection";
 import type { TokenMenuDialogProps, TokenMenuEntry, TokenMenuItemProps } from "./token-menu";
@@ -37,6 +47,15 @@ const SHAPES: { value: TokenShape; label: string }[] = [
   { value: "square", label: "Square" },
   { value: "none", label: "None" },
 ];
+
+const SIZE_LABELS: Record<TokenSize, string> = {
+  tiny: "Tiny",
+  small: "Small",
+  medium: "Medium",
+  large: "Large",
+  huge: "Huge",
+  gargantuan: "Gargantuan",
+};
 
 function useSend() {
   const send = useMapIntent();
@@ -125,6 +144,45 @@ export const scenesMapTokenMenu: readonly TokenMenuEntry[] = [
     },
   },
   {
+    id: "map.size",
+    order: 28,
+    Item: function SizeItem({ token }: TokenMenuItemProps) {
+      const send = useSend();
+      const ids = useMemo(() => [token.definitionId], [token.definitionId]);
+      const own = useDefinitions(ids).byId.get(token.definitionId)?.statBlock.size;
+      return (
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger data-testid="map-token-menu-size">
+            <ScalingIcon /> Size
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup
+              value={token.size}
+              onValueChange={(v) =>
+                void send(MAP_INTENTS.updateToken, { tokenId: token.id, size: v as TokenSize })
+              }
+            >
+              {TOKEN_SIZES.map((size) => (
+                <DropdownMenuRadioItem
+                  key={size}
+                  value={size}
+                  data-testid="map-token-size-option"
+                  data-value={size}
+                  data-own={size === own}
+                >
+                  {SIZE_LABELS[size]}
+                  {size === own && (
+                    <span className="ml-auto pl-3 text-xs text-muted-foreground">Creature's</span>
+                  )}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      );
+    },
+  },
+  {
     id: "map.owner",
     order: 30,
     Item: function OwnerItem({ token }: TokenMenuItemProps) {
@@ -192,6 +250,15 @@ export const scenesMapTokenMenu: readonly TokenMenuEntry[] = [
     Item: ({ token }: TokenMenuItemProps) => (
       <DropdownMenuItem data-testid="map-token-menu-teleport" onSelect={() => startTeleport(token)}>
         <WandSparklesIcon /> Teleport
+      </DropdownMenuItem>
+    ),
+  },
+  {
+    id: "mir.create",
+    order: 48,
+    Item: ({ token }: TokenMenuItemProps) => (
+      <DropdownMenuItem data-testid="mir-token-menu-create" onSelect={() => startMirrorPick(token)}>
+        <FlipHorizontal2Icon /> Mirror
       </DropdownMenuItem>
     ),
   },

@@ -58,6 +58,7 @@ import cmpSrdMini from "./compendium/cmp-srd-mini";
 import cmpSrdMiniS3 from "./compendium/cmp-srd-mini-s3";
 import cmpxArtBatch from "./compendium/cmpx-art";
 import cmpxBooks from "./compendium/cmpx-books";
+import sheetLinksRows from "./compendium/sheet-links-rows";
 import dicexLooks from "./dice-extras/dicex-looks";
 import dicexMacros from "./dice-extras/dicex-macros";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
@@ -156,6 +157,7 @@ import holdGreystoneStores from "./strongholds/hold-greystone-stores";
 import holdTowerMove from "./strongholds/hold-tower-move";
 import holdTowerSecret from "./strongholds/hold-tower-secret";
 import themeRound3 from "./theme-system/theme-round-3";
+import mirGoblin from "./token-mirrors/mir-goblin";
 
 export const units: readonly Fixture[] = [
   campaign,
@@ -328,6 +330,8 @@ export const units: readonly Fixture[] = [
   kitGroups,
   // Spell FX core (fix/vfx-core): the fight, Mira's and Thorn's FX spell rows, Mira's fire card
   vfxFight,
+  // Token mirrors (build/token-mirrors)
+  mirGoblin,
   sgRow,
   moilRow,
   fireCard,
@@ -347,4 +351,6 @@ export const units: readonly Fixture[] = [
   ovwCrowd,
   // Send to game log (build/log-share)
   shareMiraRows,
+  // Sheet names linking to compendium entries (build/sheet-compendium-links)
+  sheetLinksRows,
 ];

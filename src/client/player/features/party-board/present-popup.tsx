@@ -152,7 +152,10 @@ export function PresentContent({
   const shown = state === "show" ? loaded : null;
   return (
     <>
-      <TitleAs data-testid="party-present-title" className="pr-2 text-lg font-semibold break-words">
+      <TitleAs
+        data-testid="party-present-title"
+        className="pr-2 text-lg font-semibold [overflow-wrap:anywhere]"
+      >
         {shown ? shown.header.title : "Handout"}
       </TitleAs>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
@@ -171,7 +174,10 @@ export function PresentContent({
         )}
         {shown && <Images ids={shown.header.imageAssetIds} title={shown.header.title} />}
         {shown && shown.body.body !== "" && (
-          <p data-testid="party-present-body" className="text-sm leading-relaxed break-words">
+          <p
+            data-testid="party-present-body"
+            className="text-sm leading-relaxed [overflow-wrap:anywhere]"
+          >
             <DiceText
               text={shown.body.body}
               context={{ label: shown.header.title, category: "other" }}

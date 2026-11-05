@@ -73,3 +73,12 @@ export function inUseMessage(uses: readonly AssetUse[]): string {
   const list = more > 0 ? `${shown.join(", ")} and ${more} more` : shown.join(", ");
   return `In use: ${list}. Change those first.`;
 }
+
+/** FR-ASSET-69: the "Used in" line for a use list; BL-177: the Delete dialog's refusal too. */
+export function usedInText(uses: readonly AssetUse[]): string {
+  if (uses.length === 0) return "Not used anywhere: it can be deleted.";
+  return `Used in: ${uses.map(useText).join(", ")}`;
+}
+
+/** FR-ASSET-69: while `assets.uses` hasn't answered. */
+export const USES_CHECKING = "Checking where it's used…";

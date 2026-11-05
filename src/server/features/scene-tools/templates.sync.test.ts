@@ -170,6 +170,46 @@ describe("SCN §13 templates over sockets (scene-tools bundle)", () => {
     for (const c of all) c.close();
   });
 
+  test("FR-SCN-58 scn.templateClear: DM only; reaches the named player and the DM's tabs; never a player for a non-active scene", async () => {
+    const dm = await h.live(dmCred());
+    const dm2 = await h.live(dmCred());
+    const p1 = await h.live(p1Cred());
+    const p2 = await h.live(p2Cred());
+    const all = [dm, dm2, p1, p2];
+    const mark = new Map(all.map((c) => [c, c.frames.length]));
+    const since = (c: TestClient) => c.frames.slice(mark.get(c));
+    const got = (c: TestClient) =>
+      since(c).flatMap((f) =>
+        f.type === "signal" && f.name === SCN_SIGNALS.templateClear
+          ? [(f.data as { key: string }).key]
+          : [],
+      );
+    const rejects = (c: TestClient) =>
+      since(c).flatMap((f) => (f.type === "reject" ? [f.code as string] : []));
+    const send = (c: TestClient, data: Record<string, unknown>) =>
+      c.send({ type: "signal", name: SCN_SIGNALS.templateClear, data });
+    const p1Id = p1.store.you?.role === "player" ? p1.store.you.playerId : "";
+    const logs = readEventLog(db).length;
+    const seqs = all.map((c) => c.store.seq);
+
+    send(dm, { sceneId: ambush(), key: "to-p1", playerId: p1Id });
+    send(dm, { sceneId: ambush(), key: "dm-tab" });
+    send(dm, { sceneId: cellar(), key: "cellar", playerId: p1Id });
+    send(dm, { sceneId: "no-such-scene", key: "lost" });
+    send(p1, { sceneId: ambush(), key: "from-player", playerId: p1Id });
+    for (const c of [p1, dm, dm2, p2]) await barrier(c);
+
+    expect(got(dm2)).toEqual(["to-p1", "dm-tab", "cellar"]);
+    expect(got(p1)).toEqual(["to-p1"]);
+    expect(got(p2)).toEqual([]);
+    expect(got(dm)).toEqual([]);
+    expect(rejects(dm)).toEqual(["not_found"]);
+    expect(rejects(p1)).toEqual(["forbidden"]);
+    expect(readEventLog(db).length).toBe(logs);
+    expect(all.map((c) => c.store.seq)).toEqual(seqs);
+    for (const c of all) c.close();
+  });
+
   test("FR-SCN-25 / -26 / -27 Keep, edit, hide, clear: frames per role; others can't delete; leak-free and convergent", async () => {
     const dm = await h.live(dmCred());
     const p1 = await h.live(p1Cred());

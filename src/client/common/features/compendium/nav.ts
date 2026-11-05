@@ -56,6 +56,16 @@ export const openDefinition = (definitionId: string) =>
     view: { mode: "definition", definitionId },
     entryNonce: s.entryNonce + 1,
   }));
+/** FR-CMP-77: the list on a fresh search for `q` in `tab` (a name that several entries share). */
+export const showSearch = (q: string, tab: CmpTab) =>
+  cmpNav.setState((s) => ({
+    q,
+    tab,
+    filters: {},
+    expanded: [],
+    view: { mode: "list" },
+    listNonce: s.listNonce + 1,
+  }));
 /**
  * Back: the list again, refetched (FR-CMP-23); its scroll and expanded groups are kept (the list
  * stays mounted).

@@ -22,8 +22,11 @@ import type { SnapToken } from "./aoe-snap";
 import { diagonalRuleIn } from "./diagonal-rule";
 import {
   type AoeSettings,
+  clearFrame,
   DEFAULT_AOE,
   EphemeralSender,
+  type EphemeralTemplate,
+  ephemeralAt,
   type GridPoint,
   placeFrame,
   type TemplateView,
@@ -55,6 +58,8 @@ export interface AoeState {
   dmOnly: boolean;
   /** This connection's ephemeral template, as drawn locally. */
   own: { sceneId: string; template: TemplateView } | null;
+  /** Written by `TemplatesLayer`: the others' ephemerals drawn on the shown scene (FR-SCN-58). */
+  others: readonly EphemeralTemplate[];
   gesture: AoeGesture | null;
   selectedId: string | null;
   /** Written by `TemplatesLayer`: the shown scene and the kept templates this client may edit. */
@@ -70,6 +75,7 @@ export const useAoe = create<AoeState>(() => ({
   settings: DEFAULT_AOE,
   dmOnly: false,
   own: null,
+  others: [],
   gesture: null,
   selectedId: null,
   sceneId: null,
@@ -103,6 +109,15 @@ export function showOwn(sceneId: string, template: TemplateView): void {
 export function endOwn(): void {
   sender.end();
   useAoe.setState({ own: null });
+}
+
+/** FR-SCN-58: the DM cleared the ephemeral with `key`: if it is this connection's, as its Clear. */
+export function templateCleared(key: string): void {
+  if (key !== KEY) return;
+  if (useAoe.getState().gesture?.kind === "place") {
+    useAoe.setState({ gesture: null, originCell: null });
+  }
+  endOwn();
 }
 
 /** FR-SCN-34: not live → stop sending; receivers drop it after 3 s. */
@@ -207,10 +222,32 @@ function menuTemplateAt(p: MenuPoint, ctx: LayerMenuContext): TemplateRecordView
   });
 }
 
-/** FR-SCN-51: `scn-templates`' layer menu (FR-MAP-71 step 4). */
+const aoeToolOn = (ctx: LayerMenuContext) => ctx.activeTool?.id === "aoe";
+
+/** FR-SCN-58: the ephemeral a right press clears: only with the AoE tool on. */
+function menuEphemeralAt(p: MenuPoint, ctx: LayerMenuContext) {
+  if (!aoeToolOn(ctx)) return null;
+  const { own, others } = useAoe.getState();
+  return ephemeralAt(p, own?.sceneId === ctx.scene.id ? own.template : null, others, {
+    client: ctx.client,
+    scale: ctx.cam.scale,
+    grid: ctx.grid,
+    rule: diagonalRuleIn(ctx.store.records),
+  });
+}
+
+/**
+ * FR-SCN-51: `scn-templates`' layer menu (FR-MAP-71 step 4). FR-SCN-58: with the AoE tool on, a
+ * right click on an ephemeral clears it at once (nothing to lose: the panel's Clear, one click),
+ * and the templates go ahead of what lies under them, tokens included.
+ */
 export const templateContextMenu: LayerContextMenu = {
-  hit: (p, ctx) => menuTemplateAt(p, ctx) !== null,
+  first: aoeToolOn,
+  hit: (p, ctx) => menuEphemeralAt(p, ctx) !== null || menuTemplateAt(p, ctx) !== null,
   open(p, screen, ctx) {
+    const eph = menuEphemeralAt(p, ctx);
+    if (eph === "own") return endOwn();
+    if (eph) return void send?.(SCN_SIGNALS.templateClear, clearFrame(eph));
     const t = menuTemplateAt(p, ctx);
     if (t) openTemplateMenu({ templateId: t.id, sceneId: ctx.scene.id, at: screen });
   },

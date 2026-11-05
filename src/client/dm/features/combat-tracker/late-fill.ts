@@ -3,7 +3,11 @@
 // with one); the primary button reads "Apply hit" while a Hit row waits for damage; a late roll
 // fills each field (base, each extra part) on its own unless the DM typed into it, and never
 // fills a focused field; the late note names an apply of this turn the roll could have joined.
-import type { DamageCardPayload, HitRulingRecord } from "@shared/combat-tracker/schemas";
+import {
+  attackPhrase,
+  type DamageCardPayload,
+  type HitRulingRecord,
+} from "@shared/combat-tracker/schemas";
 
 export type PopupStep = "to-hit" | "damage";
 
@@ -40,6 +44,13 @@ export function ruledRows(
     .filter((t) => t.hit && !dropped.includes(t.targetId))
     .map(({ targetId, multiplier }) => ({ targetId, multiplier }));
 }
+
+/**
+ * FR-CBT-178 (#428): Clear on the damage line: a card with a to-hit that holds damage or a total
+ * the DM typed. A damage-only card can't wait for a roll (Dismiss ends it).
+ */
+export const clearShown = (card: Pick<DamageCardPayload, "toHit" | "damage">, typed: boolean) =>
+  card.toHit !== null && (card.damage !== null || typed);
 
 // ---------- fields that fill (FR-CBT-90) ----------
 
@@ -130,7 +141,7 @@ export function lateNote(
       r.spellId === p.spellId,
   );
   return hit
-    ? `${hit.attackerName}'s ${hit.attackName} attack was already applied. Undo it to use this roll there.`
+    ? `${hit.attackerName}'s ${attackPhrase(hit.attackName)} was already applied. Undo it to use this roll there.`
     : null;
 }
 

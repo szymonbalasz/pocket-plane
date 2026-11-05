@@ -1,15 +1,16 @@
 // Structure tool previews on `scn-edit` (FR-SCN-02, -08), while the tool is active: the snapped
 // hover vertex (`scn-edit-vertex`), the polyline / door in progress to the hover
 // (`scn-edit-polyline`, attr `count` = clicked vertices), the erase target (`scn-edit-erase`) and
-// box (`scn-edit-box`). Sprint 3: the clicked points (`scn-draft-point`, id = index, attr
+// box (`scn-edit-box`), the wall Flip would reverse (`scn-edit-flip`), a one-way polyline's arrows
+// (`scn-edit-one-way`). Sprint 3: the clicked points (`scn-draft-point`, id = index, attr
 // `free`); off-grid points (Ctrl, or a magnet onto a free endpoint) are small open dots.
 import { vertexToPx } from "@shared/scene-tools/geometry";
 import { Circle, Group, Line, Rect } from "react-konva";
 import { useStore } from "zustand";
 import { useCanvas } from "../../scenes-map/canvas-context";
-import { structureTool } from "../structure-store";
-import { isFreePoint, segmentPx } from "../structure-view";
-import { useShownStructure } from "./StructureLayer";
+import { picksSegments, structureTool } from "../structure-store";
+import { isFreePoint, polylineSegments, segmentPx } from "../structure-view";
+import { OneWaySegments, useShownStructure } from "./StructureLayer";
 
 export function StructureEditPreview() {
   const { activeTool, grid, cam, colors } = useCanvas();
@@ -17,7 +18,8 @@ export function StructureEditPreview() {
   const view = useShownStructure();
   if (activeTool?.id !== "structure") return null;
   const px = (v: { x: number; y: number }) => vertexToPx(grid, v);
-  const path = st.mode === "erase" ? [] : [...st.points, ...(st.hover ? [st.hover] : [])];
+  const picks = picksSegments(st.mode);
+  const path = picks ? [] : [...st.points, ...(st.hover ? [st.hover] : [])];
   const line = path.flatMap((v) => {
     const p = px(v);
     return [p.x, p.y];
@@ -42,7 +44,16 @@ export function StructureEditPreview() {
           dash={[6 / cam.scale, 4 / cam.scale]}
         />
       )}
-      {st.mode !== "erase" &&
+      {st.mode === "one-way" && (
+        <OneWaySegments
+          segs={polylineSegments(path).map((s) => segmentPx(grid, s))}
+          name="scn-edit-one-way"
+          stroke={colors.primary}
+          width={sw}
+          cell={grid.gridCellSize}
+        />
+      )}
+      {!picks &&
         st.points.map((v, i) => {
           const free = isFreePoint(v);
           return (
@@ -60,7 +71,7 @@ export function StructureEditPreview() {
             />
           );
         })}
-      {st.mode !== "erase" && st.hover && (
+      {!picks && st.hover && (
         <Circle
           name="scn-edit-vertex"
           free={isFreePoint(st.hover)}
@@ -73,9 +84,9 @@ export function StructureEditPreview() {
       )}
       {erase && (
         <Line
-          name="scn-edit-erase"
+          name={st.mode === "flip" ? "scn-edit-flip" : "scn-edit-erase"}
           points={erase}
-          stroke={colors.destructive}
+          stroke={st.mode === "flip" ? colors.primary : colors.destructive}
           strokeWidth={sw * 3}
           lineCap="round"
         />
@@ -87,7 +98,7 @@ export function StructureEditPreview() {
           y={Math.min(st.box.y0, st.box.y1)}
           width={Math.abs(st.box.x1 - st.box.x0)}
           height={Math.abs(st.box.y1 - st.box.y0)}
-          stroke={colors.destructive}
+          stroke={st.mode === "flip" ? colors.primary : colors.destructive}
           strokeWidth={sw}
           dash={[4 / cam.scale, 4 / cam.scale]}
         />

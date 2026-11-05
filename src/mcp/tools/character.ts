@@ -72,8 +72,18 @@ function characterOrServer(s: WsSession, id: string): EntityRecord | undefined {
   return e;
 }
 
+/** A feature row earlier calls of a plan add or replace (`id`): FR-AGENT-38. */
+export interface PlannedFeature {
+  id: string | null;
+  name: string;
+  usesMax?: number | null;
+  used?: number;
+  call?: number;
+}
+export const plannedFeaturesKey = (creatureId: string) => `features:${creatureId}`;
+
 /** Plan side: the target is a campaign character; null (with an issue) otherwise. */
-async function planCharacter(ctx: PlanContext, id: string, path: (string | number)[]) {
+export async function planCharacter(ctx: PlanContext, id: string, path: (string | number)[]) {
   const e = await ctx.target(id, path, "character");
   return e?.kind === "character" ? e : null;
 }
@@ -147,6 +157,14 @@ const characterPutRow = defineTool({
       }
     } else if (e) {
       ctx.planRows(e.id, input.list, 1, ["row"]);
+    }
+    if (e && input.list === "features") {
+      ctx.planned<PlannedFeature>(plannedFeaturesKey(e.id)).push({
+        id: rowId ?? null,
+        name: input.row.name,
+        usesMax: input.row.usesMax ?? null,
+        call: ctx.call,
+      });
     }
     const what = rowId === undefined ? "add" : "replace";
     return `character_put_row: ${what} ${input.list} row "${input.row.name}" on ${e?.name ?? input.creatureId}`;

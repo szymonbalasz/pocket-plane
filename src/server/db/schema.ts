@@ -52,6 +52,7 @@ import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/s
 import type { TokenTrail } from "@shared/scenes-map/schemas";
 import type { FxRecord } from "@shared/spell-fx/fx";
 import type { Facility, Staff } from "@shared/strongholds/schemas";
+import { MIRROR_MODES } from "@shared/token-mirrors/schemas";
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
@@ -491,6 +492,8 @@ export const token = sqliteTable(
     seenBy: text("seen_by", { mode: "json" }).$type<string[]>(),
     /** FR-FOG-45 (#210): DM-only token state; DM wire only when true, never to players. */
     invisible: integer("invisible", { mode: "boolean" }).notNull().default(false),
+    /** FR-MAP-150 (#429): the DM set this token's size; the definition's no longer follows. Never on a wire. */
+    sizeOverridden: integer("size_overridden", { mode: "boolean" }).notNull().default(false),
     /**
      * FR-MAP-65 (sprint 5): JSON leaf `{cells}` (2–21) | null: this turn's combat trail, written
      * only by scenes-map's `appendTrail` / `clearTrails` (combat calls them). Players: player
@@ -1525,6 +1528,51 @@ export const prop = sqliteTable(
   ],
 );
 
+/**
+ * Token mirror (MIR §8, ADR-0077): a display-only copy of a token at another place on its map.
+ * ≤ 200 per scene, ≤ 2,000 per campaign. Goes with its token and its scene.
+ */
+export const tokenMirror = sqliteTable(
+  "token_mirror",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    sceneId: text("scene_id")
+      .notNull()
+      .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
+    tokenId: text("token_id")
+      .notNull()
+      .references((): AnySQLiteColumn => token.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    col: integer("col").notNull(),
+    row: integer("row").notNull(),
+    mode: text("mode", { enum: MIRROR_MODES }).notNull(),
+    /** Copies of the source token (FR-MIR-08). */
+    name: text("name").notNull(),
+    imageAssetId: text("image_asset_id"),
+    creatureType: text("creature_type", { enum: TOKEN_CREATURE_TYPES }),
+    size: text("size", {
+      enum: ["tiny", "small", "medium", "large", "huge", "gargantuan"],
+    }).notNull(),
+    shape: text("shape", { enum: TOKEN_SHAPES }).notNull(),
+    /** FR-MIR-09: source hidden or Invisible, or off the map. */
+    suppressed: integer("suppressed", { mode: "boolean" }).notNull().default(false),
+    fogged: integer("fogged", { mode: "boolean" }).notNull().default(false),
+    /** Server copy (FR-FOG-10): player ids who see it; null = none yet. Never on a wire. */
+    seenBy: text("seen_by", { mode: "json" }).$type<string[]>(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("token_mirror_seq").on(t.seq),
+    index("token_mirror_scene").on(t.sceneId),
+    index("token_mirror_token").on(t.tokenId),
+    index("token_mirror_campaign").on(t.campaignId),
+  ],
+);
+
 /** Kept AoE template (FR-SCN-20–27); ≤ 20 per scene. Ephemeral ones are signals only. */
 export const aoeTemplate = sqliteTable(
   "aoe_template",
@@ -1844,6 +1892,7 @@ export const strongholdSeqNext = sql<number>`(select coalesce(max(${stronghold.s
 
 /** CON-20: `seq` for props and templates, computed by the DB inside the insert's transaction. */
 export const propSeqNext = sql<number>`(select coalesce(max(${prop.seq}), 0) + 1 from ${prop})`;
+export const tokenMirrorSeqNext = sql<number>`(select coalesce(max(${tokenMirror.seq}), 0) + 1 from ${tokenMirror})`;
 export const aoeTemplateSeqNext = sql<number>`(select coalesce(max(${aoeTemplate.seq}), 0) + 1 from ${aoeTemplate})`;
 /** CON-20: `seq` for roll requests (FR-DICEX-73 window order). */
 export const rollRequestSeqNext = sql<number>`(select coalesce(max(${rollRequest.seq}), 0) + 1 from ${rollRequest})`;
@@ -1885,6 +1934,7 @@ export const schema = {
   fogSettings,
   sceneStructure,
   prop,
+  tokenMirror,
   aoeTemplate,
   mapSettings,
   compendiumSource,

@@ -105,10 +105,30 @@ describe("FR-SCN-51 contextMenu hook", () => {
     expect(asked).toEqual(["switch", "dm-only"]);
   });
 
+  test("FR-SCN-58 a menu whose `first` holds is asked ahead of the layers above it", () => {
+    const low: LayerDef<object> = {
+      ...entry("low", 10, true),
+      contextMenu: { ...entry("low", 10, true).contextMenu, first: () => true } as never,
+    };
+    const layers = orderLayers([low, entry("top", 20, true)]);
+    asked.length = 0;
+    expect(layerMenuAt(layers, { x: 0, y: 0 }, ctx("player"))?.id).toBe("low");
+    expect(asked).toEqual(["low"]);
+    // No hit there: the others still get their turn.
+    const miss: LayerDef<object> = {
+      ...entry("miss", 10, false),
+      contextMenu: { ...entry("miss", 10, false).contextMenu, first: () => true } as never,
+    };
+    expect(
+      layerMenuAt(orderLayers([miss, entry("top", 20, true)]), { x: 0, y: 0 }, ctx("dm"))?.id,
+    ).toBe("top");
+  });
+
   test("FR-SCN-51 contextMenu hook: scn-templates and vfx-under (players' affected cells, FR-VFX-23) have a menu", () => {
     expect(canvasLayers.filter((l) => l.contextMenu).map((l) => l.id)).toEqual([
       "scn-templates",
       "vfx-under",
+      "mirrors",
     ]);
   });
 });

@@ -74,6 +74,7 @@ import { requireAsset } from "../assets-pipeline/commands";
 import { importedArtOfDefinition } from "../compendium/imported-art-lookup";
 import { resolveDefinition } from "../entities/commands";
 import { getOverview } from "../overview-scenes/rows";
+import { copyMirrors } from "../token-mirrors/copy";
 import { characterIdOf } from "./character-copy";
 import { entriesIn, nextPosition, placeEntries } from "./list-order";
 import { tokenMoveGuards } from "./move-guards";
@@ -297,8 +298,10 @@ export const duplicateScene = defineCommand({
       sceneChange(null, copy),
       ...lifecycleHooks.duplicated({ tx, ctx, actor }, src, copy),
     ];
+    const tokenIds = new Map<string, string>();
     for (const t of tokens) {
       const tid = ctx.ids.next();
+      tokenIds.set(t.id, tid);
       const { seq: _s, ...fields } = t;
       tx.insert(token)
         .values({
@@ -315,6 +318,7 @@ export const duplicateScene = defineCommand({
         .run();
       changes.push(tokenChange(null, readToken(tx, tid)));
     }
+    changes.push(...copyMirrors({ tx, ctx }, src.id, id, tokenIds));
     // FR-FOG-35 (#216): the copy re-derives once its tokens are copied; rows fold into creates.
     for (const d of rederiveDependants({ tx, ctx, actor }, sceneChange(null, copy))) {
       const c = changes.find((x) => x.type === d.type && x.id === d.id);
@@ -816,8 +820,8 @@ export const checkMove = defineCommand({
   },
 });
 
-/** FR-MAP-18: rename, image (custom art), shape (FR-MAP-35), creature type (FR-ENT-27), owner;
- * never size or speed. Runs token-changed hooks. */
+/** FR-MAP-18: rename, image (custom art), shape (FR-MAP-35), creature type (FR-ENT-27), owner,
+ * size (FR-MAP-150, keeps the top-left cell); never speed. Runs token-changed hooks. */
 export function updateTokenCommand(hooks: TokenHooks) {
   return defineCommand({
     name: MAP_INTENTS.updateToken,
@@ -835,10 +839,20 @@ export function updateTokenCommand(hooks: TokenHooks) {
       }
       if (input.shape !== undefined) set.shape = input.shape;
       if (input.creatureType !== undefined) set.creatureType = input.creatureType;
-      // FR-FOG-10 / -34: the owner decides the copies (owner + party rule).
+      if (input.size !== undefined) {
+        const s = findScene(tx, cid, before.sceneId) as SceneRecord;
+        assertOnMap(s, before.col, before.row, input.size);
+        set.size = input.size;
+        set.sizeOverridden =
+          input.size !== resolveDefinition(env, before.definitionId).statBlock.size;
+      }
+      const ownerPlayerId =
+        set.ownerPlayerId !== undefined ? set.ownerPlayerId : before.ownerPlayerId;
+      const size = set.size ?? before.size;
+      // FR-FOG-10 / -34: the owner and the footprint decide the copies (owner + party rule).
       const copies =
-        set.ownerPlayerId !== undefined && set.ownerPlayerId !== before.ownerPlayerId
-          ? tokenCopies(tx, { ...before, ownerPlayerId: set.ownerPlayerId })
+        ownerPlayerId !== before.ownerPlayerId || size !== before.size
+          ? tokenCopies(tx, { ...before, ownerPlayerId, size })
           : {};
       tx.update(token)
         .set({ ...set, ...copies, updatedAt: ctx.clock.iso() })
@@ -888,8 +902,8 @@ export function setTokenHiddenCommand(hooks: TokenHooks) {
 }
 
 /**
- * FR-MAP-17: same definition, image, size, shape, `creatureType`, speed, owner, hidden flag, `invisible`
- * (FR-FOG-45); numbered name; at `duplicateCell` (free of other tokens, BL-163); `fogged` / `seenBy`
+ * FR-MAP-17: same definition, image, size (and whether the DM set it, FR-MAP-150), shape,
+ * `creatureType`, speed, owner, hidden flag, `invisible` (FR-FOG-45); numbered name; at `duplicateCell` (free of other tokens, BL-163); `fogged` / `seenBy`
  * derived at that cell (FR-FOG-10).
  */
 export const duplicateToken = defineCommand({
@@ -910,6 +924,7 @@ export const duplicateToken = defineCommand({
       name: numberedName(src.name, namesOn(tx, s.id)),
       imageAssetId: assetOrNull(env, src.imageAssetId),
       size: src.size,
+      sizeOverridden: src.sizeOverridden === true,
       shape: src.shape,
       creatureType: src.creatureType,
       speed: src.speed,

@@ -1,15 +1,17 @@
 // FR-DICE-13 roll guard (sprint 14 F4, BL-135, DM #367 / #371), in-process on combat's ambush: a DM roll
 // made as a hidden or renamed monster creature is DM-only on every roll path, whatever the public
 // switch or the category preset; the unchanged public case, characters and players' own rolls
-// keep FR-DICE-13. Each case checks the stamp and every player's snapshot.
+// keep FR-DICE-13. Hidden = no player sees the creature, nor a Visible / Transparent mirror of it
+// (DM 2026-11-05). Each case checks the stamp and every player's snapshot.
 import { describe, expect, test } from "bun:test";
 import { CBT_INTENTS } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import { SCN_INTENTS } from "@shared/scene-tools/schemas";
 import { MAP_INTENTS } from "@shared/scenes-map/schemas";
+import { MIR_INTENTS, type MirrorMode } from "@shared/token-mirrors/schemas";
 import { eq } from "drizzle-orm";
-import { combatant, gameLogEntry, scene, token } from "../../db/schema";
+import { combatant, gameLogEntry, scene, token, tokenMirror } from "../../db/schema";
 import type { Viewer } from "../../ws/records";
 import { cbtxSetup } from "../combat-extras/testing";
 import { createEntity } from "../entities/commands";
@@ -150,16 +152,18 @@ describe("FR-DICE-13 roll guard (#367)", () => {
     const shown = place(t.sceneId, true);
     t.check(t.roll({ entityId: ghoulDef }, { public: true }), false);
     t.check(t.roll({ tokenId: shown }, { public: true }), false);
-    // Shown but fogged for Player 2 only (seen by Player 1, FR-FOG-11) → DM-only.
+    // Shown but fogged for both players → DM-only.
     t.hide(shown, false);
-    t.s.db
-      .update(token)
-      .set({ seenBy: [t.h.p1.id] })
-      .where(eq(token.id, shown))
-      .run();
+    const seenBy = (ids: string[]) =>
+      t.s.db.update(token).set({ seenBy: ids }).where(eq(token.id, shown)).run();
+    seenBy([]);
     t.check(t.roll({ entityId: ghoulDef }), false);
     t.check(t.roll({ tokenId: shown }), false);
-    // Seen by both players → public again.
+    // Fogged for Player 2 only: Player 1 sees it, so public (DM 2026-11-05, any player).
+    seenBy([t.h.p1.id]);
+    t.check(t.roll({ entityId: ghoulDef }), true);
+    t.check(t.roll({ tokenId: shown }), true);
+    // Seen by both players → public.
     t.s.db
       .update(token)
       .set({ seenBy: [t.h.p1.id, t.h.p2.id] })
@@ -203,7 +207,7 @@ describe("FR-DICE-13 roll guard (#367)", () => {
     t.check(t.roll({ tokenId: t.tokens.goblin }), true);
   });
 
-  test("FR-DICE-13 #371 walkthrough F1: a fight's Goblin fogged for Player 2 only (Fog all + a wall on y = 9, x 3–14): its combatant save and its definition rolls are DM-only", () => {
+  test("FR-DICE-13 walkthrough F1: a fight's Goblin fogged for Player 2 only (Fog all + a wall on y = 9, x 3–14): Player 1 sees it, so its combatant save and definition rolls follow the switch / preset", () => {
     const t = setup();
     t.run(FOG_INTENTS.setAll, { sceneId: t.sceneId, fogged: true });
     t.run(SCN_INTENTS.addWalls, { sceneId: t.sceneId, segments: [[3, 9, 14, 9]] });
@@ -218,16 +222,89 @@ describe("FR-DICE-13 roll guard (#367)", () => {
       false,
     );
     for (const extra of [{}, { public: true }]) {
-      t.check(t.roll({ tokenId: t.tokens.goblin }, extra), false);
-      t.check(t.roll({ combatantId: goblin.id }, extra), false);
-      t.check(t.roll({ entityId: t.h.goblinId }, extra), false);
-      t.check(t.roll({ entityId: t.h.goblinId }, { ...extra, category: "damage" }), false);
+      t.check(t.roll({ tokenId: t.tokens.goblin }, extra), true);
+      t.check(t.roll({ combatantId: goblin.id }, extra), true);
+      t.check(t.roll({ entityId: t.h.goblinId }, extra), true);
+      t.check(t.roll({ entityId: t.h.goblinId }, { ...extra, category: "damage" }), true);
     }
-    t.check(t.save(goblin.id, { public: true }), false);
-    // Fog lifted: public again.
-    t.run(FOG_INTENTS.setAll, { sceneId: t.sceneId, fogged: false });
     t.check(t.save(goblin.id, { public: true }), true);
-    t.check(t.roll({ entityId: t.h.goblinId }), true);
+    // The DM's own switch still hides it.
+    t.check(t.roll({ tokenId: t.tokens.goblin }, { public: false }), false);
+  });
+
+  test("FR-DICE-13 FR-MIR-06 mirrors: a creature no player sees is public when a player is shown its Visible or Transparent mirror; a Shadow, a Hidden mirror or a held-back one doesn't count", () => {
+    const t = setup();
+    const ratDef = t.run<{ id: string }>(createEntity.name, {
+      kind: "monster",
+      name: "Wererat Thug",
+      statBlock: goblinBlock,
+    }).id;
+    const rat = t.run<{ tokenId: string }>(MAP_INTENTS.placeToken, {
+      sceneId: t.sceneId,
+      definitionId: ratDef,
+      col: 3,
+      row: 3,
+    }).tokenId;
+    // The yard rat: fogged for every player (the roof is behind walls).
+    t.s.db.update(token).set({ seenBy: [] }).where(eq(token.id, rat)).run();
+    const def = () => t.roll({ entityId: ratDef }, { category: "saving-throw" });
+    t.check(def(), false);
+    const mirrorId = t.run<{ mirrorId: string }>(MIR_INTENTS.create, {
+      tokenId: rat,
+      col: 6,
+      row: 3,
+      mode: "transparent",
+    }).mirrorId;
+    const mode = (m: MirrorMode) => t.run(MIR_INTENTS.setMode, { mirrorId, mode: m });
+    const mirrorSeenBy = (ids: string[]) =>
+      t.s.db.update(tokenMirror).set({ seenBy: ids }).where(eq(tokenMirror.id, mirrorId)).run();
+    // Transparent: every player sees it, walls and fog ignored → public, as a token roll too.
+    t.check(def(), true);
+    t.check(t.roll({ tokenId: rat }), true);
+    // Shadow: anonymous, a public line would name it → DM-only. Hidden: nobody → DM-only.
+    mode("shadow");
+    t.check(def(), false);
+    mode("hidden");
+    t.check(def(), false);
+    // Visible: only for players whose sight reaches it. Player 2 on the roof sees it → public.
+    mode("visible");
+    mirrorSeenBy([t.h.p2.id]);
+    t.check(def(), true);
+    mirrorSeenBy([]);
+    t.check(def(), false);
+    // The rat hidden: its mirrors are held back (FR-MIR-09) → DM-only, a Transparent one too.
+    mode("transparent");
+    t.check(def(), true);
+    t.hide(rat, true);
+    t.check(def(), false);
+    t.hide(rat, false);
+    t.check(def(), true);
+  });
+
+  test("FR-DICE-13 FR-MIR-06 in a fight: a Goblin fogged for every player (its combatant hidden, FR-FOG-14) is public through a Transparent mirror, its save and definition rolls too; a Shadow doesn't count", () => {
+    const t = setup();
+    const goblin = t.cbt("Goblin");
+    // Fogged for every player: the token's copies and combat's hidden copy (FR-FOG-14).
+    t.s.db
+      .update(token)
+      .set({ seenBy: [], fogged: true })
+      .where(eq(token.id, t.tokens.goblin))
+      .run();
+    t.s.db.update(combatant).set({ hidden: true }).where(eq(combatant.id, goblin.id)).run();
+    t.check(t.save(goblin.id, { public: true }), false);
+    t.check(t.roll({ combatantId: goblin.id }), false);
+    const mirrorId = t.run<{ mirrorId: string }>(MIR_INTENTS.create, {
+      tokenId: t.tokens.goblin,
+      col: 6,
+      row: 3,
+      mode: "transparent",
+    }).mirrorId;
+    t.check(t.save(goblin.id, { public: true }), true);
+    t.check(t.roll({ combatantId: goblin.id }), true);
+    t.check(t.roll({ tokenId: t.tokens.goblin }), true);
+    t.run(MIR_INTENTS.setMode, { mirrorId, mode: "shadow" });
+    t.check(t.save(goblin.id, { public: true }), false);
+    t.check(t.roll({ entityId: t.h.goblinId }), false);
   });
 
   test("FR-DICE-13 hidden and renamed creature: DM-only", () => {

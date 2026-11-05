@@ -1,9 +1,18 @@
 // The Structure tool (DM, FR-SCN-08, -15): a canvas-tools entry with its panel — mode ToggleGroup
-// (Wall · Door · Erase) and Undo; Ctrl+Z undoes while the tool is active. Pointer handlers:
+// (Wall · Window · One-way · Door · Erase · Flip) and Undo; Ctrl+Z undoes while the tool is active. Pointer handlers:
 // `structure-pointer.ts`. Drawing previews: `StructureEditPreview` on `scn-edit`. Sprint 3: the
-// "Free" chip (`scn-free-chip`) follows the cursor over the canvas while Ctrl is held in Wall /
-// Door mode (FR-SCN-08).
-import { BrickWallIcon, DoorClosedIcon, EraserIcon, PenLineIcon, Undo2Icon } from "lucide-react";
+// "Free" chip (`scn-free-chip`) follows the cursor over the canvas while Ctrl is held in a mode
+// that places points (FR-SCN-08).
+import {
+  ArrowDownUpIcon,
+  ArrowUpFromLineIcon,
+  BrickWallIcon,
+  DoorClosedIcon,
+  EraserIcon,
+  Grid2x2Icon,
+  PenLineIcon,
+  Undo2Icon,
+} from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
@@ -16,6 +25,7 @@ import { typingTarget } from "../scenes-map/tools";
 import { FreeChip } from "./free-chip";
 import { structureCtrl, structurePointer } from "./structure-pointer";
 import {
+  picksSegments,
   type StructureMode,
   setStructureMode,
   shownStructure,
@@ -23,9 +33,9 @@ import {
 } from "./structure-store";
 import { undoLast, useUndoBusy, useUndoDepth } from "./undo-store";
 
-/** FR-SCN-08: the "Free" chip shows in Wall / Door mode while Ctrl is held over the canvas. */
+/** FR-SCN-08: the "Free" chip shows in a mode placing points while Ctrl is held over the canvas. */
 export function freeChipShown(mode: StructureMode, ctrl: boolean, overCanvas: boolean): boolean {
-  return ctrl && overCanvas && (mode === "wall" || mode === "door");
+  return ctrl && overCanvas && !picksSegments(mode);
 }
 
 /** FR-SCN-08: the "Free" chip at the cursor; Ctrl presses also re-pick the hover point. */
@@ -42,6 +52,18 @@ const MODES: { mode: StructureMode; label: string; hint: string; icon: typeof Pe
     icon: PenLineIcon,
   },
   {
+    mode: "window",
+    label: "Window",
+    hint: "See through, can't walk through. Draw like a wall, also over one",
+    icon: Grid2x2Icon,
+  },
+  {
+    mode: "one-way",
+    label: "One-way wall",
+    hint: "Sight passes only the way its arrows point; can't walk through. Draw like a wall, also over one",
+    icon: ArrowUpFromLineIcon,
+  },
+  {
     mode: "door",
     label: "Door",
     hint: "Click both ends; hold Ctrl for a free point",
@@ -52,6 +74,12 @@ const MODES: { mode: StructureMode; label: string; hint: string; icon: typeof Pe
     label: "Erase",
     hint: "Click a wall or door; Ctrl-drag a box",
     icon: EraserIcon,
+  },
+  {
+    mode: "flip",
+    label: "Flip one-way wall",
+    hint: "Click a one-way wall to reverse its arrows; Ctrl-drag a box for several",
+    icon: ArrowDownUpIcon,
   },
 ];
 

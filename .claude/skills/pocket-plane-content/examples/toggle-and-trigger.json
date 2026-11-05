@@ -1,0 +1,59 @@
+{
+  "calls": [
+    {
+      "tool": "character_put_row",
+      "input": {
+        "creatureId": "<character id>",
+        "list": "features",
+        "row": { "name": "Rage", "usesMax": 4, "reset": "long" }
+      }
+    },
+    {
+      "tool": "character_put_preset",
+      "input": {
+        "characterId": "<character id>",
+        "from": "rage",
+        "usesFeature": "Rage"
+      }
+    },
+    {
+      "tool": "character_put_trigger",
+      "input": {
+        "characterId": "<character id>",
+        "name": "Divine Fury",
+        "requiresPreset": "Rage",
+        "rule": {
+          "on": "hit",
+          "when": [{ "if": "via", "via": "weapon" }, { "if": "ownTurn" }],
+          "every": "turn",
+          "then": {
+            "do": "damage",
+            "formula": "1d6 + floor(level(barbarian) / 2)",
+            "type": "radiant"
+          }
+        }
+      }
+    },
+    {
+      "tool": "character_put_preset",
+      "input": {
+        "characterId": "<character id>",
+        "name": "Luckstone",
+        "modifiers": [
+          { "kind": "flat", "on": { "roll": "check" }, "value": 1 },
+          { "kind": "flat", "on": { "roll": "save" }, "value": 1 }
+        ],
+        "durationRounds": null,
+        "concentration": false
+      }
+    },
+    {
+      "tool": "character_toggle_preset",
+      "input": {
+        "characterId": "<character id>",
+        "presetName": "Luckstone",
+        "on": true
+      }
+    }
+  ]
+}

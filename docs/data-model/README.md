@@ -416,7 +416,8 @@ An instance of a creature definition: own name, read-only display copies, play s
 | definitionId | ID → Entity | Via `resolveDefinition`: global or same campaign. **Never sent to players** | [FR-MAP-13](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-26](../specs/scenes-map.md#6-functional-requirements) |
 | name | text 1–40 | **Token-owned** instance state; numbered `B <N>` on place/duplicate; never changed by a definition edit | [FR-MAP-16](../specs/scenes-map.md#6-functional-requirements), #126 |
 | imageAssetId | ID → Asset \| null | **Display copy**: portrait at place; refreshed by the hook only while it equals the old portrait (#127); DM may set custom art | FR-MAP-13, [FR-MAP-18](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-20](../specs/scenes-map.md#6-functional-requirements) |
-| size | `tiny`…`gargantuan` | **Display copy** of `statBlock.size`; never per-token editable; refreshed by the hook | FR-MAP-13, FR-MAP-20, #120 |
+| size | `tiny`…`gargantuan` | **Display copy** of `statBlock.size`, refreshed by the hook, unless the DM set this token's size (`sizeOverridden`) | FR-MAP-13, FR-MAP-20, #120, FR-MAP-150 |
+| sizeOverridden *(#429)* | bool | Column `size_overridden` not null default false. The DM set `size` from the token menu; the hook leaves it. Copied by token and scene duplicate. Server only: on no wire | [FR-MAP-150](../specs/scenes-map.md#6-functional-requirements) |
 | col, row | int | Top-left cell; footprint must overlap the map | [FR-MAP-14](../specs/scenes-map.md#6-functional-requirements) |
 | ownerPlayerId | ID → Player \| null | One owner; defaults from the character's owner; DM reassigns | FR-MAP-13, FR-MAP-18, #124 |
 | hidden | bool | Visibility flag on the record | [FR-MAP-19](../specs/scenes-map.md#6-functional-requirements) |
@@ -1079,7 +1080,7 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN, `complete`; DM ga
 |---|---|---|---|
 | sceneId (PK), campaignId | ID → Scene (`ON DELETE CASCADE`), ID → Campaign | One row per scene, created on the first edit; wire `id` = `sceneId` | SCN §8 |
 | rev, nextN | int, int | `rev` +1 per edit; `n` taken from `nextN`, unique per scene, never reused after a remove; an edit that changes nothing writes nothing *(built, build/scene-tools-structure)* | FR-SCN-07 |
-| walls | **JSON** `[n, x1, y1, x2, y2][]` | Vertex to vertex, length > 0, endpoints in the vertex range ± 1, deduped (either direction, against walls and doors); walls + doors ≤ 2,000 per scene | FR-SCN-07 |
+| walls | **JSON** `[n, x1, y1, x2, y2, kind?][]` | *(#434, FR-SCN-61)* `kind` absent = plain, 1 window, 2 one-way (direction = `(x1, y1)` → `(x2, y2)`, sees through from its right); no migration, old rows stay valid. Vertex to vertex, length > 0, endpoints in the vertex range ± 1, deduped (either direction, walls per kind, doors against every kind); walls + doors ≤ 2,000 per scene | FR-SCN-07 |
 | doors | **JSON** `[n, x1, y1, x2, y2, state, f][]` | `state` 0 open / 1 closed / 2 locked; `f` server-written fog flag: set by `scn.addDoor` (via `deriveSceneObject`, before the write), kept by `scn.setDoor`, re-derived by FOG; a door on an existing segment → `conflict` | FR-SCN-07, [FR-SCN-36](../specs/scene-tools.md#6-functional-requirements) |
 | updatedAt | timestamp | `ctx.clock` | SCN §8 |
 
@@ -2050,7 +2051,7 @@ From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP
 | `player.color` | lowercase `#rrggbb` (a palette key only in pre-sprint-6 rows, migrated at boot) | written at `player.add` (the default, below); null / invalid → the default at boot | unchanged (every connection of the campaign) | [FR-CAMP-30](../specs/campaign-management.md#6-functional-requirements), -34 |
 | `campaign.dm_color` | lowercase `#rrggbb` | DB default stays `'amber'` but is **never relied on**: `campaign.create` writes `#e69f00`; a still-invalid value → `#e69f00` at boot | unchanged | FR-CAMP-24, -34 |
 
-- **Rules** (pure, `@shared/campaign-management/colors.ts`; server and picker share them): `colorProblem(hex)` = `too-dark` (WCAG < 4.5 : 1 on `#171717`) / `too-grey` (CIELAB C\* < 25) / `too-red` (ΔE2000 < 15 from `#ef4444` in normal vision, or < 5 from `#ef4444` or `#ff6467` in the worst of normal / deuteranopia / protanopia) / null. `colorDistance(a, b)` = min ΔE2000 over normal, deuteranopia, protanopia (Machado 2009, severity 1.0). A **pick** must be ≥ 9 from the DM colour and every other player's (`colorClash`). Thresholds in the spec only.
+- **Rules** (pure, `@shared/campaign-management/colors.ts`; server and picker share them): `colorProblem(hex)` = `too-dark` (WCAG < 1.6 : 1 on `#171717`; under 4.5 : 1 names are drawn in the `readableColor` shade, #431) / `too-grey` (CIELAB C\* < 25) / `too-red` (ΔE2000 < 15 from `#ef4444` in normal vision, or < 5 from `#ef4444` or `#ff6467` in the worst of normal / deuteranopia / protanopia) / null. `colorDistance(a, b)` = min ΔE2000 over normal, deuteranopia, protanopia (Machado 2009, severity 1.0). A **pick** must be ≥ 9 from the DM colour and every other player's (`colorClash`). Thresholds in the spec only.
 - **Default** (`defaultColor(taken)`, deterministic): the first palette colour (`PLAYER_COLORS`, order unchanged) at distance ≥ 9 from every colour of the campaign; none → the palette colour whose smallest distance is largest, ties in palette order. Only defaults may break the rule (no unique index, as before).
 - **Boot migration** (start hook `campaign-management.color-backfill`, `migratePlayerColors`, one transaction, before the server listens; no event, no log row): **pass 1** palette key → its hex, uppercase hex → lowercase, on both columns; **pass 2** invalid `dm_color` → `#e69f00`, then per campaign the null / invalid `player.color` rows get defaults against the pass-1 colours in `createdAt`, `rowid` order, each seeing the ones before it. Rerun = no-op (`state:digest` equal).
 - **Derived (never stored):** a colour's validity and distances; its palette name (`colorName`: a palette hex → "Rose", else the hex); the client's CSS colour = `colorOf` (a hex as is; an old key → its palette hex via `--player-<key>`; else the role accent; system → null).
@@ -2374,7 +2375,7 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-95–119 ([ADR-0
 | Data | Where | Rule | Source |
 |---|---|---|---|
 | `WindowState.userSize` | browser layout entry (`localStorage`, #121) | `true`, optional: set at a user resize end; the placer's target size, never shrunk or grown by it (render-only fit); kept when a displacement or zone keeps that size; cleared by Reset layout. Older entries infer it at load iff `userSpot` and the size is neither a known default nor the min | [FR-SHELL-100](../specs/play-shell.md#6-functional-requirements) |
-| Displacement memory | client memory (`ShellState.memory`) | per window the placer moved, shrank or put away for a transient cause (`toolbar:<id>`, `viewport:<w>×<h>`, `window:<kind>`): its first prior rect, `userSpot`, `userSize` and the rect it wrote (null = put away); replaces sprint 7's pre-push rects; dropped when the cause ends, on a user move / resize / close / minimise, reload, reset | [FR-SHELL-102](../specs/play-shell.md#6-functional-requirements) |
+| Displacement memory | client memory (`ShellState.memory`) | per window the placer moved, shrank or put away for a transient cause (`toolbar:<id>`, `viewport:<w>×<h>`, `window:<kind>`, `zone:<w>×<h>`: a protected window's spot before a resize down, ended when the viewport is ≥ that size on both axes): its first prior rect, `userSpot`, `userSize` and the rect it wrote (null = put away), `trip` (optional `{w, h}`: the size a resize down left, on a squeeze or shrink that resize caused); replaces sprint 7's pre-push rects; dropped when the cause ends, on a user move / resize / close / minimise, reload, reset; never stored, never on the wire | [FR-SHELL-102](../specs/play-shell.md#6-functional-requirements), [-220–223](../specs/play-shell.md#6-functional-requirements) |
 | Settled viewport, put-away causes, settle log | client memory (`settledAt`, `autoMinimisedCause`, `settleLog`) | the viewport of the last `viewport` / reset settle; why each auto-minimised window went; the last settle's `trigger:kind>rung` steps | [FR-SHELL-103](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-110](../specs/play-shell.md#6-functional-requirements) |
 | `WindowDef.usefulSize` (★ kinds), size table criteria, pending rows | code (registry; `size-table.ts` test data, append-only) | DM Initiative 400×380, Game logs 460×160, player Initiative 280×320, player sheet 320×338; `dicex.requests`, `party.summary` pending | [FR-SHELL-100](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-112](../specs/play-shell.md#6-functional-requirements) |
 | Overlays, top-bar items, chrome keep-outs | code (append-only registries `overlays.ts`, `top-bar-items.ts`, `chrome-keep-outs.ts`, created empty) | not stored or sent | [FR-SHELL-112](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-113](../specs/play-shell.md#6-functional-requirements) |
@@ -2886,3 +2887,24 @@ From [log-share](../specs/log-share.md#8-data-model) (#415). **No new table, col
 - **Fold (FR-SHARE-08):** the window's shares keep ≤ 64,000 chars of text, newest first; an older one gets `text: ""`, `folded: true` in the same transaction.
 - **Fixtures:** `share-mira-rows` (Mira: Fireball, Hedge Whisper, Moonblade Shard); bundle `log-share`.
 - **Snapshot size** (CON-44, `FR-SHARE-08 CON-44`): 100 shares of the longest text: at most +109,235 B per viewer on `log-share`, about 45 KB of it the rows themselves. 0 B while no share exists.
+
+## 152. AoE tool polish (fix/aoe-template-polish)
+
+From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-57–60 ([#427](../decisions-log.md)). **No new table, column or record type.** `aoe_template.shape` keeps `cylinder` as a valid value: rows kept earlier stay as they are, the AoE tool just no longer places new ones. Protocol side: [protocol §193](../protocol/README.md#193-aoe-tool-polish-fixaoe-template-polish).
+
+## 153. Clear damage (build/cbt-clear-damage)
+
+No new table or column.
+
+| Field | Change | Rule | FR |
+|---|---|---|---|
+| `notification.payload` (kind `damage-card`) | + optional `damageCleared: true` | Set by `cbt.clearDamage` with `damage: null` (`unusedRolls`, `diceMaxed` removed); removed when new damage attaches | FR-CBT-178 |
+
+## Token mirrors (build/token-mirrors)
+
+New table `token_mirror` ([token-mirrors §8](../specs/token-mirrors.md#8-data-model)): `id`, `campaign_id`, `scene_id` (cascade), `token_id` (cascade), `seq`, `col`, `row`, `mode`, copies `name`, `image_asset_id`, `creature_type`, `size`, `shape`, derived `suppressed`, `fogged`, `seen_by`, `created_at`, `updated_at`. No existing table changes.
+
+| Derived | Rule | FR |
+|---|---|---|
+| `suppressed` | Token `hidden` or `invisible`, or no cell of the footprint on the map | FR-MIR-09 |
+| `fogged`, `seenBy` | Fog subject at the mirror's own cells; never the token's copies | FR-MIR-06 |

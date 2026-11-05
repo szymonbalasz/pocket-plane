@@ -1,6 +1,6 @@
 // Canvas layer registry core (FR-MAP-29, FR-SCN-02/03): an ordered list, map 0 < grid 10 <
-// scn-props 20 < scn-structure 26 < fog 30 < scn-templates 35 < vfx-under 38 < tokens 40 < vfx-over
-// 43 < labels 45 < scn-edit 48 < pointers 50. Later features add layers at their slots without touching scene or token code.
+// scn-props 20 < scn-structure 26 < fog 30 < scn-templates 35 < vfx-under 38 < mirrors 39 < tokens 40 < vfx-over
+// 43 < labels 45 < scn-template-labels 47 < scn-edit 48 < pointers 50. Later features add layers at their slots without touching scene or token code.
 // Sprint 4 (BL-07): every entry is a Konva Group (named by its id) inside one of four Konva layers
 // (`map-layer-<base|fog|objects|top>`), picked by its `layer` key. DOM-free so it runs under
 // `bun test`.
@@ -18,11 +18,15 @@ export const LAYER_ORDER = {
   scnTemplates: 35,
   /** spell-fx under pass: auras below tokens (FR-VFX-13). */
   vfxUnder: 38,
+  /** Token mirrors, under the tokens they copy (FR-MIR-15). */
+  mirrors: 39,
   tokens: 40,
   /** spell-fx over pass: auras and hit looks above tokens, below labels (FR-VFX-13). */
   vfxOver: 43,
   /** Token name labels + overlay badges, above every token (FR-MAP-42). */
   labels: 45,
+  /** AoE template label pills, above tokens and their labels (FR-SCN-59). */
+  scnTemplateLabels: 47,
   /** Drawing previews and handles; mounted only while a drawing tool is active. */
   scnEdit: 48,
   /** FR-MAP-121: Teleport's target footprint, while the DM picks a cell. */
@@ -100,6 +104,11 @@ export interface MenuPoint {
 export interface LayerContextMenu {
   hit(p: MenuPoint, ctx: LayerMenuContext): boolean;
   open(p: MenuPoint, screen: MenuPoint, ctx: LayerMenuContext): void;
+  /**
+   * FR-SCN-58: true = asked ahead of the other layers' menus, and a hit goes ahead of the DM's
+   * token menu (a tool that works on this layer's objects, which often lie over tokens).
+   */
+  first?(ctx: LayerMenuContext): boolean;
 }
 
 /**
@@ -184,7 +193,8 @@ export function layerToggles<P>(layers: readonly LayerDef<P>[]): LayerToggle[] {
 
 /**
  * FR-SCN-51 / FR-MAP-71 step 4: the first entry this client mounts (`layerSlots`' rules) whose
- * `contextMenu.hit(p)` is true, asked top-down by `order`; null when none hits.
+ * `contextMenu.hit(p)` is true, asked top-down by `order` (those whose `first` holds ahead of the
+ * rest, FR-SCN-58); null when none hits.
  */
 export function layerMenuAt<P>(
   layers: readonly LayerDef<P>[],
@@ -192,8 +202,9 @@ export function layerMenuAt<P>(
   ctx: LayerMenuContext,
 ): LayerDef<P> | null {
   const mounted = layerSlots(layers, ctx.client, ctx.off).flatMap((s) => s.layers);
-  for (let i = mounted.length - 1; i >= 0; i--) {
-    const l = mounted[i] as LayerDef<P>;
+  const topDown = mounted.filter((l) => l.contextMenu).reverse();
+  const first = topDown.filter((l) => l.contextMenu?.first?.(ctx) === true);
+  for (const l of [...first, ...topDown]) {
     if (l.contextMenu?.hit(p, ctx)) return l;
   }
   return null;

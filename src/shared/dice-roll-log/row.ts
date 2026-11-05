@@ -8,7 +8,7 @@ import {
   AttackLogPayload,
   HpLogPayload,
 } from "@shared/combat-tracker/log-kinds";
-import { LOG_KIND_ATTACK, LOG_KIND_HP } from "@shared/combat-tracker/schemas";
+import { attackPhrase, LOG_KIND_ATTACK, LOG_KIND_HP } from "@shared/combat-tracker/schemas";
 import type { RollCategory } from "@shared/events/dice-roll-log";
 import { LOG_KIND_SHARE, SharePayload } from "@shared/log-share/schemas";
 import type { LineSegment } from "./kind-types";
@@ -57,7 +57,7 @@ function combatAction(entry: EntryLike): string | null {
     if (!a.success) return null;
     const p = a.data;
     const name = attackName(entry, p);
-    const text = name ? `${name} attack vs ${p.targetName}` : `attacks ${p.targetName}`;
+    const text = name ? `${attackPhrase(name)} vs ${p.targetName}` : `attacks ${p.targetName}`;
     const miss = p.toHit === null && !p.hit ? " — miss" : "";
     return `${text}${miss}${calloutText(p.callout)}`;
   }

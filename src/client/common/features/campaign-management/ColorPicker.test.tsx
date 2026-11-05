@@ -15,6 +15,7 @@ import {
   ColorPickerPopover,
   draftOf,
   keyTarget,
+  LIGHTER_SHADE_MESSAGE,
   moveTo,
   othersOf,
   ownColor,
@@ -180,7 +181,7 @@ describe("FR-CAMP-35 picker", () => {
     expect(p2).toContain('aria-label="Player 2&#x27;s colour: #b388ff"');
   });
 
-  test("FR-CAMP-35 picker: reason line and Apply: #3d6ec9 too dark; #7fd8ff fine → Apply; not live or in flight → disabled, draft kept; bad hex; no colour at a hue; a hovered blocked swatch names its reason", () => {
+  test("FR-CAMP-35 picker: reason line and Apply: #00008b too dark; #7fd8ff fine → Apply; not live or in flight → disabled, draft kept; bad hex; no colour at a hue; a hovered blocked swatch names its reason", () => {
     const rules = pickerRules(othersOf(H, "p1"));
     const base = {
       hexText: null,
@@ -193,9 +194,9 @@ describe("FR-CAMP-35 picker", () => {
     const view = (hex: string, extra: Partial<Parameters<typeof pickerView>[0]> = {}) =>
       pickerView({ ...base, draft: draftOf(hex), ...extra });
     expect(view(PLAYER_COLORS.jade)).toEqual({ badHex: false, status: null, canApply: false });
-    expect(view("#3d6ec9")).toEqual({
+    expect(view("#00008b")).toEqual({
       badHex: false,
-      status: { reason: "too-dark", message: "Too dark to read on the map", block: true },
+      status: { reason: "too-dark", message: "Too dark to see", block: true },
       canApply: false,
     });
     expect(view("#7fd8ff")).toEqual({ badHex: false, status: null, canApply: true });
@@ -238,6 +239,26 @@ describe("FR-CAMP-35 picker", () => {
     });
   });
 
+  test("FR-CAMP-35 picker: a deep colour is allowed and says its names show lighter (a hint, not a block); a palette colour says nothing", () => {
+    const rules = pickerRules(othersOf(H, "p1"));
+    const view = (hex: string) =>
+      pickerView({
+        draft: draftOf(hex),
+        hexText: null,
+        hint: null,
+        stored: PLAYER_COLORS.jade,
+        rules,
+        live: true,
+        inFlight: false,
+      });
+    expect(view("#8b0000")).toEqual({
+      badHex: false,
+      status: { reason: null, message: LIGHTER_SHADE_MESSAGE, block: false },
+      canApply: true,
+    });
+    expect(view(PLAYER_COLORS.rose).status).toBeNull();
+  });
+
   test("FR-CAMP-35 clamp: while a drag is held off a refused target, the reason line names the target's reason (§13 P4); the clamped draft stays appliable", () => {
     const rules = pickerRules(othersOf(H, "p1"));
     const target = { h: 162, s: 86, v: 5 };
@@ -258,7 +279,7 @@ describe("FR-CAMP-35 picker", () => {
       }),
     ).toEqual({
       badHex: false,
-      status: { reason: "too-dark", message: "Too dark to read on the map", block: true },
+      status: { reason: "too-dark", message: "Too dark to see", block: true },
       canApply: true,
     });
   });
@@ -286,7 +307,8 @@ describe("FR-CAMP-35 picker", () => {
         live: true,
         inFlight: false,
       });
-    expect(view(pushed)).toEqual({ badHex: false, status: null, canApply: true });
+    expect(view(pushed)).toMatchObject({ badHex: false, canApply: true });
+    expect(view(pushed).status?.block ?? false).toBe(false);
     // A square key step likewise; only a held pointer drag names the refused target.
     const key = { h: 162, s: 86, v: 5 };
     expect(moveTo(key, rules, new Set(), false).pushed).toBeNull();

@@ -5,6 +5,7 @@
 // E: a reminder row with the "Hidden with the stronghold" badge keeps its text wide at 280 px, the
 // badge and the menu taking the next line. Classes per row: bun test.
 import { type Browser, expect, type Locator, type Page, test } from "@playwright/test";
+import { FACILITY_ORDER_MAX, HOLD_NAME_MAX, STAFF_ROLE_MAX } from "@shared/strongholds/schemas";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
@@ -99,6 +100,108 @@ test("full text: one word wider than the window wraps inside it: inventory notes
   ).toHaveText(WORD.slice(0, 75));
   await hold.getByTestId("hold-facility-effect").last().scrollIntoViewIfNeeded();
   await hold.screenshot({ path: test.info().outputPath("stronghold-340.png") });
+});
+
+test("FR-HOLD-29 Make reminder hands over a facility's whole effect: over the limit the editor says so and Save waits", async ({
+  browser,
+}) => {
+  const { secret, recordId } = e2eEnv();
+  const dm = await dmPage(browser);
+  const effect = "The bellows roar. ".repeat(40).slice(0, 600).trim();
+  await dmIntent(dm, secret, "hold.saveFacility", {
+    strongholdId: recordId("hold-greystone", "stronghold"),
+    facility: { name: "Long Effect", state: "built", effect },
+  });
+  const board = await openWindow(dm, "party.board");
+  await tab(board, "strongholds").click();
+  await board
+    .getByTestId("hold-row")
+    .filter({ hasText: "Greystone Keep" })
+    .getByTestId("hold-row-open")
+    .click();
+  const hold = shellWindow(dm, "hold.stronghold");
+  await hold
+    .getByTestId("hold-facility")
+    .filter({ hasText: "Long Effect" })
+    .getByTestId("hold-facility-menu")
+    .click();
+  await dm.getByTestId("hold-facility-make-reminder").click();
+  const text = dm.getByTestId("rem-editor-text");
+  await expect(text).toHaveValue(effect);
+  await expect(dm.getByTestId("rem-editor-counter")).toHaveText(`${effect.length} / 500`);
+  await expect(dm.getByTestId("rem-editor-over")).toBeVisible();
+  await expect(dm.getByTestId("rem-editor-save")).toBeDisabled();
+  await text.fill(effect.slice(0, 500).trim());
+  await expect(dm.getByTestId("rem-editor-over")).toHaveCount(0);
+  await expect(dm.getByTestId("rem-editor-save")).toBeEnabled();
+});
+
+test("full text: one word wider than the window stays inside it: stronghold, staff, notes, reminder source, handout", async ({
+  browser,
+}) => {
+  const { secret, recordId } = e2eEnv();
+  const dm = await dmPage(browser);
+  const strongholdId = recordId("hold-greystone", "stronghold");
+  const word = (n: number) => WORD.slice(0, n);
+  await dmIntent(dm, secret, "hold.update", {
+    strongholdId,
+    name: word(HOLD_NAME_MAX),
+    notes: word(110),
+  });
+  await dmIntent(dm, secret, "hold.saveFacility", {
+    strongholdId,
+    facility: { name: word(HOLD_NAME_MAX), state: "built", order: word(FACILITY_ORDER_MAX) },
+  });
+  await dmIntent(dm, secret, "hold.saveStaff", {
+    strongholdId,
+    staff: { name: word(HOLD_NAME_MAX), role: word(STAFF_ROLE_MAX), notes: word(110) },
+  });
+  await dmIntent(dm, secret, "rem.save", {
+    target: { kind: "party" },
+    text: "Source check",
+    source: word(60),
+  });
+  await dmIntent(dm, secret, "party.createHandout", {
+    title: word(60),
+    body: word(110),
+    imageAssetIds: [],
+  });
+
+  const board = await openWindow(dm, "party.board");
+  await resizeTo(dm, board, 340);
+  await tab(board, "strongholds").click();
+  await fits(board, "stronghold list at 340");
+  await tab(board, "reminders").click();
+  await expect(board.getByTestId("rem-tab")).toHaveAttribute("data-state", "ready");
+  await fits(board, "reminders at 340");
+  await tab(board, "handouts").click();
+  await fits(board, "handouts at 340");
+  await board
+    .getByTestId("party-handout-row")
+    .filter({ hasText: word(60) })
+    .locator("button")
+    .first()
+    .click();
+  const viewer = shellWindow(dm, "party.handout");
+  await expect(viewer.getByTestId("party-handout-title")).toHaveText(word(60));
+  await resizeTo(dm, viewer, 360);
+  await fits(viewer, "handout viewer at 360");
+  await viewer.screenshot({ path: test.info().outputPath("handout-360.png") });
+
+  await tab(board, "strongholds").click();
+  await board
+    .getByTestId("hold-row")
+    .filter({ hasText: word(HOLD_NAME_MAX) })
+    .getByTestId("hold-row-open")
+    .click();
+  const hold = shellWindow(dm, "hold.stronghold");
+  await expect(hold.getByTestId("hold-name")).toHaveText(word(HOLD_NAME_MAX));
+  await resizeTo(dm, hold, 340);
+  for (const key of ["facilities", "staff", "notes"]) {
+    await hold.locator(`[data-testid="hold-tab"][data-value="${key}"]`).click();
+    await fits(hold, `${key} at 340`);
+    await hold.screenshot({ path: test.info().outputPath(`hold-${key}-340.png`) });
+  }
 });
 
 test('full text: a reminder row with the "Hidden with the stronghold" badge keeps its text wide at 280 px; the badge and menu take the next line', async ({

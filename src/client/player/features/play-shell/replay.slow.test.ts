@@ -35,6 +35,10 @@ if (process.env.UPDATE_FAILING === "1") {
 // passes, PM1's P2 moved @1280×720 memory exemption with them; 29 → 12 failing.
 // Sprint 14 F1 (BL-134): K5's P2 fitted @1600×900 push passes (the push path's I7 keeps a zone a
 // drop gave back, FR-SHELL-149 / -159): 11 → 10.
+// Sprint 15 window memory (BL-143–146, FR-SHELL-220–225): P1 / P2 / P3 moved @1600×900 resize, P3
+// fitted @1600×900 resize, P1 fitted @1280×720 load, P2 moved @1280×800 memory pass: 10 → 4. Left:
+// P2 moved load / Start (note history, placed below useful at the moved camera, stays so after the
+// camera moves on; no named item).
 const EXEMPTIONS = new Map<string, string>();
 
 test("FR-SHELL-160 named exemptions are recorded failing cells", () => {

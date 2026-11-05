@@ -50,6 +50,7 @@ import {
   createSettledRefit,
   createSizeCameras,
   dryFitScene,
+  endsYieldMemory,
   type FitInputs,
   type FitReason,
   type FitVisible,
@@ -60,9 +61,12 @@ import {
   layoutKey,
   placerSettled,
   refitsOnReveal,
+  rememberYield,
   revealRefit,
   type SizeCamera,
   visibleArea,
+  type YieldMemory,
+  yieldBack,
   zoomAt,
 } from "./camera";
 import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./canvas-context";
@@ -312,10 +316,35 @@ export function MapCanvas(props: MapCanvasProps) {
   const layoutNow = useRef((): string => "");
   layoutNow.current = () =>
     layoutKey(scene.id, fitTokensOf(tokensRef.current), freeRef.current.layout);
+  /** FR-MAP-125: the camera and fit state before the Dice tray's yield refit. */
+  const yieldMemory = useRef<YieldMemory<SizeCamera | null> | null>(null);
+  /** The next `window` fit is the tray's yield. */
+  const yieldPending = useRef(false);
+  /** The next `window` fit is the tray's end: undo the yield, unless the camera moved on. */
+  const yieldEnding = useRef(false);
   const fitNow = useRef((_reason: FitReason) => {});
   fitNow.current = (reason) => {
     const inputs = fitInputs.current();
     if (!inputs) return;
+    if (reason === "window" && yieldEnding.current) {
+      yieldEnding.current = false;
+      const mem = yieldMemory.current;
+      yieldMemory.current = null;
+      const back = yieldBack(mem, camRef.current, cameraModeRef.current, inputs);
+      if (back === "leave") return;
+      if (back === "restore" && mem) {
+        setCam(mem.from);
+        const was = mem.before;
+        if (was) {
+          setFitFloor(was.floor);
+          setFitVisible(was.visible);
+          setFitRect(`${was.rect.x},${was.rect.y},${was.rect.w},${was.rect.h}`);
+          setFitReason(was.reason);
+        }
+        fitState.current = was;
+        return;
+      }
+    }
     // H2 FAIL 5 (FR-MAP-113 note): back at a size whose layout is the one it showed before, the
     // camera it had there (a resize round trip restores the map too).
     const kept = reason === "resize" ? sizeCams.take(size, layoutNow.current()) : null;
@@ -325,6 +354,14 @@ export function MapCanvas(props: MapCanvasProps) {
       ...fitFor(reason, inputs, lastFullCell.current),
       lastFull: lastFullCell.current,
     };
+    if (reason === "window" && yieldPending.current) {
+      yieldPending.current = false;
+      yieldMemory.current = rememberYield(yieldMemory.current, camRef.current, fitState.current, {
+        x: fit.x,
+        y: fit.y,
+        scale: fit.scale,
+      });
+    }
     setCam({ x: fit.x, y: fit.y, scale: fit.scale });
     setFitFloor(fit.floor);
     setFitVisible(fit.visible);
@@ -410,6 +447,12 @@ export function MapCanvas(props: MapCanvasProps) {
   const onCamera = useCallback(
     (e: CameraEvent, deferred = false, reason: FitReason = e as FitReason) => {
       const next = cameraOn(cameraModeRef.current, e);
+      // FR-MAP-126: the camera is the user's now (or a full fit's): the tray's closing leaves it.
+      if (endsYieldMemory(e)) {
+        yieldMemory.current = null;
+        yieldPending.current = false;
+        yieldEnding.current = false;
+      }
       cameraModeRef.current = next.mode;
       setCameraMode(next.mode);
       if (!next.fit) return;
@@ -433,7 +476,17 @@ export function MapCanvas(props: MapCanvasProps) {
       },
       lastFullCell: () => lastFullCell.current,
       // The placer wrote the windows; the refit frames them once they render.
-      yieldRefit: () => onCamera("window", true),
+      yieldRefit: (undoable) => {
+        yieldPending.current = undoable === true;
+        onCamera("window", true);
+      },
+      yieldEnded: () => {
+        // A refit still waiting has nothing to undo: it frames the windows as they are by then.
+        yieldPending.current = false;
+        if (yieldMemory.current === null) return;
+        yieldEnding.current = true;
+        onCamera("window", true);
+      },
     });
     return () => setFitPort(null);
   }, [onCamera]);
@@ -666,6 +719,8 @@ export function MapCanvas(props: MapCanvasProps) {
     menu: LayerContextMenu;
     ctx: LayerMenuContext;
   } | null>(null);
+  /** FR-SCN-58: the browser's `contextmenu` for this right press opens no token menu. */
+  const skipTokenMenu = useRef(false);
   useEffect(() => {
     if (live) return;
     for (const n of stageRef.current?.find(".map-token") ?? []) {
@@ -1094,14 +1149,18 @@ export function MapCanvas(props: MapCanvasProps) {
       const tp = menuTool?.pointer?.menu ? toolPointerRef.current(e.evt) : null;
       const toolMenu = tp !== null && menuTool?.pointer?.menu?.(tp) === true;
       const menuCtx: LayerMenuContext = { ...ctx, off: useLayerToggles.getState().off };
-      const asks = isLive && !toolMenu && !(onToken && client === "dm");
-      const hit = asks ? layerMenuAt(canvasLayers, p, menuCtx) : null;
+      const found = isLive && !toolMenu ? layerMenuAt(canvasLayers, p, menuCtx) : null;
+      // The DM's token menu goes first, unless the layer's menu asks to go ahead (FR-SCN-58).
+      const dmToken = onToken && client === "dm";
+      const ahead = dmToken && found?.contextMenu?.first?.(menuCtx) === true;
+      const hit = dmToken && !ahead ? null : found;
+      skipTokenMenu.current = ahead;
       const action = rightPress({
         client,
         live: isLive,
         signalsLive,
         nodeMenu: false,
-        onToken,
+        onToken: onToken && !ahead,
         toolMenu,
         layerHit: hit !== null,
       });
@@ -1192,6 +1251,10 @@ export function MapCanvas(props: MapCanvasProps) {
 
   const onContextMenu = (e: Konva.KonvaEventObject<PointerEvent>) => {
     e.evt.preventDefault();
+    // FR-SCN-58: this right press went to a layer's menu ahead of the token's.
+    const skip = skipTokenMenu.current;
+    skipTokenMenu.current = false;
+    if (skip) return;
     const node = tokenNodeOf(e.target);
     if (!node || client !== "dm" || !props.onTokenMenu || !liveRef.current) return;
     const t = tokens.find((x) => x.id === node.id());
