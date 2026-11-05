@@ -10,7 +10,7 @@ import { hiddenByHooks } from "../scenes-map/visibility-hooks";
 
 export function mirrorVisibility(r: TokenMirrorRecord, v: Viewer): Visibility {
   if (r.mode === "hidden" || r.suppressed) return "hidden";
-  // FR-MIR-06 (DM 2026-11-05, #442): every shown mode is foggable, walls and fog per player.
+  // FR-MIR-06 (DM 2026-11-05, #443): every shown mode is foggable, walls and fog per player.
   if (hiddenByHooks(TOKEN_MIRROR_TYPE, r, v)) return "hidden";
   return "redacted";
 }

@@ -95,7 +95,7 @@ describe("FR-DICE-22 roll bar guard", () => {
     expect(g([])).toBe(true);
     expect(g([mir()])).toBe(false);
     expect(g([mir({ mode: "transparent" })])).toBe(false);
-    // #442: a mirror no player has sight to doesn't count, Transparent too.
+    // #443: a mirror no player has sight to doesn't count, Transparent too.
     expect(g([mir({ mode: "transparent", fogged: true })])).toBe(true);
     expect(g([mir({ fogged: true })])).toBe(true);
     expect(g([mir({ mode: "shadow" })])).toBe(true);

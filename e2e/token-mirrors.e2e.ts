@@ -74,7 +74,7 @@ test("FR-MIR-01 FR-MIR-06 FR-MIR-15 FR-MIR-16 mirror a token, switch its mode, i
   await live(p1);
 
   // The fixture's Transparent mirror, on the far side: out of every player's sight (foggable,
-  // #442), so the DM's label says Fog and the player has none.
+  // #443), so the DM's label says Fog and the player has none.
   await expect.poll(async () => (await mirrors(dm)).length).toBe(1);
   await expect
     .poll(async () => (await mirrors(dm))[0]?.label)

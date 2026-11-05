@@ -6,7 +6,7 @@
 // its name; a definition under its name) and the visibility facts the DM holds. Hidden for players
 // here = seen by no player, as on the server (DM 2026-11-05): `hidden`, or fogged for every player
 // (`fogged`), and none of its Visible or Transparent mirrors shown to a player (not `suppressed`,
-// not `fogged`, FR-MIR-06 / -09, #442). A Shadow never counts.
+// not `fogged`, FR-MIR-06 / -09, #443). A Shadow never counts.
 
 import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
 import { actorGuarded, type GuardActor, type GuardWorld } from "@shared/dice-roll-log/roll-guard";
@@ -20,7 +20,7 @@ type GuardMirror = Pick<TokenMirrorRecord, "tokenId" | "mode" | "suppressed" | "
 
 /**
  * FR-MIR-06 / -09: a Visible or Transparent mirror some player has sight to (every mode is
- * foggable, #442; a Shadow is anonymous).
+ * foggable, #443; a Shadow is anonymous).
  */
 function mirrorShown(m: GuardMirror): boolean {
   if (m.suppressed || m.fogged) return false;

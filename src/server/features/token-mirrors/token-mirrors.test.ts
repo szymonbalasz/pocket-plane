@@ -1,4 +1,4 @@
-// Token mirrors over a real socket (MIR §13): who gets what per mode (each shown mode foggable, #442), following the source token,
+// Token mirrors over a real socket (MIR §13): who gets what per mode (each shown mode foggable, #443), following the source token,
 // and everything a mirror must never do. Bundle `token-mirrors`.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
@@ -159,7 +159,7 @@ describe("display modes (FR-MIR-06)", () => {
     t.close();
   });
 
-  test("FR-MIR-06 Transparent and Shadow are foggable too (#442): only players with sight get them", async () => {
+  test("FR-MIR-06 Transparent and Shadow are foggable too (#443): only players with sight get them", async () => {
     const t = await table();
     // Far from every PC and behind the map's walls: `fogged` says no player has sight there.
     const far = await t.create("Goblin", 18, 1, "transparent");
@@ -187,7 +187,7 @@ describe("display modes (FR-MIR-06)", () => {
     expect(t.mirror(t.dm, far)?.fogged).toBe(true);
     expect(t.mirror(t.p1, far)).toBeUndefined();
     expect(t.mirror(t.p2, far)).toBeUndefined();
-    // Same cell, Transparent: still out of sight (#442).
+    // Same cell, Transparent: still out of sight (#443).
     await ok(t.dm, M.setMode, { mirrorId: far, mode: "transparent" });
     await t.settle();
     expect(t.mirror(t.p1, far)).toBeUndefined();

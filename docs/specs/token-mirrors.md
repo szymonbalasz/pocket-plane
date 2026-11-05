@@ -53,7 +53,7 @@ phase: post-mvp
 | FR-MIR-03 | A mirror's footprint must overlap the map when placed; off the map → `invalid`. | |
 | FR-MIR-04 | A mirror does nothing: never a vision source, combatant, target, or selectable token, and players can't move it. It is not a `token` row, so token code never meets it. | |
 | FR-MIR-05 | ≤ 200 per scene and ≤ 2,000 per campaign → `conflict`. | Props' caps |
-| FR-MIR-06 | **Modes.** Hidden: no player. Visible (a normal look), Transparent and Shadow: only players whose sight reaches the mirror's cells (walls and fog apply, per player, party vision included). The modes differ in look only. *(Amended 2026-11-05, [#442](../decisions-log.md): Transparent and Shadow used to ignore walls and fog.)* | §7 |
+| FR-MIR-06 | **Modes.** Hidden: no player. Visible (a normal look), Transparent and Shadow: only players whose sight reaches the mirror's cells (walls and fog apply, per player, party vision included). The modes differ in look only. *(Amended 2026-11-05, [#443](../decisions-log.md): Transparent and Shadow used to ignore walls and fog.)* | §7 |
 | FR-MIR-07 | A player's copy never carries the source token's id, `seenBy`, `fogged`, `suppressed` or the campaign. A Shadow also carries no name, art or creature type. | Checked on snapshot and live |
 | FR-MIR-08 | When the token moves, each mirror moves by the same step, in the same transaction and event. Name, art, creature type, size and shape follow it. A mirror moves on the drop, not during a drag. | Token-changed hook |
 | FR-MIR-09 | While the token is hidden or Invisible, or the mirror has no cell on the map, no player gets it (`suppressed`), and it returns by itself when that ends. Its mode is unchanged. A mirror is otherwise independent of whether players see the token. | Stops a mirror giving away a hidden enemy |
@@ -72,7 +72,7 @@ Reference [visual-direction](../design/visual-direction.md). Uses the token's ar
 | Mode | Player sees | DM sees |
 |---|---|---|
 | Visible | The token's art, full strength, name pill | The same + dashed outline + `Mirror · Goblin · Visible` |
-| Shown, no player has sight (#442) | Nothing | As its mode + `· Fog`, e.g. `Mirror · Goblin · Transparent · Fog` |
+| Shown, no player has sight (#443) | Nothing | As its mode + `· Fog`, e.g. `Mirror · Goblin · Transparent · Fog` |
 | Transparent | Art at 45 %, name pill | The same + outline + `Mirror · Goblin · Transparent` |
 | Shadow | A dark shape at 60 %, the token's size and shape, no name | The same + outline + `Mirror · Goblin · Shadow` |
 | Hidden | Nothing | Art at 30 % + outline + `Mirror · Goblin · Hidden` |
@@ -132,4 +132,4 @@ Reference [visual-direction](../design/visual-direction.md). Uses the token's ar
 
 ## 15. Open questions
 
-None. ~~Decided by the DM: Transparent and Shadow show to every player, also one who pans to that part of the map ("fog of war is enough control").~~ Reversed by the DM 2026-11-05 ([#442](../decisions-log.md)): every shown mode is foggable.
+None. ~~Decided by the DM: Transparent and Shadow show to every player, also one who pans to that part of the map ("fog of war is enough control").~~ Reversed by the DM 2026-11-05 ([#443](../decisions-log.md)): every shown mode is foggable.

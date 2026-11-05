@@ -262,7 +262,7 @@ describe("FR-DICE-13 roll guard (#367)", () => {
     mirrorSeenBy([t.h.p2.id]);
     t.check(def(), true);
     t.check(t.roll({ tokenId: rat }), true);
-    // Transparent but out of every player's sight: foggable (#442) → DM-only.
+    // Transparent but out of every player's sight: foggable (#443) → DM-only.
     mirrorSeenBy([]);
     t.check(def(), false);
     mirrorSeenBy([t.h.p2.id]);

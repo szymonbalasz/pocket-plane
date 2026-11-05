@@ -47,7 +47,7 @@ describe("FR-MIR-15 the look", () => {
     expect(dmLabel(m({ name: "Goblin", suppressed: true }))).toBe(
       "Mirror · Goblin · Hidden with its token",
     );
-    // #442: shown, but no player has sight to it.
+    // #443: shown, but no player has sight to it.
     expect(dmLabel(m({ name: "Goblin", mode: "transparent", fogged: true }))).toBe(
       "Mirror · Goblin · Transparent · Fog",
     );

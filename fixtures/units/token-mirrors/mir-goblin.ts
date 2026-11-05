@@ -4,7 +4,7 @@ import { createMirror } from "@server/features/token-mirrors/commands";
 
 /**
  * MIR §13 `mir-goblin`: Goblin Ambush live, and a Transparent mirror of **Goblin Sneak** (4, 9) at
- * (16, 11), the far side of the map: out of every player's sight (foggable, #442).
+ * (16, 11), the far side of the map: out of every player's sight (foggable, #443).
  */
 export default defineFixture({
   key: "mir-goblin",

@@ -19,7 +19,7 @@ export const MIRRORS_PER_CAMPAIGN_MAX = 2000;
 
 /**
  * FR-MIR-06: `hidden` nobody; `visible` a normal look, `transparent` faint, `shadow` a dark
- * shape: each for whoever has sight to it, walls and fog per player (DM 2026-11-05, #442).
+ * shape: each for whoever has sight to it, walls and fog per player (DM 2026-11-05, #443).
  */
 export const MIRROR_MODES = ["hidden", "visible", "transparent", "shadow"] as const;
 export const MirrorMode = z.enum(MIRROR_MODES);
