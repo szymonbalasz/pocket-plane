@@ -84,6 +84,7 @@ describe("linked-notes co-writing authority (N2, in-process)", () => {
       version: 0,
       doc: "",
       here: [{ role: "player", playerId: p1.playerId, clientId: "a" }],
+      backlinks: [],
     });
     expect(push(p1, "c1", 0, [ins("a", 0, 0, "Hello")])).toEqual({ accepted: true });
     expect(push(p1, "c1", 1, [ins("a", 5, 5, " world"), ins("a", 11, 0, ">")])).toEqual({

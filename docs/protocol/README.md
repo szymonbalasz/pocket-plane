@@ -4549,3 +4549,19 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-13 – -16, -18 – -21, 
 - **Campaign switch:** every connection closes 4409 (FR-SYNC-07); a listener drops the other campaigns' sessions.
 - **Push frames:** `pushPrefix` (shared) = the longest prefix of unconfirmed updates within 48 KiB (one bigger update goes alone; the hub's 64 KiB frame limit still applies).
 - **Measured** (`fsync.slow.test.ts`, 3 typists, file DB, WAL + `synchronous = FULL`, Windows SSD): 484 commits/s sustained, 2.05 ms a push (p95 2.11 ms): ≈ 6% of the server thread at 30 pushes/s.
+
+## 198. Linked notes links (build/notes-links)
+
+From [linked-notes](../specs/linked-notes.md) FR-NOTES-07 – -13, -23 and [ADR-0078](../architecture/adr/0078-note-co-writing.md) "Links". **Built by `build/notes-links` (slice N5).** One server signal; the open result gains `backlinks`; no new intent, record type or table. The rename rewrite (FR-NOTES-11) is N6's.
+
+- **Links:** `parseLinks(text)` (`src/shared/linked-notes/links.ts`) finds `[[Title]]` and `[[Title|label]]` (target a valid title; no `[`, `]`, `|` or line break in target or label). `@` is an editor gesture only, so `@Duke` stays plain text.
+- **`note_link` rows:** one per distinct folded target, rewritten in the transaction that changes the text (`notes.push`, the fixtures' `notes.seedBody`). Notes written before N5 get theirs at **server start** (start hook `linked-notes.links`: every note's rows from its current text, binned ones too; a no-op once they match).
+- **`notes.open`** results add `backlinks: [{id, title}]`: the live notes of the campaign linking to the note's folded title, itself left out, by title.
+- **`NoteEdited`** payload gains optional `linksChanged: true` (the push changed the note's link targets).
+
+| Signal | Payload | Who gets it | FR |
+|---|---|---|---|
+| `notes.backlinks` (server) | `{noteId, backlinks: [{id, title}]}` | Every open note's editors whose list differs from the one they were last sent, after a push that changed links, or a create, rename, delete or restore in the campaign | FR-NOTES-12 |
+
+- **Client only:** chips (atomic; a click follows, never moves the caret; Alt+click or arrowing in shows the raw text until the caret leaves; Backspace after / Delete before removes one whole; dotted when missing, a click creates it with `notes.create {ifMissing: true}` and opens it); the `@` / `[[` title picker (shared matcher, ≤ 8 notes, "Create note "…"" last); die buttons after dice notation (`findNotation`): a click sends `dice.roll {expression, mode, category: "other", label: "Note"}`, Alt+click or physical-dice mode stages it in the dice tray with the same label; headings (`#`–`###`), `**bold**` and list lines styled in place.
+- **Test IDs:** `notes-link` (`data-title`, `data-missing`), `notes-picker`, `notes-picker-item` (`data-record-id`), `notes-picker-create`, `notes-die` (`data-value`), `notes-backlinks` (`data-count`), `notes-backlink` (`data-record-id`).

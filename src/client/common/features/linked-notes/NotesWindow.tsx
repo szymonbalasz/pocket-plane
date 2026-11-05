@@ -5,7 +5,12 @@
 // view. No search box (N4), no links (N5).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
-import { NOTE_TYPE, type NoteRecord, type RestoreNoteResult } from "@shared/linked-notes/schemas";
+import {
+  NOTE_ROLL_LABEL,
+  NOTE_TYPE,
+  type NoteRecord,
+  type RestoreNoteResult,
+} from "@shared/linked-notes/schemas";
 import { isNoteTitle, NOTE_TITLE_MAX } from "@shared/linked-notes/titles";
 import { ChevronRightIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -31,8 +36,14 @@ import { Tip } from "../../components/ui/tip";
 import { onlineDot } from "../../sync/presence";
 import { useLazyRecords, usePresence, useSync } from "../../sync/store";
 import { useColorOf } from "../campaign-management/colors";
+import { toastIntentError } from "../combat-tracker/store";
+import { notationRequest } from "../dice-extras/DiceText";
+import { stageTray } from "../dice-extras/store";
+import { usePhysicalDice } from "../dice-roll-log/physical";
 import { relativeTime } from "../notifications/logic";
 import { intentFailure } from "../party-board/logic";
+import { titlesByFold } from "./link-state";
+import type { LinkHost } from "./link-view";
 import {
   bannerText,
   binnedNotes,
@@ -344,7 +355,70 @@ function NarrowBin({ rows, now }: { rows: NoteRecord[]; now: number }) {
 }
 
 /** The open note: header, chips, status, banner, editor. Keyed by note (a fresh session each). */
-function NotePane({ note, gone }: { note: NoteRecord | null; gone: boolean }) {
+/**
+ * N5: what the editor's links, picker and die buttons call. Follow opens the note with that
+ * folded title, creating it first when missing (FR-NOTES-10: `ifMissing`, so a note someone
+ * created meanwhile opens); a die click rolls labelled "Note" (FR-NOTES-23), or goes to the dice
+ * tray on Alt+click or in physical-dice mode (FR-DICE-07, FR-DICEX-06).
+ */
+function useLinkHost(live: readonly NoteRecord[]): { host: LinkHost; titlesKey: string } {
+  const connection = useSync((s) => s.connection);
+  const [physical] = usePhysicalDice();
+  const titles = useMemo(() => live.map((n) => ({ id: n.id, title: n.title })), [live]);
+  const byFold = useMemo(() => titlesByFold(titles), [titles]);
+  const titlesKey = titles.map((t) => `${t.id}:${t.title}`).join("|");
+  const create = async (title: string): Promise<string | null> => {
+    try {
+      const r = (await connection.sendIntent("notes.create", { title, ifMissing: true })) as {
+        noteId: string;
+      };
+      return r.noteId;
+    } catch (err) {
+      toast.error(intentFailure(err, LOST).message);
+      return null;
+    }
+  };
+  const host: LinkHost = {
+    titles: () => titles,
+    byFold: () => byFold,
+    follow: (link) => {
+      const hit = byFold.get(link.fold);
+      if (hit) notesUi.getState().select(hit.id);
+      else
+        void create(link.target).then((id) => {
+          if (id) notesUi.getState().select(id);
+        });
+    },
+    create: async (title) => (await create(title)) !== null,
+    roll: (expression, e) => {
+      const request = notationRequest(expression, { label: NOTE_ROLL_LABEL }, e, undefined);
+      if (physical || e.altKey) {
+        stageTray(request);
+        return;
+      }
+      connection
+        .sendIntent("dice.roll", {
+          expression,
+          mode: request.mode,
+          category: "other",
+          label: NOTE_ROLL_LABEL,
+        })
+        .catch(toastIntentError);
+    },
+  };
+  return { host, titlesKey };
+}
+
+function NotePane({
+  note,
+  gone,
+  live: liveRows,
+}: {
+  note: NoteRecord | null;
+  gone: boolean;
+  live: readonly NoteRecord[];
+}) {
+  const links = useLinkHost(liveRows);
   const selected = useStore(notesUi, (s) => s.selected) as string;
   const you = useSync((s) => s.store.you);
   const live = useLive();
@@ -495,9 +569,33 @@ function NotePane({ note, gone }: { note: NoteRecord | null; gone: boolean }) {
           title={note?.title ?? ""}
           visible={visible}
           presenceKey={presenceKey}
+          links={links.host}
+          titlesKey={links.titlesKey}
           person={person}
           onSession={() => setTick((n) => n + 1)}
         />
+      </div>
+      {/* FR-NOTES-12: the live notes linking here, refreshed live. */}
+      <div
+        className="flex flex-wrap items-center gap-1 border-t px-3 py-1.5 text-xs text-muted-foreground"
+        data-testid="notes-backlinks"
+        data-count={session?.backlinks.length ?? 0}
+      >
+        <span>Linked from:</span>
+        {(session?.backlinks ?? []).length === 0 && <span>no other note yet</span>}
+        {(session?.backlinks ?? []).map((b) => (
+          <Button
+            key={b.id}
+            variant="link"
+            size="sm"
+            className="h-auto px-1 py-0 text-xs"
+            data-testid="notes-backlink"
+            data-record-id={b.id}
+            onClick={() => notesUi.getState().select(b.id)}
+          >
+            {b.title}
+          </Button>
+        ))}
       </div>
       {note && <TitleDialog open={renaming} onOpenChange={setRenaming} note={note} />}
       {note && <DeleteDialog note={note} open={deleting} onOpenChange={setDeleting} />}
@@ -604,7 +702,7 @@ export default function NotesWindow() {
           {list}
         </aside>
         {selected ? (
-          <NotePane note={current} gone={loaded && current === null} />
+          <NotePane note={current} gone={loaded && current === null} live={live_} />
         ) : (
           <div className="flex flex-1 items-center justify-center p-4 text-sm text-muted-foreground">
             {loaded && live_.length === 0 ? "No notes yet" : "Pick a note, or make a new one"}

@@ -8,6 +8,8 @@ export const NOTES_UPDATES_SIGNAL = "notes.updates";
 export const NOTES_HERE_SIGNAL = "notes.here";
 export const NOTES_CLOSED_SIGNAL = "notes.closed";
 export const NOTES_CURSOR_SIGNAL = "notes.cursor";
+/** N5: server signal, an open note's backlinks changed (FR-NOTES-12). */
+export const NOTES_BACKLINKS_SIGNAL = "notes.backlinks";
 
 /** FR-NOTES-13: notes one connection may have open at once. */
 export const NOTES_OPEN_MAX = 8;
@@ -67,9 +69,14 @@ export const OpenNoteIntent = z.strictObject({
  * `updates` (the client's `version` is still covered: the changes since it, maybe none) or `doc`
  * (the whole text at `version`); either way who is here.
  */
-export type OpenNoteResult =
-  | { mode: "updates"; version: number; updates: NoteUpdate[]; here: NoteHere[] }
-  | { mode: "doc"; version: number; doc: string; here: NoteHere[] };
+/** FR-NOTES-12: a live note linking to the open one ("Linked from"). */
+export const NoteBacklink = z.strictObject({ id: z.string(), title: z.string() });
+export type NoteBacklink = z.infer<typeof NoteBacklink>;
+
+export type OpenNoteResult = (
+  | { mode: "updates"; version: number; updates: NoteUpdate[] }
+  | { mode: "doc"; version: number; doc: string }
+) & { here: NoteHere[]; backlinks: NoteBacklink[] };
 
 /** `notes.push` (FR-NOTES-14, -21): updates based on `version`, all from the bound editor. */
 export const PushNoteIntent = z.strictObject({
@@ -104,6 +111,16 @@ export const NoteClosedSignal = z.strictObject({
   reason: z.enum(["deleted"]),
 });
 export type NoteClosedSignal = z.infer<typeof NoteClosedSignal>;
+
+/**
+ * Server signal `notes.backlinks` (N5, FR-NOTES-12): the open note's backlinks now, sent only to
+ * its editors whose list changed (≤ 1 s after a link, title, delete or restore change).
+ */
+export const NoteBacklinksSignal = z.strictObject({
+  noteId: z.string(),
+  backlinks: z.array(NoteBacklink),
+});
+export type NoteBacklinksSignal = z.infer<typeof NoteBacklinksSignal>;
 
 const Range = z.strictObject({ anchor: z.int().min(0), head: z.int().min(0) });
 
