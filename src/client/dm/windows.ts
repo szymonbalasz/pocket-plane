@@ -1,6 +1,7 @@
 // DM window registry (FR-SHELL-07, ADR-0025). APPEND-ONLY (AGENTS §9.9): a feature adds one
 // import and one line in the list for each of its DM window types; nothing else changes here.
 
+import { notesWindow } from "@ui/features/linked-notes/window";
 import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
@@ -59,6 +60,7 @@ const windows: WindowDef[] = [
   assetsWindow, // asset.library "Assets" (assets-pipeline, FR-ASSET-69; #394)
   dmCompendiumEntryWindow, // cmp.entry, no launcher, one per popped-out entry (compendium, FR-CMP-76)
   statsDiceWindow, // stats.dice, no launcher, the Luck tab's d20 chart (stats, FR-STATS-90)
+  notesWindow, // notes.main "Notes" (linked-notes N3, NOTES §7)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

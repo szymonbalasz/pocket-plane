@@ -108,6 +108,13 @@ const shared: Record<string, SizeRow> = {
     criterion: "header + the first 4 fight lines",
   },
   // FR-STATS-90: the Luck tab's d20 chart, no launcher.
+  // Linked notes N3 (NOTES §7): default 760 × 560, useful 560 × 420, min 360 × 320.
+  "notes.main": {
+    default: all(760, 560),
+    useful: all(560, 420),
+    min: s(360, 320),
+    criterion: "the list's New button and 5 rows, the note's header, status and first lines",
+  },
   "stats.dice": {
     default: all(440, 400),
     useful: all(400, 340),

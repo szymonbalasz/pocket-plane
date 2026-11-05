@@ -919,6 +919,7 @@ const GOLDEN_KINDS = [
   "recap.session", // SP3 (S4, FR-RECAP-10): appended, goldens regenerated
   "ent.statblock", // kit-parity K7 (§7.3, FR-KIT-100): appended, goldens regenerated
   "dice.details", // FR-DICE-106: appended, goldens regenerated
+  "notes.main", // linked-notes N3 (NOTES §7, 760 × 560 per spec): appended, goldens regenerated
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

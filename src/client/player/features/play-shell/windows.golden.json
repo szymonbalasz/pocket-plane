@@ -66,6 +66,12 @@
     "parked": ""
   },
   {
+    "at": "open @1600×900 notes.main",
+    "rect": "594,468,570×420",
+    "placed": "auto",
+    "parked": "cmp.rules,recap.session"
+  },
+  {
     "at": "reopen @1600×900 note.history",
     "rect": "774,76,360×480",
     "placed": "stored",
@@ -130,6 +136,12 @@
     "rect": "68,392,402×284",
     "placed": "reopened",
     "parked": ""
+  },
+  {
+    "at": "reopen @1600×900 notes.main",
+    "rect": "594,468,570×420",
+    "placed": "reopened",
+    "parked": "cmp.rules,recap.session"
   },
   {
     "at": "reopen 1440×900 @1440×900 note.history",
@@ -198,6 +210,12 @@
     "parked": "cmp.rules"
   },
   {
+    "at": "reopen 1440×900 @1440×900 notes.main",
+    "rect": "496,236,560×440",
+    "placed": "reopened",
+    "parked": "recap.session,dice.details"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 note.history",
     "rect": "479,83,360×480",
     "placed": "reopened",
@@ -264,6 +282,12 @@
     "parked": "recap.session"
   },
   {
+    "at": "reopen 1280×800 @1280×800 notes.main",
+    "rect": "446,256,382×320",
+    "placed": "reopened",
+    "parked": "dice.details"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "505,60,360×436",
     "placed": "reopened",
@@ -328,6 +352,12 @@
     "rect": "470,196,420×300",
     "placed": "reopened",
     "parked": "recap.session"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 notes.main",
+    "rect": "471,176,360×320",
+    "placed": "reopened",
+    "parked": "dice.details"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -408,6 +438,12 @@
     "parked": "cmp.rules"
   },
   {
+    "at": "open @1440×900 notes.main",
+    "rect": "496,236,560×440",
+    "placed": "auto",
+    "parked": "recap.session,dice.details"
+  },
+  {
     "at": "reopen @1440×900 note.history",
     "rect": "604,76,360×480",
     "placed": "stored",
@@ -472,6 +508,12 @@
     "rect": "540,60,420×300",
     "placed": "reopened",
     "parked": "cmp.rules"
+  },
+  {
+    "at": "reopen @1440×900 notes.main",
+    "rect": "496,236,560×440",
+    "placed": "reopened",
+    "parked": "recap.session,dice.details"
   },
   {
     "at": "reopen 1280×800 @1280×800 note.history",
@@ -540,6 +582,12 @@
     "parked": "recap.session"
   },
   {
+    "at": "reopen 1280×800 @1280×800 notes.main",
+    "rect": "446,256,382×320",
+    "placed": "reopened",
+    "parked": "dice.details"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "505,60,360×436",
     "placed": "reopened",
@@ -604,6 +652,12 @@
     "rect": "470,196,420×300",
     "placed": "reopened",
     "parked": "recap.session"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 notes.main",
+    "rect": "471,176,360×320",
+    "placed": "reopened",
+    "parked": "dice.details"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -684,6 +738,12 @@
     "parked": "recap.session"
   },
   {
+    "at": "open @1280×800 notes.main",
+    "rect": "446,256,382×320",
+    "placed": "auto",
+    "parked": "dice.details"
+  },
+  {
     "at": "reopen @1280×800 note.history",
     "rect": "479,83,360×480",
     "placed": "stored",
@@ -750,6 +810,12 @@
     "parked": "recap.session"
   },
   {
+    "at": "reopen @1280×800 notes.main",
+    "rect": "446,256,382×320",
+    "placed": "reopened",
+    "parked": "dice.details"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "505,60,360×436",
     "placed": "reopened",
@@ -814,6 +880,12 @@
     "rect": "470,196,420×300",
     "placed": "reopened",
     "parked": "recap.session"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 notes.main",
+    "rect": "471,176,360×320",
+    "placed": "reopened",
+    "parked": "dice.details"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -894,6 +966,12 @@
     "parked": "recap.session"
   },
   {
+    "at": "open @1280×720 notes.main",
+    "rect": "471,176,360×320",
+    "placed": "auto",
+    "parked": "dice.details"
+  },
+  {
     "at": "reopen @1280×720 note.history",
     "rect": "505,60,360×436",
     "placed": "stored",
@@ -958,6 +1036,12 @@
     "rect": "470,196,420×300",
     "placed": "reopened",
     "parked": "recap.session"
+  },
+  {
+    "at": "reopen @1280×720 notes.main",
+    "rect": "471,176,360×320",
+    "placed": "reopened",
+    "parked": "dice.details"
   },
   {
     "at": "protected @1280×720 note.history",

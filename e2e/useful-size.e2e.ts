@@ -134,6 +134,13 @@ const DM: Case[] = [
     check: 3,
     rows: '[data-testid="asset-picker-item"]',
   },
+  {
+    kind: "notes.main",
+    useful: { w: 560, h: 420 },
+    // NOTES §7 (N3): the list (New, rows, Recycle bin) and the empty note pane, unscrolled.
+    criterion: "the list's New button and rows, the note pane",
+    check: "body",
+  },
 ];
 const PLAYER: Case[] = [
   { kind: "cbt.initiative", useful: { w: 280, h: 320 }, criterion: "header + 4 rows", check: 4 },
@@ -176,6 +183,13 @@ const PLAYER: Case[] = [
     // FR-STATS-66: the Fight tab (the first criterion; the award grid: FR-STATS-67 below).
     criterion: "5 rows names whole",
     check: 5,
+  },
+  {
+    kind: "notes.main",
+    useful: { w: 560, h: 420 },
+    // NOTES §7 (N3): the list (New, rows, Recycle bin) and the empty note pane, unscrolled.
+    criterion: "the list's New button and rows, the note pane",
+    check: "body",
   },
 ];
 /** FR-SHELL-112 (1): pending until their owners register them (none left this sprint). */

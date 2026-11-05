@@ -72,9 +72,9 @@ test("FR-SHELL-155 party.summary layout migrated (DM): a remembered, minimised P
   expect(m.tab).toBe("status");
 });
 
-test("FR-SHELL-161 launcher threshold (DM): every product label shows from 1521 px (recorded: test-mode launchers out, 6 px a character; SP2 re-test; #394 Assets); below it icons only; nothing in the ⋯ menu at 1280", () => {
+test("FR-SHELL-161 launcher threshold (DM): every product label shows from 1602 px (recorded: test-mode launchers out, 6 px a character; SP2 re-test; #394 Assets; NOTES N3); below it icons only; nothing in the ⋯ menu at 1280", () => {
   const t = launcherThreshold(registry);
   console.log(`FR-SHELL-161 DM labels from ${t.labelsFrom}`);
-  expect(t.labelsFrom).toBe(1521); // measured; a new launcher updates it (S3; #394 Assets: 1434 → 1521)
+  expect(t.labelsFrom).toBe(1602); // measured; a new launcher updates it (S3; #394 Assets: 1434 → 1521; NOTES N3 Notes: → 1602)
   expect(t.at1280).toEqual({ compact: true, overflow: [] });
 });

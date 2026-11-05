@@ -1,0 +1,108 @@
+// FR-NOTES-15: other people's carets (a line with a name tag) and selections, in their colour.
+// The window computes them (session `mapCursor`) and hands them to the editor as one effect.
+import { type Extension, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
+import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
+
+export interface DrawnCursor {
+  clientId: string;
+  /** `data-player-id`: the player's id, "dm" for the DM. */
+  playerKey: string;
+  label: string;
+  color: string;
+  ranges: { anchor: number; head: number }[];
+}
+
+export const setCursors = StateEffect.define<DrawnCursor[]>();
+
+class Caret extends WidgetType {
+  constructor(readonly c: DrawnCursor) {
+    super();
+  }
+  override eq(other: Caret): boolean {
+    return (
+      other.c.clientId === this.c.clientId &&
+      other.c.label === this.c.label &&
+      other.c.color === this.c.color
+    );
+  }
+  toDOM(): HTMLElement {
+    const wrap = document.createElement("span");
+    wrap.className = "cm-remote-caret";
+    wrap.dataset.testid = "notes-cursor";
+    wrap.dataset.playerId = this.c.playerKey;
+    wrap.dataset.clientId = this.c.clientId;
+    wrap.style.borderLeftColor = this.c.color;
+    const tag = document.createElement("span");
+    tag.className = "cm-remote-tag";
+    tag.textContent = this.c.label;
+    tag.style.backgroundColor = this.c.color;
+    wrap.appendChild(tag);
+    return wrap;
+  }
+  override ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+function build(cursors: readonly DrawnCursor[], docLength: number): DecorationSet {
+  const marks: { from: number; to: number; deco: Decoration }[] = [];
+  for (const c of cursors)
+    for (const r of c.ranges) {
+      const head = Math.min(r.head, docLength);
+      const from = Math.min(r.anchor, r.head, docLength);
+      const to = Math.min(Math.max(r.anchor, r.head), docLength);
+      if (from < to)
+        marks.push({
+          from,
+          to,
+          deco: Decoration.mark({
+            attributes: {
+              style: `background-color: color-mix(in srgb, ${c.color} 28%, transparent)`,
+            },
+          }),
+        });
+      marks.push({
+        from: head,
+        to: head,
+        deco: Decoration.widget({ widget: new Caret(c), side: 1 }),
+      });
+    }
+  marks.sort((a, b) => a.from - b.from || a.to - b.to);
+  const b = new RangeSetBuilder<Decoration>();
+  for (const m of marks) b.add(m.from, m.to, m.deco);
+  return b.finish();
+}
+
+const field = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(set, tr) {
+    let next = set.map(tr.changes);
+    for (const e of tr.effects) if (e.is(setCursors)) next = build(e.value, tr.state.doc.length);
+    return next;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+const theme = EditorView.baseTheme({
+  ".cm-remote-caret": {
+    position: "relative",
+    borderLeft: "2px solid",
+    marginLeft: "-1px",
+    marginRight: "-1px",
+  },
+  ".cm-remote-tag": {
+    position: "absolute",
+    bottom: "100%",
+    left: "-2px",
+    padding: "0 4px",
+    borderRadius: "3px 3px 3px 0",
+    fontSize: "10px",
+    lineHeight: "14px",
+    whiteSpace: "nowrap",
+    color: "var(--background)",
+    pointerEvents: "none",
+    userSelect: "none",
+  },
+});
+
+export const remoteCursors: Extension = [field, theme];
