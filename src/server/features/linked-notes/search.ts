@@ -18,9 +18,10 @@ import {
   NOTE_SEARCH_LIMIT,
   type NoteSearchHit,
   type NoteSearchResponse,
+  noteSearchTier,
   noteSnippet,
 } from "@shared/linked-notes/search";
-import { type FoldedName, fold, foldName, queryWords, searchTier } from "@shared/search/match";
+import { type FoldedName, fold, foldName, queryWords } from "@shared/search/match";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { CommitHook } from "../../commands/commands";
 import type { Db } from "../../db/client";
@@ -184,7 +185,7 @@ export function runNoteSearch(s: Services, cid: string, q: string): NoteSearchRu
   const hits: { h: Head; e: Entry; tier: number }[] = [];
   for (const h of heads) {
     const e = entryFor(db, rt, idx, cid, h);
-    const tier = searchTier(e.name, e.words, words);
+    const tier = noteSearchTier(e.name, e.words, words);
     if (tier !== null) hits.push({ h, e, tier });
   }
   // Already by title: a stable sort by tier keeps that order within a tier.

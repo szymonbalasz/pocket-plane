@@ -4,8 +4,10 @@
 // chips; undo takes back only your own typing; a player typing offline catches up on reconnect;
 // delete → the other reader's banner → Recycle bin → Restore. Rules and limits: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import sharp from "sharp";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
+import { storedTheme } from "./support/theme";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -154,9 +156,10 @@ test("FR-NOTES-04 FR-NOTES-05 FR-NOTES-20 delete while another reads it: their b
 
   await bin.click();
   const row = p1Win.getByTestId("notes-bin-item").filter({ hasText: "Duke Varen" });
-  // r1: "Deleted by … · when" stays on one line at the default width.
-  const line = await row.getByTestId("notes-bin-deleted").boundingBox();
-  expect(line && line.height < 20).toBe(true);
+  // Who deleted it is shown whole (the time may move to a second line, never the name cut).
+  const who = row.getByTestId("notes-bin-who");
+  await expect(who).toHaveText(/^Deleted by /);
+  expect(await who.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await row.getByTestId("notes-restore").click();
   await expect(bin).toHaveAttribute("data-count", String(before));
   await expect(p2Win.getByTestId("notes-list-item").filter({ hasText: "Duke Varen" })).toHaveCount(
@@ -477,4 +480,133 @@ test("N6 FR-NOTES-11 the DM renames a note while P1 types in a note linking to i
   await dm.getByTestId("notes-title-input").fill("Quest log");
   await dm.getByTestId("notes-title-save").click();
   await expect(chip(p1Win, "Quest log")).toHaveAttribute("data-missing", "false");
+});
+
+test("polish r1 (Gilt & Stone and Simple Dark): unfocused preview, redo, list text holds still, bullets, tags on top, bin names whole, snippets without markers, short words", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  const p1 = await rolePage(browser); // Gilt & Stone (a fresh browser's theme)
+  await p1.goto(link("Player 1"));
+  await live(p1);
+  const p2 = await rolePage(browser);
+  await storedTheme(p2, "default"); // Simple Dark
+  await p2.goto(link("Player 2"));
+  await live(p2);
+
+  // An opened note isn't focused: its line-1 heading shows styled, no "#".
+  const p2Win = await openNote(p2, "Quest log");
+  await expect(p2Win.locator(".cm-line.cm-note-h1")).toHaveText(/^Quest log/);
+  const bulletSize = await p2Win
+    .locator(".cm-note-bullet-dot")
+    .first()
+    .evaluate((el) => ({
+      bullet: Number.parseFloat(getComputedStyle(el).fontSize),
+      line: Number.parseFloat(getComputedStyle(el.closest(".cm-line") as Element).fontSize),
+    }));
+  expect(bulletSize.bullet).toBeGreaterThan(bulletSize.line); // the kit's readable size
+
+  // A list item's text holds still when the caret enters its line.
+  const chipX = async () =>
+    (await p2Win.locator('[data-testid="notes-link"]').first().boundingBox())?.x;
+  const away = await chipX();
+  await p2Win
+    .locator(".cm-line.cm-note-li")
+    .first()
+    .click({ position: { x: 40, y: 6 } });
+  await expect(p2Win.locator(".cm-line.cm-note-li .cm-note-bullet")).toHaveCount(0);
+  const here = await chipX();
+  expect(Math.abs((here ?? 0) - (away ?? 0))).toBeLessThanOrEqual(1);
+
+  // Redo: Ctrl+Shift+Z as well as Ctrl+Y.
+  const p1Win = await openNote(p1, "Quest log");
+  await p1Win
+    .locator(".cm-line")
+    .last()
+    .click({ position: { x: 3, y: 6 } });
+  await p1.keyboard.press("End");
+  await p1.keyboard.type(" R1", { delay: 20 });
+  await p1.keyboard.press("Control+z");
+  await expect.poll(() => docText(p1Win)).not.toContain(" R1");
+  await p1.keyboard.press("Control+Shift+Z");
+  await expect.poll(() => docText(p1Win)).toContain(" R1");
+
+  // A typist's name tag is on top of the text in both themes.
+  await p1.keyboard.type(" ledger keeper, line of fire", { delay: 15 });
+  // On top: the tag's left padding, as painted, is the tag's own background (nothing over it).
+  const onTop = async (page: Page, win: Locator) => {
+    const tag = win.locator(".cm-remote-caret[data-tag=shown] .cm-remote-tag").first();
+    const box = await tag.boundingBox();
+    if (!box) return false;
+    const bg = await tag.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const [r, g, b] = (bg.match(/\d+/g) ?? []).map(Number) as [number, number, number];
+    const shot = await page.screenshot({
+      clip: {
+        x: Math.ceil(box.x) + 1,
+        y: Math.ceil(box.y) + 2,
+        width: 2,
+        height: Math.max(2, Math.floor(box.height) - 4),
+      },
+    });
+    const { data, info } = await sharp(shot).raw().toBuffer({ resolveWithObject: true });
+    let same = 0;
+    for (let i = 0; i < data.length; i += info.channels)
+      if (
+        Math.abs((data[i] ?? 0) - r) +
+          Math.abs((data[i + 1] ?? 0) - g) +
+          Math.abs((data[i + 2] ?? 0) - b) <
+        40
+      )
+        same++;
+    return same >= (data.length / info.channels) * 0.8;
+  };
+  await expect.poll(() => onTop(p2, p2Win), { timeout: 5_000 }).toBe(true);
+  await p2.keyboard.press("End");
+  await p2.keyboard.type(" P2", { delay: 15 });
+  await expect.poll(() => onTop(p1, p1Win), { timeout: 5_000 }).toBe(true);
+  await expect(p1Win.getByTestId("notes-status")).toHaveText("Saved");
+
+  // The bin row names who deleted a note in full, in both themes, at the default width.
+  await p1Win.getByTestId("notes-new").click();
+  await p1.getByTestId("notes-title-input").fill("Throwaway");
+  await p1.getByTestId("notes-title-save").click();
+  await expect(p1Win.getByTestId("notes-title")).toHaveText("Throwaway");
+  await p1Win.getByTestId("notes-delete").click();
+  await p1.getByTestId("notes-delete-confirm").click();
+  for (const [page, w] of [
+    [p1, p1Win],
+    [p2, p2Win],
+  ] as const) {
+    // Wide: the fold-out under the list; narrow (< 520 px): the Recycle bin button and dialog.
+    const wide = await w.getByTestId("notes-bin").isVisible();
+    if (wide) await w.getByTestId("notes-bin").click();
+    else await w.getByTestId("notes-bin-narrow").click();
+    const scope = wide ? w : page.getByTestId("notes-bin-dialog");
+    const who = scope
+      .getByTestId("notes-bin-who")
+      .filter({ hasText: "Deleted by Player 1" })
+      .first();
+    await expect(who).toBeVisible();
+    expect(await who.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    if (!wide) await page.keyboard.press("Escape");
+  }
+
+  // Search: snippets without markdown markers; the last word as a prefix; short words whole.
+  const dmWin = await openWindow(dm, "notes.main");
+  const box = dmWin.getByTestId("notes-search");
+  const results = dmWin.getByTestId("notes-search-result");
+  await box.fill("recover");
+  const snippet = results
+    .filter({ hasText: "Quest log" })
+    .first()
+    .getByTestId("notes-search-snippet");
+  await expect(snippet).toContainText("Recover the");
+  expect(await snippet.textContent()).not.toMatch(/(^|\s)[#*-]\s|\*\*/);
+  await box.fill("ledger k");
+  await expect(results.filter({ hasText: "Quest log" })).toHaveCount(1);
+  await box.fill("line of");
+  await expect(results.filter({ hasText: "Quest log" })).toHaveCount(1);
 });

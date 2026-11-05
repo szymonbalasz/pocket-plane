@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { queryWords } from "../search/match";
+import { fold, foldName, queryWords } from "../search/match";
 import {
   chipText,
   NOTE_SEARCH_Q_MAX,
@@ -7,7 +7,9 @@ import {
   NOTE_SNIPPET_MAX,
   NoteSearchQuery,
   NoteSearchResponse,
+  noteSearchTier,
   noteSnippet,
+  plainText,
 } from "./search";
 
 const snip = (text: string, q: string) => noteSnippet(text, queryWords(q)).snippet;
@@ -68,8 +70,8 @@ describe("FR-NOTES-22 snippet", () => {
       "hoard",
     ]);
     expect(marked("Café noir, CAFÉS", "cafe")).toEqual(["Café", "CAFÉS"]);
-    // Words under 3 letters never match a body, so never marked.
-    expect(marked("an ox and an ant", "an ant")).toEqual(["ant"]);
+    // r1: a short word that isn't the last matches whole body words only ("an", never "ant").
+    expect(marked("an ox and an ant", "an ant")).toEqual(["an", "an", "ant"]);
     const many = noteSnippet("x ".concat("gold ".repeat(40)), queryWords("gold"));
     expect(many.marks).toHaveLength(NOTE_SNIPPET_MARKS_MAX);
   });
@@ -120,5 +122,42 @@ describe("FR-NOTES-22 REST shapes", () => {
     expect(NoteSearchResponse.safeParse({ results: Array(51).fill(hit), more: true }).success).toBe(
       false,
     );
+  });
+
+  describe("FR-NOTES-22 r1 search polish", () => {
+    const name = foldName("Burnt Ledger");
+    const tier = (body: string, q: string) =>
+      noteSearchTier(
+        foldName("Quest log"),
+        [...new Set(fold(body).split(" "))].sort(),
+        queryWords(q),
+      );
+
+    test("FR-NOTES-22 r1 the last word, being typed, matches body words as a prefix at any length", () => {
+      expect(tier("Ask the ledger keeper", "the ledger k")).toBe(5);
+      expect(tier("Ask the ledger keeper", "the ledger kee")).toBe(5);
+      expect(tier("Ask the ledger clerk", "the ledger k")).toBeNull();
+      void name;
+    });
+
+    test("FR-NOTES-22 r1 words under 3 letters match whole body words", () => {
+      expect(tier("The last line of the map", "line of")).toBe(5);
+      expect(tier("The last line of the map", "of the")).toBe(5);
+      // Not the last word: "of" must be a whole word ("office" doesn't do).
+      expect(tier("Found in the office", "of the")).toBeNull();
+      expect(tier("Found in the office", "the of")).toBe(5); // last: prefix of "office"
+    });
+
+    test("FR-NOTES-22 r1 snippets drop markdown markers as the editor's live preview does", () => {
+      expect(plainText("# Quest log\n- Recover the **wolf** pelt\n  1. nested item")).toBe(
+        "Quest log\nRecover the wolf pelt\nnested item",
+      );
+      const r = noteSnippet(
+        "# Quest log\n- Recover the [[Burnt Ledger|ledger]] and the **wolf**",
+        queryWords("wolf"),
+      );
+      expect(r.snippet).toBe("Quest log Recover the ledger and the wolf");
+      expect(r.snippet).not.toMatch(/[#*]/);
+    });
   });
 });

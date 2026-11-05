@@ -47,7 +47,6 @@ import type { LinkHost } from "./link-view";
 import {
   bannerText,
   binnedNotes,
-  deletedLine,
   deletedParts,
   hereChips,
   liveNotes,
@@ -283,13 +282,16 @@ function BinRows({
         >
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm">{n.title}</div>
-            {/* r1: one line at the list's width: the name truncates, the time never wraps. */}
+            {/* Who deleted it is never cut: the time moves to a second line when the name and
+                the time don't fit together (any theme's type), and never wraps itself. */}
             <div
-              className="flex min-w-0 text-xs text-muted-foreground"
+              className="flex min-w-0 flex-wrap text-xs text-muted-foreground"
               data-testid="notes-bin-deleted"
             >
-              <span className="truncate">{deletedParts(n, players, now).who}</span>
-              <span className="shrink-0 whitespace-nowrap">
+              <span className="break-words" data-testid="notes-bin-who">
+                {deletedParts(n, players, now).who}
+              </span>
+              <span className="whitespace-nowrap">
                 &nbsp;· {deletedParts(n, players, now).when}
               </span>
             </div>

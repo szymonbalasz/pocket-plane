@@ -2,7 +2,7 @@
 // `NoteSession` over the sync connection. Opens straight into editing; others' carets and
 // selections with name tags; undo of this tab's own changes only (history + its keymap); the
 // browser's spell check; re-opens after every snapshot; typing carries on offline.
-import { defaultKeymap, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, historyKeymap, redo } from "@codemirror/commands";
 import { Compartment, Transaction } from "@codemirror/state";
 import { EditorView, keymap, placeholder } from "@codemirror/view";
 import {
@@ -25,6 +25,9 @@ import { type NoteHost, NoteSession, type NoteTransport } from "./session";
 
 /** How often the name tags' 2 s window is re-checked. */
 const TAG_CHECK_MS = 250;
+
+/** r1: redo on Ctrl+Shift+Z / Cmd+Shift+Z on every platform (FR-NOTES-17). */
+export const REDO_KEYS = [{ key: "Mod-Shift-z", run: redo, preventDefault: true }];
 
 /** An empty note's hint (N5 r1). */
 export const NOTE_PLACEHOLDER = "Type @ to link a note · # heading · **bold** · - list";
@@ -62,7 +65,8 @@ const theme = EditorView.theme({
   "&": { height: "100%", fontSize: "0.875rem" },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "inherit", lineHeight: "1.55", overflow: "auto", minHeight: "0" },
-  ".cm-content": { padding: "10px 12px", caretColor: "var(--foreground)" },
+  // Room above line 1 for a caret's name tag (16 px), so it is never cut (r1, every theme).
+  ".cm-content": { padding: "20px 12px 10px", caretColor: "var(--foreground)" },
   ".cm-cursor": { borderLeftColor: "var(--foreground)" },
 });
 
@@ -167,7 +171,8 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
     const extensions = [
       editable.of(EditorView.editable.of(false)),
       named.of(nameAttr(titleRef.current)),
-      keymap.of([...historyKeymap, ...defaultKeymap]),
+      // r1: Ctrl+Shift+Z (Cmd+Shift+Z on a Mac) redoes everywhere, as Ctrl+Y does.
+      keymap.of([...REDO_KEYS, ...historyKeymap, ...defaultKeymap]),
       EditorView.lineWrapping,
       // r1: linking is discoverable from an empty note.
       placeholder(NOTE_PLACEHOLDER),

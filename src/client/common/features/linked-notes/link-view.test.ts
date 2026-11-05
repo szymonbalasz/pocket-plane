@@ -2,10 +2,21 @@
 // line, shown on it; bullets for `-` lists, numbers kept), chips (missing ones flagged), die buttons
 // after dice notation, and the hover hints' texts (FR-NOTES-07, -09, -10, -13).
 import { describe, expect, test } from "bun:test";
+import { redo } from "@codemirror/commands";
 import { EditorState } from "@codemirror/state";
 import type { Decoration } from "@codemirror/view";
 import { revealField, titlesByFold } from "./link-state";
-import { buildDecorations, CHIP_HINT, dieHint, type LinkHost, MISSING_HINT } from "./link-view";
+import {
+  buildDecorations,
+  CHIP_HINT,
+  caretLines,
+  dieHint,
+  focusField,
+  type LinkHost,
+  listLevel,
+  MISSING_HINT,
+} from "./link-view";
+import { REDO_KEYS } from "./NoteEditor";
 
 const NOTES = [{ id: "n1", title: "Duke Varen" }];
 const host: LinkHost = {
@@ -63,17 +74,60 @@ describe("linked-notes editor decorations (N5 r1)", () => {
     const away = kinds(decorations(doc, doc.length));
     expect(away).toEqual(
       expect.arrayContaining([
-        "cm-note-li@0-0",
+        "cm-note-li cm-note-li-0@0-0",
         "Bullet@0-2",
-        "cm-note-li@8-8",
+        "cm-note-li cm-note-li-0@8-8",
         "Bullet@8-10",
-        "cm-note-li@17-17",
-        "cm-note-li-mark@17-19",
+        "cm-note-li cm-note-li-0@17-17",
+        "cm-note-li-mark@17-20",
       ]),
     );
     const onFirst = kinds(decorations(doc, 3));
     expect(onFirst).toContain("cm-note-li-mark@0-2");
     expect(onFirst).not.toContain("Bullet@0-2");
+  });
+
+  test("FR-NOTES-13 r1 nested lists indent one step per level; off the caret's line the indent is padding", () => {
+    expect([
+      listLevel(""),
+      listLevel("  "),
+      listLevel("\t"),
+      listLevel("    "),
+      listLevel("\t\t\t\t\t"),
+    ]).toEqual([0, 1, 1, 2, 4]);
+    const doc = "- top\n  - nested\n    - deeper\nend";
+    const away = kinds(decorations(doc, doc.length));
+    expect(away).toEqual(
+      expect.arrayContaining([
+        "cm-note-li cm-note-li-1@6-6",
+        "hide@6-8",
+        "Bullet@8-10",
+        "cm-note-li cm-note-li-2@17-17",
+        "hide@17-21",
+      ]),
+    );
+  });
+
+  test("FR-NOTES-13 r1 an editor without focus previews every line (an opened note's line-1 heading is styled)", () => {
+    const doc = "# Quest log\nmore";
+    const state = (focused: boolean) =>
+      EditorState.create({
+        doc,
+        selection: { anchor: 0 },
+        extensions: [revealField, focusField.init(() => focused)],
+      });
+    expect(caretLines(state(false)).size).toBe(0);
+    expect(caretLines(state(true))).toEqual(new Set([1]));
+    const seen: string[] = [];
+    buildDecorations(state(false), host).between(0, doc.length, (from, to, d) => {
+      if (!(d.spec as { class?: string }).class && from !== to) seen.push(`hide@${from}-${to}`);
+    });
+    expect(seen).toContain("hide@0-2");
+  });
+
+  test("FR-NOTES-17 r1 Ctrl+Shift+Z / Cmd+Shift+Z redo on every platform", () => {
+    expect(REDO_KEYS.map((k) => k.key)).toEqual(["Mod-Shift-z"]);
+    expect(REDO_KEYS[0]?.run).toBe(redo);
   });
 
   test("FR-NOTES-07 FR-NOTES-10 FR-NOTES-13 chips (a missing one flagged) and a die after dice notation", () => {
