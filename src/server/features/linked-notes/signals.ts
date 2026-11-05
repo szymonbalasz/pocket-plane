@@ -3,6 +3,8 @@
 // `notes.here` after open / close / pruning, `notes.closed` when a note is binned while open.
 // The client signal `notes.cursor` reaches the players with the note open and the DM's
 // connections (ADR-0033 audience); another campaign's note, or a binned one, is `not_found`.
+
+import { ChangeSet } from "@codemirror/state";
 import {
   NOTES_BACKLINKS_SIGNAL,
   NOTES_CLOSED_SIGNAL,
@@ -82,9 +84,17 @@ export function editedCommitHook(rt: NotesRuntime): CommitHook {
     const done = rt.pending.get(p.noteId);
     rt.pending.delete(p.noteId);
     const session = rt.sessions.get(p.noteId);
-    if (!done || !session || done.version !== p.from + p.updates.length) return;
-    session.text = done.text;
-    session.version = done.version;
+    if (!session) return;
+    if (done && done.version === p.from + p.updates.length) {
+      session.text = done.text;
+      session.version = done.version;
+    } else if (!done && session.version === p.from) {
+      // N6: a server-authored change (a rename's rewrite) moves the cached text the same way.
+      let text = session.text;
+      for (const u of p.updates) text = ChangeSet.fromJSON(u.changes).apply(text);
+      session.text = text;
+      session.version = p.from + p.updates.length;
+    }
   };
 }
 

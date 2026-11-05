@@ -29,6 +29,7 @@ import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import { note } from "../../db/schema";
 import { syncLinks } from "./links";
+import { rewriteLinks } from "./rename";
 import { getNoteRow, liveNoteByFold, type NoteRow, noteCount, toNoteRecord } from "./rows";
 
 export const NOTES_INTENTS = {
@@ -144,6 +145,7 @@ export const renameNote = defineCommand({
     if (before.deletedAt !== null) throw notFound(NOTE_NOT_FOUND);
     if (before.title === title) return;
     const titleKey = titleFold(title);
+    // A clash refuses before anything is written (FR-NOTES-02, -11).
     if (liveNoteByFold(env.tx, cid, titleKey, noteId)) throw conflict(NOTE_TITLE_CLASH);
     const by = byOf(env);
     env.tx
@@ -158,6 +160,9 @@ export const renameNote = defineCommand({
       .where(eq(note.id, noteId))
       .run();
     emitChanged(env, cid, "renamed", before, noteId);
+    // FR-NOTES-11 (N6): links follow, in this same transaction. A case-only rename keeps the
+    // folded title, so its links still resolve and stay as typed.
+    if (titleKey !== before.titleFold) rewriteLinks(env, cid, before.titleFold, title);
   },
 });
 

@@ -2,6 +2,7 @@
 // banner texts, who-is-here chips. No React, no CodeMirror (tests import it directly).
 import type { NoteHere } from "@shared/linked-notes/collab";
 import type { NoteActor, NoteRecord } from "@shared/linked-notes/schemas";
+import { titleFold } from "@shared/linked-notes/titles";
 import { relativeTime } from "../notifications/logic";
 import type { NoteBanner, NoteStatus } from "./session";
 
@@ -74,6 +75,37 @@ export function bannerText(b: NoteBanner): string {
     case "reload":
       return "The note changed a lot while you were away, so it was reloaded";
   }
+}
+
+/** N6: how long a renamed note's old title keeps resolving (its links' rewrite is on its way). */
+export const RENAME_ALIAS_MS = 5_000;
+
+/**
+ * Records the old folded title of every note whose title changed since `previous` (id → title)
+ * as an alias of it until `now + RENAME_ALIAS_MS`; drops expired aliases.
+ */
+export function renamedAliases(
+  previous: ReadonlyMap<string, string>,
+  titles: readonly { id: string; title: string }[],
+  now: number,
+  aliases: Map<string, { note: { id: string; title: string }; until: number }>,
+): void {
+  for (const [fold, a] of aliases) if (a.until <= now) aliases.delete(fold);
+  for (const t of titles) {
+    const old = previous.get(t.id);
+    if (old !== undefined && titleFold(old) !== titleFold(t.title))
+      aliases.set(titleFold(old), { note: t, until: now + RENAME_ALIAS_MS });
+  }
+}
+
+/** Live titles by fold, plus unexpired aliases that no live note holds. */
+export function withAliases<T extends { id: string; title: string }>(
+  byFold: Map<string, T>,
+  aliases: ReadonlyMap<string, { note: T; until: number }>,
+  now: number,
+): Map<string, T> {
+  for (const [fold, a] of aliases) if (a.until > now && !byFold.has(fold)) byFold.set(fold, a.note);
+  return byFold;
 }
 
 export interface HereChip {

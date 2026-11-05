@@ -42,17 +42,18 @@ import { stageTray } from "../dice-extras/store";
 import { usePhysicalDice } from "../dice-roll-log/physical";
 import { relativeTime } from "../notifications/logic";
 import { intentFailure } from "../party-board/logic";
-import { titlesByFold } from "./link-state";
+import { type PickTitle, titlesByFold } from "./link-state";
 import type { LinkHost } from "./link-view";
 import {
   bannerText,
   binnedNotes,
-  deletedLine,
   deletedParts,
   hereChips,
   liveNotes,
   nameOf,
+  renamedAliases,
   STATUS_TEXT,
+  withAliases,
 } from "./logic";
 import { type EditorHandle, NoteEditor } from "./NoteEditor";
 import {
@@ -281,13 +282,16 @@ function BinRows({
         >
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm">{n.title}</div>
-            {/* r1: one line at the list's width: the name truncates, the time never wraps. */}
+            {/* Who deleted it is never cut: the time moves to a second line when the name and
+                the time don't fit together (any theme's type), and never wraps itself. */}
             <div
-              className="flex min-w-0 text-xs text-muted-foreground"
+              className="flex min-w-0 flex-wrap text-xs text-muted-foreground"
               data-testid="notes-bin-deleted"
             >
-              <span className="truncate">{deletedParts(n, players, now).who}</span>
-              <span className="shrink-0 whitespace-nowrap">
+              <span className="break-words" data-testid="notes-bin-who">
+                {deletedParts(n, players, now).who}
+              </span>
+              <span className="whitespace-nowrap">
                 &nbsp;· {deletedParts(n, players, now).when}
               </span>
             </div>
@@ -382,7 +386,16 @@ function useLinkHost(live: readonly NoteRecord[]): { host: LinkHost; titlesKey: 
   const connection = useSync((s) => s.connection);
   const [physical] = usePhysicalDice();
   const titles = useMemo(() => live.map((n) => ({ id: n.id, title: n.title })), [live]);
-  const byFold = useMemo(() => titlesByFold(titles), [titles]);
+  // N6: a renamed note's record can land a moment before its links' rewrite: its old title keeps
+  // resolving for a few seconds, so those chips stay solid.
+  const aliases = useRef(new Map<string, { note: PickTitle; until: number }>());
+  const previous = useRef(new Map<string, string>());
+  const byFold = useMemo(() => {
+    const now = Date.now();
+    renamedAliases(previous.current, titles, now, aliases.current);
+    previous.current = new Map(titles.map((t) => [t.id, t.title]));
+    return withAliases(titlesByFold(titles), aliases.current, now);
+  }, [titles]);
   const titlesKey = titles.map((t) => `${t.id}:${t.title}`).join("|");
   const create = async (title: string): Promise<string | null> => {
     try {

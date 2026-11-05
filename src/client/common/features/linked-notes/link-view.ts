@@ -236,10 +236,14 @@ class Bullet extends WidgetType {
     return true;
   }
   toDOM(): HTMLElement {
+    // The slot is the raw marker's width at the text's size; the dot inside is larger.
     const s = document.createElement("span");
     s.className = "cm-note-bullet";
-    s.textContent = "•";
     s.setAttribute("aria-hidden", "true");
+    const dot = document.createElement("span");
+    dot.className = "cm-note-bullet-dot";
+    dot.textContent = "•";
+    s.appendChild(dot);
     return s;
   }
 }
@@ -254,10 +258,30 @@ const syntax = Decoration.mark({ class: "cm-note-md" });
 const hide = Decoration.replace({});
 const bold = Decoration.mark({ class: "cm-note-bold" });
 const bullet = Decoration.replace({ widget: new Bullet() });
+const listMark = Decoration.mark({ class: "cm-note-li-mark" });
+/** Nesting: a tab or two spaces per level (at most 4). */
+export const listLevel = (indent: string) =>
+  Math.min(4, Math.floor(indent.replace(/\t/g, "  ").length / 2));
+const listClass = (indent: string) => `cm-note-li cm-note-li-${listLevel(indent)}`;
 
-/** The lines a selection touches: their markdown markers show as typed (live preview). */
+/** r1: whether the editor has focus; until it does, every line shows its preview. */
+const setFocused = StateEffect.define<boolean>();
+export const focusField = StateField.define<boolean>({
+  create: () => false,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setFocused)) return e.value;
+    return value;
+  },
+});
+
+/**
+ * The lines a selection touches: their markdown markers show as typed (live preview). None while
+ * the editor doesn't have focus (r1: an opened note shows line 1's heading styled). A state
+ * without the focus field (tests) counts as focused.
+ */
 export function caretLines(state: EditorState): Set<number> {
   const out = new Set<number>();
+  if (state.field(focusField, false) === false) return out;
   for (const r of state.selection.ranges) {
     const a = state.doc.lineAt(r.from).number;
     const b = state.doc.lineAt(r.to).number;
@@ -310,21 +334,22 @@ export function buildDecorations(state: EditorState, host: LinkHost): Decoration
     }
     const b = BULLET.exec(line.text);
     if (b) {
-      out.push(Decoration.line({ class: "cm-note-li" }).range(line.from));
-      const at = line.from + (b[1] as string).length;
+      const indent = b[1] as string;
+      out.push(Decoration.line({ class: listClass(indent) }).range(line.from));
+      const at = line.from + indent.length;
       const end = at + (b[2] as string).length + (b[3] as string).length;
-      out.push(
-        live ? bullet.range(at, end) : Decoration.mark({ class: "cm-note-li-mark" }).range(at, end),
-      );
+      // Off the caret's line the indent is the line's padding (one clear step per level).
+      if (live && indent.length > 0) out.push(hide.range(line.from, at));
+      out.push(live ? bullet.range(at, end) : listMark.range(at, end));
       continue;
     }
     const num = NUMBERED.exec(line.text);
     if (num) {
-      out.push(Decoration.line({ class: "cm-note-li" }).range(line.from));
-      const at = line.from + (num[1] as string).length;
-      out.push(
-        Decoration.mark({ class: "cm-note-li-mark" }).range(at, at + (num[2] as string).length),
-      );
+      const indent = num[1] as string;
+      out.push(Decoration.line({ class: listClass(indent) }).range(line.from));
+      const at = line.from + indent.length;
+      if (live && indent.length > 0) out.push(hide.range(line.from, at));
+      out.push(listMark.range(at, at + (num[2] as string).length + (num[3] as string).length));
     }
   }
   return Decoration.set(out, true);
@@ -462,14 +487,20 @@ const theme = EditorView.baseTheme({
   ".cm-note-h1": { fontSize: "1.3em" },
   ".cm-note-h2": { fontSize: "1.15em" },
   ".cm-note-h3": { fontSize: "1.05em" },
-  ".cm-note-li": { paddingLeft: "1.4em !important", textIndent: "-1em" },
-  ".cm-note-bullet": {
+  // r1: the marker keeps one width as text or as a bullet, so the item's text never moves;
+  // each nesting level indents one clear step.
+  ".cm-note-li": { paddingLeft: "1.6em !important", textIndent: "-1.4em" },
+  ".cm-note-li-1": { paddingLeft: "3.1em !important" },
+  ".cm-note-li-2": { paddingLeft: "4.6em !important" },
+  ".cm-note-li-3": { paddingLeft: "6.1em !important" },
+  ".cm-note-li-4": { paddingLeft: "7.6em !important" },
+  ".cm-note-bullet, .cm-note-li-mark": {
     display: "inline-block",
-    width: "1em",
+    minWidth: "1.4em",
     textIndent: "0",
     color: "var(--primary)",
   },
-  ".cm-note-li-mark": { color: "var(--primary)" },
+  ".cm-note-bullet-dot": { fontSize: "1.25em", fontWeight: "700", lineHeight: "1" },
   ".cm-tooltip.cm-note-picker, .cm-note-picker": {
     minWidth: "200px",
     maxWidth: "320px",
@@ -496,6 +527,7 @@ export function noteLinks(host: LinkHost): Extension {
         tr.docChanged ||
         tr.effects.some((e) => e.is(refreshLinks)) ||
         tr.startState.field(revealField, false) !== tr.state.field(revealField, false) ||
+        tr.effects.some((e) => e.is(setFocused)) ||
         (tr.selection && linesKey(tr.startState) !== linesKey(tr.state))
       )
         return buildDecorations(tr.state, host);
@@ -520,6 +552,8 @@ export function noteLinks(host: LinkHost): Extension {
   return [
     revealField,
     pickerField,
+    focusField,
+    EditorView.focusChangeEffect.of((_state, focusing) => setFocused.of(focusing)),
     hintField,
     decorations,
     picker,

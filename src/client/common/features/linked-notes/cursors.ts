@@ -91,14 +91,17 @@ const field = StateField.define<DecorationSet>({
 });
 
 const theme = EditorView.baseTheme({
+  // r1: above the text and the line above it in every theme, never clipped.
   ".cm-remote-caret": {
     position: "relative",
+    zIndex: "5",
     borderLeft: "2px solid",
     marginLeft: "-1px",
     marginRight: "-1px",
   },
   ".cm-remote-tag": {
     position: "absolute",
+    zIndex: "6",
     bottom: "100%",
     left: "-2px",
     padding: "0 4px",

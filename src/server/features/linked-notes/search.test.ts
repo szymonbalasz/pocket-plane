@@ -147,7 +147,8 @@ describe("FR-NOTES-22 note search", () => {
     const dm = await h.live(DM);
     const id = idOf(NOTES_SHARED.quest);
     await ok(dm, dm.intent(N.rename, { noteId: id, title: "Quest journal" }));
-    expect(await titles("journal")).toEqual(["Quest journal"]);
+    // N6: Burnt Ledger's `[[Quest log]]` was rewritten to the new title, so it is found too.
+    expect((await titles("journal")).sort()).toEqual([NOTES_SHARED.ledger, "Quest journal"]);
     await ok(dm, dm.intent(N.rename, { noteId: id, title: NOTES_SHARED.quest }));
     expect(await titles("journal")).toEqual([]);
     dm.close();

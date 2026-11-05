@@ -2,7 +2,16 @@
 // token, the token's campaign only. Live notes' titles and bodies, matched with the shared matcher
 // (`src/shared/search/`, ADR-0079); up to 50 results, each with its title and a snippet.
 import { z } from "zod";
-import { fold, TEXT_MATCH_MIN, wordForms } from "../search/match";
+import {
+  compileQuery,
+  type FoldedName,
+  fold,
+  lowerBound,
+  queryTier,
+  type SearchTier,
+  TEXT_MATCH_MIN,
+  wordForms,
+} from "../search/match";
 import { parseLinks } from "./links";
 
 /** FR-NOTES-22: results per search. */
@@ -56,44 +65,101 @@ export function chipText(text: string): string {
   return out + text.slice(at);
 }
 
+/** Markdown markers as the editor's live preview hides them: headings, list markers, `**`. */
+const HEADING_MARK = /^[ \t]*#{1,3}[ \t]+/gm;
+const LIST_MARK = /^[ \t]*(?:[-*]|\d+\.)[ \t]+/gm;
+const BOLD_MARK = /\*\*([^*\r\n]+)\*\*/g;
+
+/** r1: text as the editor reads off the caret's line: chips' text, no markdown markers. */
+export function plainText(text: string): string {
+  return stripMarks(chipText(text));
+}
+
+/** Markdown markers out of (chip-) text. */
+const stripMarks = (text: string) =>
+  text.replace(HEADING_MARK, "").replace(LIST_MARK, "").replace(BOLD_MARK, "$1");
+
+/** Room around the first hit that markers are stripped in (the snippet is cut from it). */
+const WINDOW = 400;
+
+/**
+ * r1 body rule per query word (the name rule is the shared matcher's): the **last** word, still
+ * being typed, matches as a prefix at any length ("the ledger k" keeps "keeper"); any other word
+ * under 3 letters matches a whole body word ("line of"); longer words match as prefixes, their
+ * plural forms too, as the shared matcher does.
+ */
+export function bodyRule(words: readonly string[]): ((w: string) => boolean)[] {
+  const last = words.length - 1;
+  return words.map((q, i) => {
+    if (i === last) {
+      const forms = q.length >= TEXT_MATCH_MIN ? wordForms(q) : [q];
+      return (w: string) => forms.some((f) => w.startsWith(f));
+    }
+    if (q.length < TEXT_MATCH_MIN) return (w: string) => w === q;
+    const forms = wordForms(q);
+    return (w: string) => forms.some((f) => w.startsWith(f));
+  });
+}
+
+/**
+ * FR-NOTES-22 (r1): the shared matcher's tiers (`queryTier`) with notes' body rule (`bodyRule`)
+ * over the body's sorted, folded words.
+ */
+export function noteSearchTier(
+  name: FoldedName,
+  textWords: readonly string[],
+  words: readonly string[],
+): SearchTier | null {
+  const q = compileQuery(words);
+  const last = words.length - 1;
+  return queryTier(name, q, (i) => {
+    const w = words[i] as string;
+    if (i !== last && w.length < TEXT_MATCH_MIN) return textWords[lowerBound(textWords, w)] === w;
+    const forms = i === last && w.length < TEXT_MATCH_MIN ? [w] : (q.forms[i] as readonly string[]);
+    return forms.some((f) => textWords[lowerBound(textWords, f)]?.startsWith(f) === true);
+  });
+}
+
 /** A raw word as `fold` sees it (lower-cased, folded), cheaply for plain words. */
 const folded = (w: string): string => {
   const lower = w.toLowerCase();
   return PLAIN.test(lower) ? lower : fold(w);
 };
 
-/** Index in `text` of the first word some form starts (as `fold` sees it), or -1. */
-function firstHit(text: string, forms: readonly string[]): number {
+type Rule = (w: string) => boolean;
+
+/** Index in `text` of the first word a rule matches (as `fold` sees it), or -1. */
+function firstHit(text: string, rules: readonly Rule[]): number {
   RAW_WORD.lastIndex = 0;
   for (let m = RAW_WORD.exec(text); m !== null; m = RAW_WORD.exec(text)) {
     const w = folded(m[0]);
-    for (const f of forms) if (w.startsWith(f)) return m.index;
+    if (rules.some((r) => r(w))) return m.index;
   }
   return -1;
 }
 
-/** The words of `snippet` some form starts. */
-function marksOf(snippet: string, forms: readonly string[]): [number, number][] {
+/** The words of `snippet` a rule matches. */
+function marksOf(snippet: string, rules: readonly Rule[]): [number, number][] {
   const out: [number, number][] = [];
-  if (forms.length === 0) return out;
+  if (rules.length === 0) return out;
   RAW_WORD.lastIndex = 0;
   for (let m = RAW_WORD.exec(snippet); m !== null; m = RAW_WORD.exec(snippet)) {
     const w = folded(m[0]);
-    if (forms.some((f) => w.startsWith(f))) out.push([m.index, m.index + m[0].length]);
+    if (rules.some((r) => r(w))) out.push([m.index, m.index + m[0].length]);
     if (out.length === NOTE_SNIPPET_MARKS_MAX) break;
   }
   return out;
 }
 
 /** `text` cut to the snippet length at a space, "…" where cut. */
-function clip(text: string, start: number): string {
+function clip(text: string, start: number, before = false, after = false): string {
   let end = Math.min(text.length, start + NOTE_SNIPPET_MAX);
   if (end < text.length) {
     const cut = text.slice(start, end).search(/\s\S*$/);
     if (cut > NOTE_SNIPPET_MAX / 2) end = start + cut;
   }
   const body = text.slice(start, end).replace(/\s+/g, " ").trim();
-  return `${start > 0 ? "…" : ""}${body}${end < text.length ? "…" : ""}`;
+  return `${start > 0 || before ? "…" : ""}${body}${end < text.length || after ? "…" : ""}`;
 }
 
 /**
@@ -106,18 +172,24 @@ export function noteSnippet(
   body: string,
   words: readonly string[],
 ): { snippet: string; marks: [number, number][] } {
-  const text = chipText(body);
-  const forms = words.filter((w) => w.length >= TEXT_MATCH_MIN).flatMap((w) => wordForms(w));
-  const at = forms.length > 0 ? firstHit(text, forms) : -1;
-  if (at === -1) {
-    const line = text.split("\n").find((l) => l.trim() !== "") ?? "";
-    return { snippet: clip(line, 0), marks: [] };
+  const full = chipText(body);
+  const rules = bodyRule(words);
+  const hit = rules.length > 0 ? firstHit(full, rules) : -1;
+  if (hit === -1) {
+    const line = full.split("\n").find((l) => stripMarks(l).trim() !== "") ?? "";
+    return { snippet: clip(stripMarks(line), 0), marks: [] };
   }
+  // Markers stripped in a window around the hit only (a body can be 32 KiB, 50 hits a search);
+  // line starts inside it lose their heading and list markers too.
+  const from = Math.max(0, hit - WINDOW);
+  const to = Math.min(full.length, hit + NOTE_SNIPPET_MAX + WINDOW);
+  const text = stripMarks(full.slice(from, to));
+  const at = Math.max(0, firstHit(text, rules));
   let start = Math.max(0, at - NOTE_SNIPPET_LEAD);
   if (start > 0) {
     const space = text.slice(start, at).search(/\s/);
     start = space === -1 ? at : start + space + 1;
   }
-  const snippet = clip(text, start);
-  return { snippet, marks: marksOf(snippet, forms) };
+  const snippet = clip(text, start, from > 0, to < full.length);
+  return { snippet, marks: marksOf(snippet, rules) };
 }
