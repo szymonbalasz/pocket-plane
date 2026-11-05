@@ -36,6 +36,8 @@ export const NoteEdited = defineEvent({
     from: z.int().min(0),
     clientId: z.string().min(1).max(64),
     updates: z.array(NoteUpdateJson),
+    /** N5: the note's link targets changed (backlinks refresh). */
+    linksChanged: z.literal(true).optional(),
   }),
   logged: false,
   undoable: false,

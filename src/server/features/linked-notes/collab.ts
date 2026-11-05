@@ -26,6 +26,8 @@ export interface Subscriber {
   role: "dm" | "player";
   playerId: string | null;
   clientId: string;
+  /** `backlinksKey` of the backlinks this editor was last sent (N5, FR-NOTES-12). */
+  backlinks?: string;
 }
 
 export interface Session {

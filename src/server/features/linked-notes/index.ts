@@ -8,9 +8,11 @@ import type { Feature } from "../../services";
 import { NotesRuntime, notesRuntimes } from "./collab";
 import { closeNote, openNote, pushNote } from "./collab-commands";
 import { createNote, deleteNote, renameNote, restoreNote, seedNoteBody } from "./commands";
+import { rebuildLinks } from "./links";
 import { noteType } from "./records";
 import {
   editedCommitHook,
+  noteBacklinksSignal,
   noteClosedSignal,
   noteCursorSignal,
   noteHereSignal,
@@ -38,6 +40,11 @@ export const linkedNotes: Feature = {
     r.services.signals.registerServer(noteUpdatesSignal);
     r.services.signals.registerServer(noteHereSignal);
     r.services.signals.registerServer(noteClosedSignal);
+    r.services.signals.registerServer(noteBacklinksSignal);
+    // N5: link rows for notes written before links existed (and any drift), at every start.
+    r.onStart("linked-notes.links", (s) => {
+      rebuildLinks(s.db, s.log);
+    });
     r.signal(noteCursorSignal(rt));
     r.afterCommit("linked-notes.edited", editedCommitHook(rt));
     r.listener("linked-notes.signals", notesListener(r.services, rt));

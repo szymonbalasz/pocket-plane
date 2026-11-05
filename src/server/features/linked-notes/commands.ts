@@ -28,6 +28,7 @@ import { z } from "zod";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import { note } from "../../db/schema";
+import { syncLinks } from "./links";
 import { getNoteRow, liveNoteByFold, type NoteRow, noteCount, toNoteRecord } from "./rows";
 
 export const NOTES_INTENTS = {
@@ -245,5 +246,6 @@ export const seedNoteBody = defineCommand({
       .set({ body, bodyFold: fold(body), bodyVersion: version, version })
       .where(eq(note.id, noteId))
       .run();
+    syncLinks(env.tx, noteId, body);
   },
 });

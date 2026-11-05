@@ -4,12 +4,14 @@
 // browser's spell check; re-opens after every snapshot; typing carries on offline.
 import { defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { Compartment, Transaction } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import { EditorView, keymap, placeholder } from "@codemirror/view";
 import {
+  NOTES_BACKLINKS_SIGNAL,
   NOTES_CLOSED_SIGNAL,
   NOTES_CURSOR_SIGNAL,
   NOTES_HERE_SIGNAL,
   NOTES_UPDATES_SIGNAL,
+  type NoteBacklinksSignal,
   type NoteClosedSignal,
   type NoteCursorSignal,
   type NoteHereSignal,
@@ -18,10 +20,14 @@ import {
 import { forwardRef, useEffect, useImperativeHandle, useReducer, useRef, useState } from "react";
 import { useSync } from "../../sync/store";
 import { type DrawnCursor, remoteCursors, setCursors } from "./cursors";
+import { type LinkHost, noteLinks, refreshLinks } from "./link-view";
 import { type NoteHost, NoteSession, type NoteTransport } from "./session";
 
 /** How often the name tags' 2 s window is re-checked. */
 const TAG_CHECK_MS = 250;
+
+/** An empty note's hint (N5 r1). */
+export const NOTE_PLACEHOLDER = "Type @ to link a note · # heading · **bold** · - list";
 
 /** What the pane around the editor reads and does. */
 export interface EditorHandle {
@@ -38,6 +44,10 @@ export interface NoteEditorProps {
   visible(c: { role: "dm" | "player"; playerId: string | null }): boolean;
   /** Changes when `visible` may answer differently (the online players). */
   presenceKey: string;
+  /** N5: links, the picker and die buttons (read through a ref: always the latest). */
+  links: LinkHost;
+  /** Changes when the live titles change: chips re-resolve. */
+  titlesKey: string;
   /** Person → caret colour and label (`You` for our own other tab). */
   person(c: { role: "dm" | "player"; playerId: string | null }): { color: string; label: string };
   onSession(): void;
@@ -57,7 +67,7 @@ const theme = EditorView.theme({
 });
 
 export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function NoteEditor(
-  { noteId, title, visible, presenceKey, person, onSession },
+  { noteId, title, visible, presenceKey, links, titlesKey, person, onSession },
   ref,
 ) {
   const connection = useSync((s) => s.connection);
@@ -73,6 +83,8 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
   const titleRef = useRef(title);
   titleRef.current = title;
   const redraw = useRef<(() => void) | null>(null);
+  const linksRef = useRef(links);
+  linksRef.current = links;
   const onSessionRef = useRef(onSession);
   onSessionRef.current = onSession;
   const [, bump] = useReducer((n: number) => n + 1, 0);
@@ -157,8 +169,17 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
       named.of(nameAttr(titleRef.current)),
       keymap.of([...historyKeymap, ...defaultKeymap]),
       EditorView.lineWrapping,
+      // r1: linking is discoverable from an empty note.
+      placeholder(NOTE_PLACEHOLDER),
       EditorView.contentAttributes.of({ spellcheck: "true", "data-testid": "notes-editor-text" }),
       remoteCursors,
+      noteLinks({
+        titles: () => linksRef.current.titles(),
+        byFold: () => linksRef.current.byFold(),
+        follow: (l) => linksRef.current.follow(l),
+        create: (t) => linksRef.current.create(t),
+        roll: (x, e) => linksRef.current.roll(x, e),
+      }),
       theme,
       EditorView.updateListener.of((u) => {
         const s = sessionRef.current;
@@ -202,6 +223,8 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
           return session.onHere(f.data as NoteHereSignal);
         case NOTES_CLOSED_SIGNAL:
           return session.onClosed(f.data as NoteClosedSignal);
+        case NOTES_BACKLINKS_SIGNAL:
+          return session.onBacklinks(f.data as NoteBacklinksSignal);
         case NOTES_CURSOR_SIGNAL:
           return session.onCursor(f.data as NoteCursorSignal, f.from);
       }
@@ -247,6 +270,10 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
   useEffect(() => {
     if (presenceKey !== null) redraw.current?.();
   }, [presenceKey]);
+  // N5: a note created, renamed, binned or restored: chips re-resolve (dotted ↔ solid).
+  useEffect(() => {
+    if (titlesKey !== null) viewRef.current?.dispatch({ effects: refreshLinks.of(null) });
+  }, [titlesKey]);
 
   // r1: a framed editing area (the kit's input border) that scrolls inside itself.
   return (

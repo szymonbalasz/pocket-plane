@@ -31,6 +31,7 @@ import { conflict, invalid, notFound } from "../../commands/errors";
 import { note, noteChange } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { changesFor, type NotesRuntime, pruneChanges, updatesSince } from "./collab";
+import { backlinksKey, backlinksOf, syncLinks } from "./links";
 import { getNoteRow, type NoteRow, toNoteRecord } from "./rows";
 
 export const NOTES_COLLAB_INTENTS = {
@@ -107,13 +108,20 @@ export function openNote(rt: NotesRuntime) {
       const since =
         version === undefined ? null : updatesSince(env.tx, noteId, version, session.version);
       for (const c of stale) session.subs.delete(c);
-      session.subs.set(connId, { connId, ...me, clientId });
+      const backlinks = backlinksOf(env.tx, cid, noteId);
+      session.subs.set(connId, { connId, ...me, clientId, backlinks: backlinksKey(backlinks) });
       here.add(noteId);
       emitHere(env, cid, here);
       const who = rt.here(noteId);
       return since === null
-        ? { mode: "doc", version: session.version, doc: session.text.toString(), here: who }
-        : { mode: "updates", version: session.version, updates: since, here: who };
+        ? {
+            mode: "doc",
+            version: session.version,
+            doc: session.text.toString(),
+            here: who,
+            backlinks,
+          }
+        : { mode: "updates", version: session.version, updates: since, here: who, backlinks };
     },
   });
 }
@@ -178,6 +186,8 @@ export function pushNote(rt: NotesRuntime) {
         .where(eq(note.id, noteId))
         .run();
       if (folds) pruneChanges(env.tx, noteId, next);
+      // N5 (FR-NOTES-07, -12): the link rows follow the text in the same transaction.
+      const linksChanged = syncLinks(env.tx, noteId, body);
       const changes: RecordChange[] = [];
       if (touch) {
         const after = getNoteRow(env.tx, cid, noteId) as NoteRow;
@@ -192,7 +202,13 @@ export function pushNote(rt: NotesRuntime) {
       env.emit({
         type: NoteEdited.type,
         campaignId: cid,
-        payload: { noteId, from: version, clientId: sub.clientId, updates: stored },
+        payload: {
+          noteId,
+          from: version,
+          clientId: sub.clientId,
+          updates: stored,
+          ...(linksChanged ? { linksChanged: true as const } : {}),
+        },
         changes,
       });
       return { accepted: true };

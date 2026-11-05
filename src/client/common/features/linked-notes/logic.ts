@@ -40,6 +40,17 @@ export const STATUS_TEXT: Record<NoteStatus, string> = {
   none: "",
 };
 
+/** A bin row's second line in two parts: who (may truncate) and when (never wraps). */
+export function deletedParts(
+  n: Pick<NoteRecord, "deletedAt" | "deletedBy">,
+  players: Readonly<Record<string, { name: string }>>,
+  now: number,
+  ago: (iso: string, now: number) => string = relativeTime,
+): { who: string; when: string } {
+  const name = n.deletedBy ? nameOf(n.deletedBy, players) : "someone";
+  return { who: `Deleted by ${name}`, when: ago(n.deletedAt ?? "", now) };
+}
+
 /** A bin row's second line (r1): "Deleted by <name> · <when>". */
 export function deletedLine(
   n: Pick<NoteRecord, "deletedAt" | "deletedBy">,
