@@ -232,7 +232,7 @@ describe("FR-DICE-13 roll guard (#367)", () => {
     t.check(t.roll({ tokenId: t.tokens.goblin }, { public: false }), false);
   });
 
-  test("FR-DICE-13 FR-MIR-06 mirrors: a creature no player sees is public when a player is shown its Visible or Transparent mirror; a Shadow, a Hidden mirror or a held-back one doesn't count", () => {
+  test("FR-DICE-13 FR-MIR-06 mirrors: a creature no player sees is public when a player has sight to its Visible or Transparent mirror; a Shadow, a Hidden, an out-of-sight or a held-back mirror doesn't count", () => {
     const t = setup();
     const ratDef = t.run<{ id: string }>(createEntity.name, {
       kind: "monster",
@@ -258,9 +258,14 @@ describe("FR-DICE-13 roll guard (#367)", () => {
     const mode = (m: MirrorMode) => t.run(MIR_INTENTS.setMode, { mirrorId, mode: m });
     const mirrorSeenBy = (ids: string[]) =>
       t.s.db.update(tokenMirror).set({ seenBy: ids }).where(eq(tokenMirror.id, mirrorId)).run();
-    // Transparent: every player sees it, walls and fog ignored → public, as a token roll too.
+    // Transparent, seen by Player 2 → public, as a token roll too.
+    mirrorSeenBy([t.h.p2.id]);
     t.check(def(), true);
     t.check(t.roll({ tokenId: rat }), true);
+    // Transparent but out of every player's sight: foggable (#443) → DM-only.
+    mirrorSeenBy([]);
+    t.check(def(), false);
+    mirrorSeenBy([t.h.p2.id]);
     // Shadow: anonymous, a public line would name it → DM-only. Hidden: nobody → DM-only.
     mode("shadow");
     t.check(def(), false);
@@ -268,12 +273,12 @@ describe("FR-DICE-13 roll guard (#367)", () => {
     t.check(def(), false);
     // Visible: only for players whose sight reaches it. Player 2 on the roof sees it → public.
     mode("visible");
-    mirrorSeenBy([t.h.p2.id]);
     t.check(def(), true);
     mirrorSeenBy([]);
     t.check(def(), false);
     // The rat hidden: its mirrors are held back (FR-MIR-09) → DM-only, a Transparent one too.
     mode("transparent");
+    mirrorSeenBy([t.h.p2.id]);
     t.check(def(), true);
     t.hide(rat, true);
     t.check(def(), false);
@@ -299,6 +304,11 @@ describe("FR-DICE-13 roll guard (#367)", () => {
       row: 3,
       mode: "transparent",
     }).mirrorId;
+    t.s.db
+      .update(tokenMirror)
+      .set({ seenBy: [t.h.p1.id] })
+      .where(eq(tokenMirror.id, mirrorId))
+      .run();
     t.check(t.save(goblin.id, { public: true }), true);
     t.check(t.roll({ combatantId: goblin.id }), true);
     t.check(t.roll({ tokenId: t.tokens.goblin }), true);

@@ -1,4 +1,4 @@
-// Token mirrors over a real socket (MIR §13): who gets what per mode, following the source token,
+// Token mirrors over a real socket (MIR §13): who gets what per mode (each shown mode foggable, #443), following the source token,
 // and everything a mirror must never do. Bundle `token-mirrors`.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
@@ -159,17 +159,22 @@ describe("display modes (FR-MIR-06)", () => {
     t.close();
   });
 
-  test("FR-MIR-06 Transparent and Shadow reach every player, walls and fog aside", async () => {
+  test("FR-MIR-06 Transparent and Shadow are foggable too (#443): only players with sight get them", async () => {
     const t = await table();
     // Far from every PC and behind the map's walls: `fogged` says no player has sight there.
-    const id = await t.create("Goblin", 18, 1, "transparent");
-    expect(t.mirror(t.dm, id)?.fogged).toBe(true);
-    expect(t.mirror(t.p1, id)?.mode).toBe("transparent");
-    expect(t.mirror(t.p2, id)?.mode).toBe("transparent");
-    await ok(t.dm, M.setMode, { mirrorId: id, mode: "shadow" });
-    await t.settle();
-    expect(t.mirror(t.p1, id)?.mode).toBe("shadow");
-    expect(t.mirror(t.p2, id)?.mode).toBe("shadow");
+    const far = await t.create("Goblin", 18, 1, "transparent");
+    // Both players' sight (columns 0-7, rows 2-12 of Goblin Ambush).
+    const near = await t.create("Goblin", 3, 3, "transparent");
+    expect(t.mirror(t.dm, far)?.fogged).toBe(true);
+    for (const mode of ["transparent", "shadow"] as const) {
+      await ok(t.dm, M.setMode, { mirrorId: far, mode });
+      await ok(t.dm, M.setMode, { mirrorId: near, mode });
+      await t.settle();
+      for (const p of [t.p1, t.p2]) {
+        expect(t.mirror(p, far)).toBeUndefined();
+        expect(t.mirror(p, near)?.mode).toBe(mode);
+      }
+    }
     t.close();
   });
 
@@ -182,10 +187,10 @@ describe("display modes (FR-MIR-06)", () => {
     expect(t.mirror(t.dm, far)?.fogged).toBe(true);
     expect(t.mirror(t.p1, far)).toBeUndefined();
     expect(t.mirror(t.p2, far)).toBeUndefined();
-    // Same cell, Transparent: walls and fog no longer matter.
+    // Same cell, Transparent: still out of sight (#443).
     await ok(t.dm, M.setMode, { mirrorId: far, mode: "transparent" });
     await t.settle();
-    expect(t.mirror(t.p1, far)).toBeDefined();
+    expect(t.mirror(t.p1, far)).toBeUndefined();
     await ok(t.dm, M.setMode, { mirrorId: far, mode: "visible" });
     await t.settle();
     expect(t.mirror(t.p1, far)).toBeUndefined();
@@ -201,7 +206,7 @@ describe("display modes (FR-MIR-06)", () => {
 
   test("FR-MIR-07 a player's copy never names its token; a shadow has no name or art", async () => {
     const t = await table();
-    const id = await t.create("Goblin", 6, 1, "transparent");
+    const id = await t.create("Goblin", 3, 3, "transparent");
     const clear = t.mirror(t.p1, id) as Record<string, unknown>;
     expect(clear.name).toBe("Goblin");
     for (const k of ["tokenId", "seenBy", "fogged", "suppressed", "campaignId", "seq"]) {
@@ -227,12 +232,12 @@ describe("following the token", () => {
   test("FR-MIR-08 a move steps every mirror by the same amount; a rename follows", async () => {
     const t = await table();
     const g = t.token("Goblin Sneak 2");
-    const a = await t.create("Goblin Sneak 2", 7, 2, "transparent");
-    const b = await t.create("Goblin Sneak 2", 9, 3, "transparent");
+    const a = await t.create("Goblin Sneak 2", 3, 5, "transparent");
+    const b = await t.create("Goblin Sneak 2", 4, 6, "transparent");
     await ok(t.dm, I.moveToken, { tokenId: g.id, col: g.col + 2, row: g.row - 1 });
     await t.settle();
-    expect(t.mirror(t.p1, a)).toMatchObject({ col: 9, row: 1 });
-    expect(t.mirror(t.dm, b)).toMatchObject({ col: 11, row: 2 });
+    expect(t.mirror(t.p1, a)).toMatchObject({ col: 5, row: 4 });
+    expect(t.mirror(t.dm, b)).toMatchObject({ col: 6, row: 5 });
     await ok(t.dm, I.updateToken, { tokenId: g.id, name: "Lookout" });
     await t.settle();
     expect(t.mirror(t.p1, a)?.name).toBe("Lookout");
@@ -242,7 +247,7 @@ describe("following the token", () => {
   test("FR-MIR-09 a hidden or Invisible token's mirrors stop showing, and come back", async () => {
     const t = await table();
     const g = t.token("Crypt Ogre");
-    const id = await t.create("Crypt Ogre", 7, 4, "transparent");
+    const id = await t.create("Crypt Ogre", 3, 4, "transparent");
     expect(t.mirror(t.p1, id)).toBeDefined();
     await ok(t.dm, I.setTokenHidden, { tokenId: g.id, hidden: true });
     await t.settle();
@@ -264,15 +269,16 @@ describe("following the token", () => {
   test("FR-MIR-09 a step that takes a mirror off the map hides it; a step back shows it", async () => {
     const t = await table();
     const g = t.token("Crypt Ogre");
-    // Goblin Ambush is 20 wide: a mirror on the last column leaves with one step right.
-    const id = await t.create("Crypt Ogre", 19, 6, "transparent");
-    await ok(t.dm, I.moveToken, { tokenId: g.id, col: g.col + 3, row: g.row });
+    // A mirror on the first column (in sight) leaves the map with a step left.
+    const id = await t.create("Crypt Ogre", 0, 6, "transparent");
+    expect(t.mirror(t.p1, id)).toBeDefined();
+    await ok(t.dm, I.moveToken, { tokenId: g.id, col: g.col - 3, row: g.row });
     await t.settle();
     expect(t.mirror(t.dm, id)?.suppressed).toBe(true);
     expect(t.mirror(t.p1, id)).toBeUndefined();
     await ok(t.dm, I.moveToken, { tokenId: g.id, col: g.col, row: g.row });
     await t.settle();
-    expect(t.mirror(t.dm, id)).toMatchObject({ col: 19, suppressed: false });
+    expect(t.mirror(t.dm, id)).toMatchObject({ col: 0, suppressed: false });
     expect(t.mirror(t.p1, id)).toBeDefined();
     t.close();
   });
@@ -280,11 +286,11 @@ describe("following the token", () => {
   test("FR-MIR-10 a teleport sets the mirrors to Hidden and leaves them where they are", async () => {
     const t = await table();
     const g = t.token("Goblin Sneak");
-    const id = await t.create("Goblin Sneak", 8, 5, "transparent");
+    const id = await t.create("Goblin Sneak", 6, 5, "transparent");
     expect(t.mirror(t.p1, id)).toBeDefined();
     await ok(t.dm, I.teleportToken, { tokenId: g.id, col: g.col + 4, row: g.row });
     await t.settle();
-    expect(t.mirror(t.dm, id)).toMatchObject({ col: 8, row: 5, mode: "hidden" });
+    expect(t.mirror(t.dm, id)).toMatchObject({ col: 6, row: 5, mode: "hidden" });
     expect(t.mirror(t.p1, id)).toBeUndefined();
     t.close();
   });
@@ -297,7 +303,7 @@ describe("following the token", () => {
     await t.settle();
     const { mirrorId } = await ok<{ mirrorId: string }>(t.dm, M.create, {
       tokenId,
-      col: 9,
+      col: 5,
       row: 5,
       mode: "transparent",
     });
@@ -315,13 +321,13 @@ describe("the DM's hands", () => {
   test("FR-MIR-12 dragging a mirror sets a new distance to its token", async () => {
     const t = await table();
     const g = t.token("Goblin");
-    const id = await t.create("Goblin", 10, 4, "transparent");
-    await ok(t.dm, M.move, { mirrorId: id, col: 12, row: 4 });
+    const id = await t.create("Goblin", 1, 4, "transparent");
+    await ok(t.dm, M.move, { mirrorId: id, col: 3, row: 4 });
     await t.settle();
-    expect(t.mirror(t.p1, id)).toMatchObject({ col: 12, row: 4 });
+    expect(t.mirror(t.p1, id)).toMatchObject({ col: 3, row: 4 });
     await ok(t.dm, I.moveToken, { tokenId: g.id, col: g.col + 1, row: g.row });
     await t.settle();
-    expect(t.mirror(t.p1, id)).toMatchObject({ col: 13, row: 4 });
+    expect(t.mirror(t.p1, id)).toMatchObject({ col: 4, row: 4 });
     const off = await reply(t.dm, M.move, { mirrorId: id, col: 900, row: 4 });
     expect(off.type).toBe("reject");
     t.close();
