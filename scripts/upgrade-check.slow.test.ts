@@ -92,12 +92,12 @@ test(
 );
 
 test(
-  "BL-173 a bundle the base doesn't have falls back to `base`, and says so",
+  "BL-173 N7 a bundle the base doesn't have falls back to the first fallback it has (session-sim-17, then base), and says so",
   async () => {
     const r = await runCheck(["--base=HEAD", "--bundle=no-such-bundle"]);
     expect(r.code).toBe(0);
-    expect(r.stdout).toContain("the base has no bundle no-such-bundle: used base");
-    expect(r.stdout).toContain("bundle base");
+    expect(r.stdout).toContain("the base has no bundle no-such-bundle: used session-sim-17");
+    expect(r.stdout).toContain("bundle session-sim-17");
   },
   TIMEOUT_MS,
 );

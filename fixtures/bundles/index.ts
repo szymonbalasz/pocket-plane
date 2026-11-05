@@ -125,6 +125,7 @@ import sessionSim11 from "./session-sim-11";
 import sessionSim12 from "./session-sim-12";
 import sessionSim13 from "./session-sim-13";
 import sessionSim17 from "./session-sim-17";
+import sessionSim18 from "./session-sim-18";
 import sheetLinks from "./sheet-links";
 import spPalette from "./sp-palette";
 import spPaletteE2e from "./sp-palette-e2e";
@@ -416,4 +417,6 @@ export const bundles: readonly Bundle[] = [
   sheetLinks,
   // Linked notes records (build/notes-core)
   notes,
+  // Linked notes N7 (fix/notes-sim): the full session simulation with notes
+  sessionSim18,
 ];
