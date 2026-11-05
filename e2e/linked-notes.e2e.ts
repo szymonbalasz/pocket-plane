@@ -470,4 +470,11 @@ test("N6 FR-NOTES-11 the DM renames a note while P1 types in a note linking to i
     expect(await docText(w)).toContain("[typed during the rename]");
   }
   expect(await docText(p2Win)).toBe(await docText(p1Win));
+
+  // Back to "Quest log" (other specs on this bundle's server use it): the chips follow back.
+  await dmWin.getByTestId("notes-list-item").filter({ hasText: "Quest journal" }).first().click();
+  await dmWin.getByTestId("notes-rename").click();
+  await dm.getByTestId("notes-title-input").fill("Quest log");
+  await dm.getByTestId("notes-title-save").click();
+  await expect(chip(p1Win, "Quest log")).toHaveAttribute("data-missing", "false");
 });

@@ -9,6 +9,7 @@ import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
 import { NOTES_SHARED } from "@fixtures/units/linked-notes/notes-shared";
 import { NOTE_TITLE_CLASH } from "@shared/linked-notes/schemas";
+import { NoteSearchResponse } from "@shared/linked-notes/search";
 import type { Credential } from "@shared/protocol/frames";
 import { asc, eq } from "drizzle-orm";
 import { armCrashHook } from "../../commands/crash";
@@ -217,4 +218,25 @@ describe("linked-notes rename rewrite (N6)", () => {
     expect(p.doc).toBe(after.quest);
     p.c.close();
   }, 30_000);
+
+  test("FR-NOTES-11 FR-NOTES-22 search follows a rename's rewrite: the new title is found in linking notes, the old one isn't", async () => {
+    const search = async (q: string) => {
+      const r = await fetch(`${h.http}/api/notes/search?q=${encodeURIComponent(q)}`, {
+        headers: { Authorization: `Bearer ${TEST_SECRET}` },
+      });
+      expect(r.status).toBe(200);
+      return NoteSearchResponse.parse(await r.json())
+        .results.map((x) => x.title)
+        .sort();
+    };
+    const ledger = row(ids[NOTES_SHARED.ledger] as string).title; // renamed by the tests above
+    // Warm the cache first: Burnt Ledger's body links "[[Duke Varen]]".
+    expect(await search("Duke Varen")).toEqual([NOTES_SHARED.duke, ledger].sort());
+    expect(await search("Lord Ashby")).toEqual([]);
+    const dm = await h.live(DM);
+    await ask(dm, N.rename, { noteId: ids[NOTES_SHARED.duke] as string, title: "Lord Ashby" });
+    expect(await search("Lord Ashby")).toEqual(["Lord Ashby", ledger].sort());
+    expect(await search("Duke Varen")).toEqual([]);
+    dm.close();
+  });
 });

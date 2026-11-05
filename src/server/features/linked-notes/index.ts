@@ -10,6 +10,7 @@ import { closeNote, openNote, pushNote } from "./collab-commands";
 import { createNote, deleteNote, renameNote, restoreNote, seedNoteBody } from "./commands";
 import { rebuildLinks } from "./links";
 import { noteType } from "./records";
+import { searchCommitHook } from "./search";
 import {
   editedCommitHook,
   noteBacklinksSignal,
@@ -47,6 +48,7 @@ export const linkedNotes: Feature = {
     });
     r.signal(noteCursorSignal(rt));
     r.afterCommit("linked-notes.edited", editedCommitHook(rt));
+    r.afterCommit("linked-notes.search", searchCommitHook(r.services));
     r.listener("linked-notes.signals", notesListener(r.services, rt));
     // A campaign switch closes every connection (4409): drop the other campaigns' sessions.
     r.listener("linked-notes.switch", ({ event }) => {
