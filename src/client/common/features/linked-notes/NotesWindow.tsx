@@ -7,7 +7,7 @@
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { NOTE_TYPE, type NoteRecord, type RestoreNoteResult } from "@shared/linked-notes/schemas";
 import { isNoteTitle, NOTE_TITLE_MAX } from "@shared/linked-notes/titles";
-import { ChevronRightIcon, PlusIcon } from "lucide-react";
+import { ChevronRightIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "zustand";
@@ -28,11 +28,20 @@ import {
 import { Input, Skeleton } from "../../components/ui/primitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Tip } from "../../components/ui/tip";
-import { useLazyRecords, useSync } from "../../sync/store";
+import { onlineDot } from "../../sync/presence";
+import { useLazyRecords, usePresence, useSync } from "../../sync/store";
 import { useColorOf } from "../campaign-management/colors";
 import { relativeTime } from "../notifications/logic";
 import { intentFailure } from "../party-board/logic";
-import { bannerText, binnedNotes, hereChips, liveNotes, nameOf, STATUS_TEXT } from "./logic";
+import {
+  bannerText,
+  binnedNotes,
+  deletedLine,
+  hereChips,
+  liveNotes,
+  nameOf,
+  STATUS_TEXT,
+} from "./logic";
 import { type EditorHandle, NoteEditor } from "./NoteEditor";
 import { notesUi } from "./ui";
 
@@ -226,10 +235,65 @@ function NoteRow({ note, selected, now }: { note: NoteRecord; selected: boolean;
 }
 
 /** FR-NOTES-04 – -06: the Recycle bin fold-out, newest first: title, who deleted it, when, Restore. */
-function RecycleBin({ rows, now }: { rows: NoteRecord[]; now: number }) {
+/** FR-NOTES-04 – -06: the bin's rows, newest first: title, "Deleted by <name> · <when>", Restore. */
+function BinRows({
+  rows,
+  now,
+  onRestored,
+}: {
+  rows: NoteRecord[];
+  now: number;
+  onRestored?(): void;
+}) {
   const players = usePlayers();
   const live = useLive();
   const intent = useIntent();
+  return (
+    <div className="flex flex-col gap-1">
+      {rows.length === 0 && <p className="px-2 text-xs text-muted-foreground">Empty</p>}
+      {rows.map((n) => (
+        <div
+          key={n.id}
+          className="flex items-center gap-2 rounded-md px-2 py-1"
+          data-testid="notes-bin-item"
+          data-record-id={n.id}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm">{n.title}</div>
+            <div className="text-xs text-muted-foreground" data-testid="notes-bin-deleted">
+              {deletedLine(n, players, now)}
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 shrink-0"
+            data-testid="notes-restore"
+            data-record-id={n.id}
+            disabled={!live || intent.busy}
+            onClick={async () => {
+              const r = await intent.send<RestoreNoteResult>("notes.restore", { noteId: n.id });
+              if (r) {
+                notesUi.getState().select(n.id);
+                onRestored?.();
+              }
+            }}
+          >
+            Restore
+          </Button>
+        </div>
+      ))}
+      {intent.error && (
+        <p role="alert" className="px-2 text-xs text-destructive" data-testid="notes-restore-error">
+          {intent.error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** The wide layout's fold-out at the list's foot (NOTES §7). */
+function RecycleBin({ rows, now }: { rows: NoteRecord[]; now: number }) {
   return (
     <Collapsible>
       <CollapsibleTrigger asChild>
@@ -244,49 +308,38 @@ function RecycleBin({ rows, now }: { rows: NoteRecord[]; now: number }) {
           Recycle bin ({rows.length})
         </Button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-col gap-1 pt-1">
-        {rows.length === 0 && <p className="px-2 text-xs text-muted-foreground">Empty</p>}
-        {rows.map((n) => (
-          <div
-            key={n.id}
-            className="flex items-center gap-2 rounded-md px-2 py-1"
-            data-testid="notes-bin-item"
-            data-record-id={n.id}
-          >
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm">{n.title}</div>
-              <div className="text-xs text-muted-foreground">
-                {n.deletedBy ? nameOf(n.deletedBy, players) : ""} ·{" "}
-                {relativeTime(n.deletedAt ?? "", now)}
-              </div>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 shrink-0"
-              data-testid="notes-restore"
-              data-record-id={n.id}
-              disabled={!live || intent.busy}
-              onClick={async () => {
-                const r = await intent.send<RestoreNoteResult>("notes.restore", { noteId: n.id });
-                if (r) notesUi.getState().select(n.id);
-              }}
-            >
-              Restore
-            </Button>
-          </div>
-        ))}
-        {intent.error && (
-          <p
-            role="alert"
-            className="px-2 text-xs text-destructive"
-            data-testid="notes-restore-error"
-          >
-            {intent.error}
-          </p>
-        )}
+      <CollapsibleContent className="pt-1">
+        <BinRows rows={rows} now={now} />
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+/** r1: the narrow layout's way to the bin: a button beside the dropdown, the rows in a dialog. */
+function NarrowBin({ rows, now }: { rows: NoteRecord[]; now: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Tip content={`Recycle bin (${rows.length})`}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8"
+          aria-label={`Recycle bin (${rows.length})`}
+          data-testid="notes-bin-narrow"
+          data-count={rows.length}
+          onClick={() => setOpen(true)}
+        >
+          <Trash2Icon className="size-3.5" />
+        </Button>
+      </Tip>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm" data-testid="notes-bin-dialog">
+          <DialogTitle>Recycle bin ({rows.length})</DialogTitle>
+          <BinRows rows={rows} now={now} onRestored={() => setOpen(false)} />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -298,6 +351,12 @@ function NotePane({ note, gone }: { note: NoteRecord | null; gone: boolean }) {
   const waiting = useSync((s) => s.state === "waiting");
   const players = usePlayers();
   const colorOf = useColorOf();
+  const presence = usePresence();
+  // FR-NOTES-16: a player live-sync shows offline has no chip and no caret. Presence reaches the
+  // DM only (FR-SYNC-23); a player's client relies on the server's `notes.here` pruning.
+  const visible = (c: { role: "dm" | "player"; playerId: string | null }) =>
+    me.role !== "dm" || c.role === "dm" || onlineDot(presence, c.playerId ?? "") !== "offline";
+  const presenceKey = presence.known ? [...presence.online].sort().join(",") : "?";
   const editor = useRef<EditorHandle | null>(null);
   const [, setTick] = useState(0);
   const [renaming, setRenaming] = useState(false);
@@ -312,7 +371,7 @@ function NotePane({ note, gone }: { note: NoteRecord | null; gone: boolean }) {
     };
   };
   const session = editor.current?.session ?? null;
-  const chips = hereChips(session?.here ?? [], me);
+  const chips = hereChips(session?.here ?? [], me).filter((c) => c.you || visible(c));
   const sessionBanner = session?.banner ?? null;
   // A campaign switch (players wait, FR-SYNC-07) or a note this campaign doesn't have.
   const banner =
@@ -357,8 +416,9 @@ function NotePane({ note, gone }: { note: NoteRecord | null; gone: boolean }) {
           })}
         </fieldset>
         <span
-          className="text-xs text-muted-foreground"
+          className={`text-xs ${session?.status === "full" ? "font-medium text-destructive" : "text-muted-foreground"}`}
           data-testid="notes-status"
+          data-state={session?.status ?? "loading"}
           aria-live="polite"
         >
           {STATUS_TEXT[session?.status ?? "loading"]}
@@ -432,6 +492,9 @@ function NotePane({ note, gone }: { note: NoteRecord | null; gone: boolean }) {
           key={selected}
           ref={editor}
           noteId={selected}
+          title={note?.title ?? ""}
+          visible={visible}
+          presenceKey={presenceKey}
           person={person}
           onSession={() => setTick((n) => n + 1)}
         />
@@ -534,6 +597,7 @@ export default function NotesWindow() {
             <PlusIcon className="size-3.5" />
           </Button>
         </Tip>
+        {loaded && <NarrowBin rows={bin} now={now} />}
       </div>
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-56 shrink-0 flex-col border-r p-2 @[520px]/notes:flex">

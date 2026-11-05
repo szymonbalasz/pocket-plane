@@ -109,7 +109,7 @@
   },
   {
     "at": "open @1600×900 notes.main",
-    "rect": "510,176,560×420",
+    "rect": "555,176,440×420",
     "placed": "auto",
     "parked": "cmp.rules"
   },
@@ -223,7 +223,7 @@
   },
   {
     "at": "reopen @1600×900 notes.main",
-    "rect": "510,176,560×420",
+    "rect": "555,176,440×420",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
@@ -337,7 +337,7 @@
   },
   {
     "at": "reopen 1440×900 @1440×900 notes.main",
-    "rect": "401,176,615×420",
+    "rect": "401,176,467×420",
     "placed": "reopened",
     "parked": "recap.session"
   },
@@ -451,7 +451,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 notes.main",
-    "rect": "338,247,490×320",
+    "rect": "338,60,490×420",
     "placed": "reopened",
     "parked": "ent.statblock"
   },
@@ -565,7 +565,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 notes.main",
-    "rect": "408,60,420×320",
+    "rect": "408,60,448×436",
     "placed": "reopened",
     "parked": "dice.details"
   },
@@ -691,7 +691,7 @@
   },
   {
     "at": "open @1440×900 notes.main",
-    "rect": "401,176,615×420",
+    "rect": "401,176,467×420",
     "placed": "auto",
     "parked": "recap.session"
   },
@@ -805,7 +805,7 @@
   },
   {
     "at": "reopen @1440×900 notes.main",
-    "rect": "401,176,615×420",
+    "rect": "401,176,467×420",
     "placed": "reopened",
     "parked": "recap.session"
   },
@@ -919,7 +919,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 notes.main",
-    "rect": "338,247,490×320",
+    "rect": "338,60,490×420",
     "placed": "reopened",
     "parked": "ent.statblock"
   },
@@ -1033,7 +1033,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 notes.main",
-    "rect": "408,60,420×320",
+    "rect": "408,60,448×436",
     "placed": "reopened",
     "parked": "dice.details"
   },
@@ -1159,7 +1159,7 @@
   },
   {
     "at": "open @1280×800 notes.main",
-    "rect": "338,247,490×320",
+    "rect": "338,60,490×420",
     "placed": "auto",
     "parked": "ent.statblock"
   },
@@ -1273,7 +1273,7 @@
   },
   {
     "at": "reopen @1280×800 notes.main",
-    "rect": "338,247,490×320",
+    "rect": "338,60,490×420",
     "placed": "reopened",
     "parked": "ent.statblock"
   },
@@ -1387,7 +1387,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 notes.main",
-    "rect": "408,60,420×320",
+    "rect": "408,60,448×436",
     "placed": "reopened",
     "parked": "dice.details"
   },
@@ -1513,7 +1513,7 @@
   },
   {
     "at": "open @1280×720 notes.main",
-    "rect": "408,60,420×320",
+    "rect": "408,60,448×436",
     "placed": "auto",
     "parked": "dice.details"
   },
@@ -1627,7 +1627,7 @@
   },
   {
     "at": "reopen @1280×720 notes.main",
-    "rect": "408,60,420×320",
+    "rect": "408,60,448×436",
     "placed": "reopened",
     "parked": "dice.details"
   },

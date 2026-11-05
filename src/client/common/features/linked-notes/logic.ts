@@ -2,6 +2,7 @@
 // banner texts, who-is-here chips. No React, no CodeMirror (tests import it directly).
 import type { NoteHere } from "@shared/linked-notes/collab";
 import type { NoteActor, NoteRecord } from "@shared/linked-notes/schemas";
+import { relativeTime } from "../notifications/logic";
 import type { NoteBanner, NoteStatus } from "./session";
 
 /** Live notes, last changed first (then title, for a stable order). */
@@ -29,12 +30,26 @@ export function nameOf(
   return players[who.playerId ?? ""]?.name ?? "A player";
 }
 
+/** The status line (r1): "Saving…" only after ~1 s unconfirmed; nothing beside a deleted banner. */
 export const STATUS_TEXT: Record<NoteStatus, string> = {
   loading: "Loading…",
   saving: "Saving…",
   saved: "Saved",
   offline: "Offline",
+  full: "Note is full",
+  none: "",
 };
+
+/** A bin row's second line (r1): "Deleted by <name> · <when>". */
+export function deletedLine(
+  n: Pick<NoteRecord, "deletedAt" | "deletedBy">,
+  players: Readonly<Record<string, { name: string }>>,
+  now: number,
+  ago: (iso: string, now: number) => string = relativeTime,
+): string {
+  const who = n.deletedBy ? nameOf(n.deletedBy, players) : "someone";
+  return `Deleted by ${who} · ${ago(n.deletedAt ?? "", now)}`;
+}
 
 /** FR-NOTES-20, -21: the banner's line. */
 export function bannerText(b: NoteBanner): string {

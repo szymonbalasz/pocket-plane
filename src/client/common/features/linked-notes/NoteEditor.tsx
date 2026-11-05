@@ -18,7 +18,10 @@ import {
 import { forwardRef, useEffect, useImperativeHandle, useReducer, useRef, useState } from "react";
 import { useSync } from "../../sync/store";
 import { type DrawnCursor, remoteCursors, setCursors } from "./cursors";
-import { CURSOR_TTL_MS, type NoteHost, NoteSession, type NoteTransport } from "./session";
+import { type NoteHost, NoteSession, type NoteTransport } from "./session";
+
+/** How often the name tags' 2 s window is re-checked. */
+const TAG_CHECK_MS = 250;
 
 /** What the pane around the editor reads and does. */
 export interface EditorHandle {
@@ -29,23 +32,32 @@ export interface EditorHandle {
 
 export interface NoteEditorProps {
   noteId: string;
+  /** The note's title: the textbox's accessible name (r1). */
+  title: string;
+  /** False for a person live-sync shows offline: no caret (FR-NOTES-15, -16). */
+  visible(c: { role: "dm" | "player"; playerId: string | null }): boolean;
+  /** Changes when `visible` may answer differently (the online players). */
+  presenceKey: string;
   /** Person → caret colour and label (`You` for our own other tab). */
   person(c: { role: "dm" | "player"; playerId: string | null }): { color: string; label: string };
   onSession(): void;
 }
 
 const editable = new Compartment();
+const named = new Compartment();
+const nameAttr = (title: string) =>
+  EditorView.contentAttributes.of({ "aria-label": title || "Note" });
 
 const theme = EditorView.theme({
   "&": { height: "100%", fontSize: "0.875rem" },
   "&.cm-focused": { outline: "none" },
-  ".cm-scroller": { fontFamily: "inherit", lineHeight: "1.55", overflow: "auto" },
+  ".cm-scroller": { fontFamily: "inherit", lineHeight: "1.55", overflow: "auto", minHeight: "0" },
   ".cm-content": { padding: "10px 12px", caretColor: "var(--foreground)" },
   ".cm-cursor": { borderLeftColor: "var(--foreground)" },
 });
 
 export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function NoteEditor(
-  { noteId, person, onSession },
+  { noteId, title, visible, presenceKey, person, onSession },
   ref,
 ) {
   const connection = useSync((s) => s.connection);
@@ -56,6 +68,11 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
   const sessionRef = useRef<NoteSession | null>(null);
   const personRef = useRef(person);
   personRef.current = person;
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  const titleRef = useRef(title);
+  titleRef.current = title;
+  const redraw = useRef<(() => void) | null>(null);
   const onSessionRef = useRef(onSession);
   onSessionRef.current = onSession;
   const [, bump] = useReducer((n: number) => n + 1, 0);
@@ -70,7 +87,7 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
       const view = viewRef.current;
       if (!s || !view) return;
       for (const c of s.cursors.values()) {
-        if ((c.playerId ?? "dm") !== playerKey) continue;
+        if ((c.playerId ?? "dm") !== playerKey || !visibleRef.current(c)) continue;
         const r = s.mapCursor(c)?.[0];
         if (!r) continue;
         view.dispatch({ effects: EditorView.scrollIntoView(r.head, { y: "center" }) });
@@ -84,6 +101,8 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
     const parent = box.current;
     if (!parent) return;
     let queued = false;
+    /** Which carets showed their tag at the last draw (redraw when one changes). */
+    let tags = "";
     /** Session changes land outside CodeMirror updates: redraw cursors and editability after. */
     const flush = () => {
       queued = false;
@@ -91,21 +110,30 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
       const view = viewRef.current;
       if (!s || !view) return;
       const drawn: DrawnCursor[] = [];
+      tags = "";
       for (const c of s.cursors.values()) {
+        if (!visibleRef.current(c)) continue;
         const ranges = s.mapCursor(c);
         if (!ranges) continue;
+        const tag = s.showTag(c);
+        tags += `${c.clientId}:${tag};`;
         const p = personRef.current({ role: c.role, playerId: c.playerId });
         drawn.push({
           clientId: c.clientId,
           playerKey: c.playerId ?? "dm",
           label: p.label,
           color: p.color,
+          tag,
           ranges,
         });
       }
       const canEdit = s.editable;
       view.dispatch({
-        effects: [setCursors.of(drawn), editable.reconfigure(EditorView.editable.of(canEdit))],
+        effects: [
+          setCursors.of(drawn),
+          editable.reconfigure(EditorView.editable.of(canEdit)),
+          named.reconfigure(nameAttr(titleRef.current)),
+        ],
       });
       bump();
       onSessionRef.current();
@@ -115,6 +143,7 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
       queued = true;
       queueMicrotask(flush);
     };
+    redraw.current = later;
     const transport: NoteTransport = {
       live: () => connection.snapshot.state === "live",
       send: (name, payload) => connection.sendIntent(name, payload),
@@ -125,6 +154,7 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
     };
     const extensions = [
       editable.of(EditorView.editable.of(false)),
+      named.of(nameAttr(titleRef.current)),
       keymap.of([...historyKeymap, ...defaultKeymap]),
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({ spellcheck: "true", "data-testid": "notes-editor-text" }),
@@ -176,17 +206,23 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
           return session.onCursor(f.data as NoteCursorSignal, f.from);
       }
     });
-    const expiry = window.setInterval(() => {
-      if (session.expireCursors()) later();
-    }, CURSOR_TTL_MS / 5);
+    // r1: a name tag shows for 2 s after its person moves or types; redraw when one turns.
+    const tagCheck = window.setInterval(() => {
+      let now = "";
+      for (const c of session.cursors.values())
+        if (visibleRef.current(c) && session.mapCursor(c))
+          now += `${c.clientId}:${session.showTag(c)};`;
+      if (now !== tags) later();
+    }, TAG_CHECK_MS);
     void session.open();
     return () => {
       offSignal();
-      window.clearInterval(expiry);
+      window.clearInterval(tagCheck);
       session.close();
       view?.destroy();
       viewRef.current = null;
       sessionRef.current = null;
+      redraw.current = null;
     };
   }, [connection, noteId, clientId]);
 
@@ -203,5 +239,21 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
     } else sessionRef.current?.connectionChanged();
   }, [live, generation]);
 
-  return <div ref={box} className="h-full min-h-0" data-testid="notes-editor" />;
+  // A title change or a person going offline: redraw (name, carets).
+  useEffect(() => {
+    if (!viewRef.current) return;
+    viewRef.current.dispatch({ effects: named.reconfigure(nameAttr(title)) });
+  }, [title]);
+  useEffect(() => {
+    if (presenceKey !== null) redraw.current?.();
+  }, [presenceKey]);
+
+  // r1: a framed editing area (the kit's input border) that scrolls inside itself.
+  return (
+    <div
+      ref={box}
+      className="h-full min-h-0 overflow-hidden rounded-md border border-input bg-transparent shadow-xs focus-within:ring-2 focus-within:ring-ring [&_.cm-editor]:h-full"
+      data-testid="notes-editor"
+    />
+  );
 });

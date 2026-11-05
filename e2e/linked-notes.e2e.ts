@@ -80,6 +80,13 @@ test("FR-NOTES-14 FR-NOTES-15 FR-NOTES-16 FR-NOTES-17 three people type into Bur
 
   // FR-NOTES-15: the others' carets, each tagged; FR-NOTES-16: a chip per person.
   await expect(dmWin.locator('[data-testid="notes-cursor"]')).not.toHaveCount(0);
+  // r1 (FR-NOTES-15): idle carets stay; their name tags give way after ~2 s.
+  const idle = await dmWin.locator('[data-testid="notes-cursor"]').count();
+  await dm.waitForTimeout(11_000);
+  await expect(dmWin.locator('[data-testid="notes-cursor"]')).toHaveCount(idle);
+  await expect(dmWin.locator('[data-testid="notes-cursor"][data-tag="shown"]')).toHaveCount(0);
+  // r1 (FR-NOTES-16): a chip click jumps to an idle person's caret.
+  await dmWin.getByTestId("notes-here").filter({ hasNotText: "You" }).first().click();
   await expect(p2Win.getByTestId("notes-here").filter({ hasText: "You" })).toHaveCount(1);
 
   // FR-NOTES-17: Player 1's undo removes only Player 1's typing, for everyone.
@@ -143,4 +150,59 @@ test("FR-NOTES-04 FR-NOTES-05 FR-NOTES-20 delete while another reads it: their b
   // The reader re-opens it: the banner goes, the text is intact.
   await p2Win.getByTestId("notes-list-item").filter({ hasText: "Duke Varen" }).click();
   await expect.poll(() => docText(p2Win), { timeout: 5_000 }).toBe(text);
+});
+
+/** Drags the window's resize handle until it is `w` × `h` (as useful-size does). */
+async function resizeTo(page: Page, win: Locator, w: number, h: number) {
+  const box = await win.boundingBox();
+  const handle = await win.getByTestId("ui-window-resize").boundingBox();
+  if (!box || !handle) throw new Error("window not shown");
+  const x = handle.x + handle.width / 2;
+  const y = handle.y + handle.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 5; i++)
+    await page.mouse.move(x + ((w - box.width) * i) / 5, y + ((h - box.height) * i) / 5);
+  await page.mouse.up();
+  await expect
+    .poll(async () => {
+      const b = await win.boundingBox();
+      return b && [Math.round(b.width), Math.round(b.height)];
+    })
+    .toEqual([w, h]);
+}
+
+test("r1 FR-NOTES-13 the editor is framed, scrolls inside itself and is named after the note; narrow Notes still reaches the Recycle bin and Restore", async ({
+  browser,
+}) => {
+  const { p1 } = await setup(browser);
+  const win = await openNote(p1, "Burnt Ledger");
+  const editor = win.getByTestId("notes-editor");
+  expect(await editor.evaluate((el) => getComputedStyle(el).borderTopWidth)).not.toBe("0px");
+  await expect(win.locator(".cm-content")).toHaveAttribute("aria-label", "Burnt Ledger");
+  await win.locator(".cm-content").click();
+  await p1.keyboard.press("Control+End");
+  for (let i = 0; i < 40; i++) await p1.keyboard.press("Enter");
+  await p1.keyboard.type("bottom line");
+  const scroll = await win.locator(".cm-scroller").evaluate((el) => ({
+    over: el.scrollHeight > el.clientHeight,
+    y: getComputedStyle(el).overflowY,
+  }));
+  expect(scroll).toEqual({ over: true, y: "auto" });
+  const body = await win
+    .getByTestId("ui-window-body")
+    .evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
+  expect(body).toBe(true);
+
+  await resizeTo(p1, win, 400, 420);
+  await expect(win.getByTestId("notes-picker-narrow")).toBeVisible();
+  const bin = win.getByTestId("notes-bin-narrow");
+  await expect(bin).toBeVisible();
+  await bin.click();
+  const dialog = p1.getByTestId("notes-bin-dialog");
+  const row = dialog.getByTestId("notes-bin-item").filter({ hasText: "Old rumours" });
+  await expect(row.getByTestId("notes-bin-deleted")).toContainText("Deleted by DM ·");
+  await row.getByTestId("notes-restore").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(win.getByTestId("notes-title")).toHaveText("Old rumours");
 });

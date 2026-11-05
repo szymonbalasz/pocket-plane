@@ -60,6 +60,20 @@ export class FakeAuthority {
   pushes: { bytes: number; updates: number }[] = [];
   /** Next push answers `not_found` (binned meanwhile). */
   gone = false;
+  /** While set, every answer waits for it (a slow server). */
+  held: Promise<void> | null = null;
+
+  /** Holds every answer until the returned release is called. */
+  pause(): () => void {
+    let release!: () => void;
+    this.held = new Promise<void>((r) => {
+      release = r;
+    });
+    return () => {
+      this.held = null;
+      release();
+    };
+  }
 
   constructor(
     readonly noteId: string,
@@ -151,6 +165,7 @@ export class FakeEditor implements NoteHost {
       },
       send: async (name, payload) => {
         await Promise.resolve();
+        if (auth.held) await auth.held;
         if (!this.live) throw new Rejected("offline", "Not connected");
         const bytes = new TextEncoder().encode(JSON.stringify(payload)).length;
         const p = payload as { version?: number; updates: NoteUpdate[] };

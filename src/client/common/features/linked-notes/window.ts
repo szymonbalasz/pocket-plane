@@ -1,5 +1,5 @@
-// `notes.main` "Notes" (NOTES §7, FR-NOTES-13), both clients: default 760 × 560, useful
-// 560 × 420, min 360 × 320; launcher "Notes" after Stats. The body, CodeMirror included, is its
+// `notes.main` "Notes" (NOTES §7, FR-NOTES-13), both clients: default 760 × 560; r1 ruling:
+// it opens smaller when there's no room (useful 440 × 420, min 320 × 280); launcher "Notes". The body, CodeMirror included, is its
 // own lazy chunk, loaded when the window first opens (NOTES §12): the entry bundles carry only
 // this definition.
 import { NotebookPenIcon } from "lucide-react";
@@ -20,8 +20,10 @@ export const notesWindow = defineWindow({
   title: "Notes",
   clients: ["dm", "player"],
   defaultSize: { w: 760, h: 560 },
-  minSize: { w: 360, h: 320 },
-  usefulSize: { w: 560, h: 420 },
+  // r1 ruling: may open smaller when there is no room (the contract minimum, FR-SHELL-61).
+  minSize: { w: 320, h: 280 },
+  // r1 ruling: opens narrower when there is no room (fits beside the Dice tray at 1280 × 720).
+  usefulSize: { w: 440, h: 420 },
   defaultPosition: { anchor: "top-left", dx: 56 },
   defaultOpen: false,
   launcher: { icon: NotebookPenIcon, label: "Notes", order: 60 },

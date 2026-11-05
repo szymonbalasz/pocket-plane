@@ -4,7 +4,15 @@ import { describe, expect, test } from "bun:test";
 import type { NoteRecord } from "@shared/linked-notes/schemas";
 import { COMMANDS } from "../play-shell/commands";
 import { NOTES_WINDOW_KIND } from "./kind";
-import { bannerText, binnedNotes, hereChips, liveNotes, nameOf, STATUS_TEXT } from "./logic";
+import {
+  bannerText,
+  binnedNotes,
+  deletedLine,
+  hereChips,
+  liveNotes,
+  nameOf,
+  STATUS_TEXT,
+} from "./logic";
 import { notesUi } from "./ui";
 import { notesWindow } from "./window";
 
@@ -56,7 +64,30 @@ describe("linked-notes window logic (N3)", () => {
       ["p2", false],
       ["dm", false],
     ]);
-    expect(Object.values(STATUS_TEXT)).toEqual(["Loading…", "Saving…", "Saved", "Offline"]);
+    expect(Object.values(STATUS_TEXT)).toEqual([
+      "Loading…",
+      "Saving…",
+      "Saved",
+      "Offline",
+      "Note is full",
+      "",
+    ]);
+  });
+
+  test("FR-NOTES-04 r1 a bin row says who deleted it and when", () => {
+    const ago = () => "20 min ago";
+    const players = { p1: { name: "Mira" } };
+    expect(
+      deletedLine(
+        { deletedAt: "x", deletedBy: { role: "player", playerId: "p1" } },
+        players,
+        0,
+        ago,
+      ),
+    ).toBe("Deleted by Mira · 20 min ago");
+    expect(
+      deletedLine({ deletedAt: "x", deletedBy: { role: "dm", playerId: null } }, players, 0, ago),
+    ).toBe("Deleted by DM · 20 min ago");
   });
 
   test("FR-NOTES-20 FR-NOTES-21 banner texts", () => {
@@ -66,14 +97,14 @@ describe("linked-notes window logic (N3)", () => {
     expect(bannerText({ kind: "reload", text: "" })).toContain("reloaded");
   });
 
-  test("FR-NOTES-13 NOTES §7 notes.main in both clients: 760 × 560, useful 560 × 420, min 360 × 320, launcher Notes; Open Notes and New note in the palette", () => {
+  test("FR-NOTES-13 NOTES §7 notes.main in both clients: 760 × 560; r1: useful 440 × 420, min 320 × 280 (opens smaller without room); launcher Notes; Open Notes and New note in the palette", () => {
     expect(notesWindow).toMatchObject({
       kind: NOTES_WINDOW_KIND,
       title: "Notes",
       clients: ["dm", "player"],
       defaultSize: { w: 760, h: 560 },
-      usefulSize: { w: 560, h: 420 },
-      minSize: { w: 360, h: 320 },
+      usefulSize: { w: 440, h: 420 },
+      minSize: { w: 320, h: 280 },
       launcher: { label: "Notes" },
     });
     const opened: string[] = [];

@@ -136,7 +136,7 @@ const DM: Case[] = [
   },
   {
     kind: "notes.main",
-    useful: { w: 560, h: 420 },
+    useful: { w: 440, h: 420 },
     // NOTES §7 (N3): the list (New, rows, Recycle bin) and the empty note pane, unscrolled.
     criterion: "the list's New button and rows, the note pane",
     check: "body",
@@ -186,7 +186,7 @@ const PLAYER: Case[] = [
   },
   {
     kind: "notes.main",
-    useful: { w: 560, h: 420 },
+    useful: { w: 440, h: 420 },
     // NOTES §7 (N3): the list (New, rows, Recycle bin) and the empty note pane, unscrolled.
     criterion: "the list's New button and rows, the note pane",
     check: "body",

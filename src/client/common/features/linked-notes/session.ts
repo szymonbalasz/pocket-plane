@@ -36,12 +36,17 @@ import { NOTE_BODY_MAX_BYTES, NOTE_BODY_TOO_BIG } from "@shared/linked-notes/sch
 export const PUSH_DELAY_MS = 100;
 /** FR-NOTES-15: cursor signals per second at most. */
 export const CURSOR_PER_SECOND = 10;
-/** FR-NOTES-15: a cursor goes this long after its last signal. */
-export const CURSOR_TTL_MS = 10_000;
-/** ADR-0078: a cursor more than this many versions behind ours is dropped. */
+/** FR-NOTES-15 (walkthrough r1): a caret's name tag shows this long after its person moves or types. */
+export const TAG_MS = 2_000;
+/** Accepted changes kept for bringing forward a cursor that arrives from an older version. */
 export const CURSOR_MAX_LAG = 50;
+/** r1: "Saving…" only once unconfirmed text has waited this long; until then "Saved". */
+export const SAVING_AFTER_MS = 1_000;
+/** FR-NOTES-21: "Note is full" stays this long after the cap refused input. */
+export const FULL_SHOWN_MS = 3_000;
 
-export type NoteStatus = "loading" | "saved" | "saving" | "offline";
+/** `none`: a deleted / gone banner speaks for the note; `full`: the cap refused input. */
+export type NoteStatus = "loading" | "saved" | "saving" | "offline" | "full" | "none";
 
 /**
  * A banner over the editor (FR-NOTES-20, -21): `deleted` (binned while open: Restore), `gone`
@@ -62,7 +67,7 @@ export interface RemoteCursor {
   playerId: string | null;
   version: number;
   ranges: { anchor: number; head: number }[];
-  /** Local clock ms of the last signal. */
+  /** Local clock ms of the person's last move or typing (shows the name tag, `TAG_MS`). */
   at: number;
 }
 
@@ -103,11 +108,26 @@ export function docBytes(state: EditorState): number {
   return utf8.encode(state.doc.toString()).length;
 }
 
-/** FR-NOTES-21: refuses a local change that would take the note past 32 KiB of UTF-8. */
-export const typingCap: Extension = EditorState.changeFilter.of((tr) => {
-  if (!tr.docChanged || tr.annotation(Transaction.remote) === true) return true;
-  return docBytes(tr.state) <= NOTE_BODY_MAX_BYTES;
-});
+/**
+ * FR-NOTES-21: refuses a local change (typing or a paste) that would take the note past 32 KiB
+ * of UTF-8, and tells `onBlocked`, so the status can say "Note is full".
+ */
+export function typingCap(onBlocked: () => void = () => {}): Extension {
+  return EditorState.changeFilter.of((tr) => {
+    if (!tr.docChanged || tr.annotation(Transaction.remote) === true) return true;
+    if (docBytes(tr.state) <= NOTE_BODY_MAX_BYTES) return true;
+    onBlocked();
+    return false;
+  });
+}
+
+/** A range through one change set (positions past its start text are clamped first). */
+function mapRange(r: { anchor: number; head: number }, cs: ChangeSet) {
+  return {
+    anchor: cs.mapPos(Math.min(r.anchor, cs.length), 1),
+    head: cs.mapPos(Math.min(r.head, cs.length), 1),
+  };
+}
 
 const toUpdates = (list: readonly NoteUpdate[]): Update[] =>
   list.map((u) => ({ changes: ChangeSet.fromJSON(u.changes), clientID: u.clientId }));
@@ -134,6 +154,11 @@ export class NoteSession {
   private pushTimer: unknown = null;
   private lastCursorAt = -Infinity;
   private cursorTimer: unknown = null;
+  /** Since when unconfirmed text has waited (null = none). */
+  private pendingSince: number | null = null;
+  private statusTimer: unknown = null;
+  /** When the cap last refused input. */
+  private blockedAt = Number.NEGATIVE_INFINITY;
   private closed = false;
   private readonly t: NoteTransport;
   private readonly host: NoteHost;
@@ -156,7 +181,7 @@ export class NoteSession {
       extensions: [
         collab({ startVersion: version, clientID: this.clientId }),
         history(),
-        typingCap,
+        typingCap(() => this.blocked()),
         this.extensions,
       ],
     });
@@ -176,18 +201,50 @@ export class NoteSession {
     return this.everOpened && this.banner?.kind !== "deleted" && this.banner?.kind !== "gone";
   }
 
+  /**
+   * The status line (r1): "Saving…" only once unconfirmed text has waited `SAVING_AFTER_MS`, else
+   * "Saved"; "Note is full" for `FULL_SHOWN_MS` after the cap refused input; nothing while a
+   * deleted / gone banner shows. Re-checks itself when the next change of label is due.
+   */
   private refresh(): void {
     if (this.closed) return;
-    this.status = !this.t.live()
-      ? "offline"
-      : !this.opened
-        ? this.everOpened
-          ? "saving"
-          : "loading"
-        : this.inflight || this.unconfirmed > 0
-          ? "saving"
-          : "saved";
+    const now = this.t.now();
+    const gone = this.banner?.kind === "deleted" || this.banner?.kind === "gone";
+    const pending =
+      !gone && (this.inflight || this.unconfirmed > 0 || (!this.opened && this.everOpened));
+    if (!pending) this.pendingSince = null;
+    else if (this.pendingSince === null) this.pendingSince = now;
+    const waited = this.pendingSince === null ? 0 : now - this.pendingSince;
+    const fullFor = FULL_SHOWN_MS - (now - this.blockedAt);
+    this.status = gone
+      ? "none"
+      : !this.t.live()
+        ? "offline"
+        : !this.everOpened
+          ? "loading"
+          : fullFor > 0
+            ? "full"
+            : pending && waited >= SAVING_AFTER_MS
+              ? "saving"
+              : "saved";
+    if (this.statusTimer !== null) this.t.clearTimeout(this.statusTimer);
+    this.statusTimer = null;
+    const due = Math.min(
+      fullFor > 0 ? fullFor : Number.POSITIVE_INFINITY,
+      pending && waited < SAVING_AFTER_MS ? SAVING_AFTER_MS - waited : Number.POSITIVE_INFINITY,
+    );
+    if (Number.isFinite(due))
+      this.statusTimer = this.t.setTimeout(() => {
+        this.statusTimer = null;
+        this.refresh();
+      }, due);
     this.changed();
+  }
+
+  /** The cap refused input (FR-NOTES-21): "Note is full", once the refused transaction is done. */
+  private blocked(): void {
+    this.blockedAt = this.t.now();
+    this.t.setTimeout(() => this.refresh(), 0);
   }
 
   /** `notes.open`: the whole text the first time, else the updates since our version. */
@@ -318,8 +375,17 @@ export class NoteSession {
     const list = toUpdates(fresh);
     const at = this.version;
     this.host.dispatch(receiveUpdates(this.host.state, list));
+    const now = this.t.now();
     list.forEach((u, i) => {
       this.past.push({ version: at + i, changes: u.changes });
+      // Carets stay where they are under others' typing (FR-NOTES-15): each one at this version
+      // moves on with it; an update from its own person shows the name tag again.
+      for (const c of this.cursors.values()) {
+        if (c.clientId === u.clientID) c.at = now;
+        if (c.version !== at + i) continue;
+        c.ranges = c.ranges.map((r) => mapRange(r, u.changes));
+        c.version = at + i + 1;
+      }
     });
     if (this.past.length > CURSOR_MAX_LAG) this.past.splice(0, this.past.length - CURSOR_MAX_LAG);
     this.refresh();
@@ -354,49 +420,44 @@ export class NoteSession {
   onCursor(d: NoteCursorSignal, from: { role: "dm" } | { role: "player"; playerId: string }): void {
     if (d.noteId !== this.noteId || d.clientId === this.clientId) return;
     if (d.left) this.cursors.delete(d.clientId);
-    else
+    else {
+      // From an older version: brought forward through the changes kept since; ahead of ours:
+      // kept as is until `receive` brings us there. Stays until close, `left` or leaving `here`.
+      let ranges = d.ranges.slice(0, NOTES_CURSOR_RANGES_MAX);
+      let version = d.version;
+      if (version < this.version) {
+        for (const p of this.past)
+          if (p.version >= version) ranges = ranges.map((r) => mapRange(r, p.changes));
+        version = this.version;
+      }
       this.cursors.set(d.clientId, {
         clientId: d.clientId,
         role: from.role,
         playerId: from.role === "player" ? from.playerId : null,
-        version: d.version,
-        ranges: d.ranges.slice(0, NOTES_CURSOR_RANGES_MAX),
+        version,
+        ranges,
         at: this.t.now(),
       });
+    }
     this.changed();
   }
 
-  /** Drops cursors older than 10 s; true when one went. */
-  expireCursors(): boolean {
-    const now = this.t.now();
-    let gone = false;
-    for (const [id, c] of this.cursors)
-      if (now - c.at > CURSOR_TTL_MS) {
-        this.cursors.delete(id);
-        gone = true;
-      }
-    return gone;
+  /** r1: a caret's name tag shows for `TAG_MS` after its person moved or typed (and on hover). */
+  showTag(c: RemoteCursor): boolean {
+    return this.t.now() - c.at < TAG_MS;
   }
 
   /**
-   * A remote cursor's ranges in our current text: mapped from its version through the accepted
-   * changes since, then through our unconfirmed ones. Null when it is too old or ahead of us.
+   * A remote cursor's ranges in our current text: kept at our synced version as changes arrive,
+   * then mapped through our unconfirmed changes. Null while it is ahead of us.
    */
   mapCursor(c: RemoteCursor): { anchor: number; head: number }[] | null {
-    const v = this.version;
-    if (c.version > v || v - c.version > CURSOR_MAX_LAG) return null;
-    const steps = this.past.filter((p) => p.version >= c.version).map((p) => p.changes);
-    if (c.version < v && steps.length < v - c.version) return null;
-    for (const u of sendableUpdates(this.host.state)) steps.push(u.changes);
+    if (c.version > this.version) return null;
+    let ranges = c.ranges;
+    for (const u of sendableUpdates(this.host.state))
+      ranges = ranges.map((r) => mapRange(r, u.changes));
     const len = this.host.state.doc.length;
-    return c.ranges.map((r) => {
-      let { anchor, head } = r;
-      for (const cs of steps) {
-        anchor = cs.mapPos(Math.min(anchor, cs.length), 1);
-        head = cs.mapPos(Math.min(head, cs.length), 1);
-      }
-      return { anchor: Math.min(anchor, len), head: Math.min(head, len) };
-    });
+    return ranges.map((r) => ({ anchor: Math.min(r.anchor, len), head: Math.min(r.head, len) }));
   }
 
   /** Our selection changed: a cursor signal, at most 10 a second (the last one always goes). */
@@ -451,5 +512,6 @@ export class NoteSession {
     this.closed = true;
     if (this.pushTimer !== null) this.t.clearTimeout(this.pushTimer);
     if (this.cursorTimer !== null) this.t.clearTimeout(this.cursorTimer);
+    if (this.statusTimer !== null) this.t.clearTimeout(this.statusTimer);
   }
 }

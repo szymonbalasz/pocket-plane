@@ -7,7 +7,7 @@ import { undo } from "@codemirror/commands";
 import { EditorSelection } from "@codemirror/state";
 import { NOTES_CURSOR_SIGNAL, NOTES_PUSH_FRAME_BYTES } from "@shared/linked-notes/collab";
 import { NOTE_BODY_MAX_BYTES } from "@shared/linked-notes/schemas";
-import { CURSOR_TTL_MS, docBytes, PUSH_DELAY_MS } from "./session";
+import { docBytes, FULL_SHOWN_MS, PUSH_DELAY_MS, SAVING_AFTER_MS, TAG_MS } from "./session";
 import { FakeAuthority, FakeClock, FakeEditor } from "./testing";
 
 const START = "Found in the Duke's office.\nRoll 2d6 to search it.";
@@ -54,12 +54,12 @@ describe("linked-notes NoteSession (N3)", () => {
     expect(auth.pushes.length).toBeGreaterThan(0);
   });
 
-  test("FR-NOTES-14 one push in flight, batched after 100 ms; Saving… until confirmed", async () => {
+  test("FR-NOTES-14 one push in flight, batched after 100 ms; Saved while it goes through quickly (r1)", async () => {
     const { clock, auth, eds } = await table(1);
     const [a] = eds as [FakeEditor];
     a.type("end", "a");
     a.type("end", "b");
-    expect(a.session.status).toBe("saving");
+    expect(a.session.status).toBe("saved");
     await clock.advance(PUSH_DELAY_MS - 1);
     expect(auth.pushes).toHaveLength(0);
     await clock.advance(1);
@@ -206,12 +206,9 @@ describe("linked-notes NoteSession (N3)", () => {
     await clock.advance(200);
     const c = b.session.cursors.get("tab-0");
     expect(c && b.session.mapCursor(c)).toEqual([{ anchor: 5, head: 7 }]);
-    // Our own cursor is never drawn; `left` removes; silence expires.
+    // Our own cursor is never drawn; `left` removes.
     b.session.onCursor({ noteId: "n1", clientId: "tab-1", version: 1, ranges: [] }, { role: "dm" });
     expect(b.session.cursors.has("tab-1")).toBe(false);
-    await clock.advance(CURSOR_TTL_MS + 1);
-    expect(b.session.expireCursors()).toBe(true);
-    expect(b.session.cursors.size).toBe(0);
     b.session.onCursor(
       { noteId: "n1", clientId: "tab-0", version: 1, ranges: [{ anchor: 0, head: 0 }] },
       { role: "player", playerId: "tab-0" },
@@ -221,6 +218,84 @@ describe("linked-notes NoteSession (N3)", () => {
       { role: "player", playerId: "tab-0" },
     );
     expect(b.session.cursors.size).toBe(0);
+  });
+
+  test("FR-NOTES-15 r1 a caret stays while its person has the note open, however long they idle, and moves with others' typing; it goes on leaving `here`", async () => {
+    const { clock, auth, eds } = await table(3, "abcdef");
+    const [a, b, c] = eds as [FakeEditor, FakeEditor, FakeEditor];
+    b.session.onCursor(
+      { noteId: "n1", clientId: "tab-0", version: 0, ranges: [{ anchor: 3, head: 3 }] },
+      { role: "player", playerId: "tab-0" },
+    );
+    await clock.advance(60_000); // a idles a minute
+    for (let i = 0; i < 60; i++) {
+      c.type(0, "z"); // 60 changes before a's caret: more than the kept window (50)
+      await clock.advance(PUSH_DELAY_MS);
+    }
+    await clock.advance(1000);
+    const cur = b.session.cursors.get("tab-0");
+    expect(cur && b.session.mapCursor(cur)).toEqual([{ anchor: 63, head: 63 }]);
+    expect(b.doc.slice(60, 63)).toBe("abc");
+    // Leaving `here` (closed, or pruned after a disconnect) takes it away.
+    b.session.onHere({ noteId: "n1", here: auth.here().filter((h) => h.clientId !== "tab-0") });
+    expect(b.session.cursors.has("tab-0")).toBe(false);
+    void a;
+  }, 30_000);
+
+  test("FR-NOTES-15 r1 a name tag shows for 2 s after its person moves or types, then only the caret", async () => {
+    const { clock, eds } = await table(2, "abc");
+    const [a, b] = eds as [FakeEditor, FakeEditor];
+    b.session.onCursor(
+      { noteId: "n1", clientId: "tab-0", version: 0, ranges: [{ anchor: 1, head: 1 }] },
+      { role: "player", playerId: "tab-0" },
+    );
+    const cur = () =>
+      b.session.cursors.get("tab-0") as NonNullable<ReturnType<typeof b.session.cursors.get>>;
+    expect(b.session.showTag(cur())).toBe(true);
+    await clock.advance(TAG_MS + 1);
+    expect(b.session.showTag(cur())).toBe(false);
+    a.type(0, "x"); // typing (its update reaches b) shows the tag again
+    await clock.advance(PUSH_DELAY_MS + 10);
+    expect(b.session.showTag(cur())).toBe(true);
+  });
+
+  test("FR-NOTES-18 r1 'Saving…' only once unconfirmed text has waited 1 s; a deleted note shows no status", async () => {
+    const { clock, auth, eds } = await table(2);
+    const [a, b] = eds as [FakeEditor, FakeEditor];
+    const seen = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      a.type("end", "k");
+      await clock.advance(80);
+      seen.add(a.session.status);
+    }
+    expect([...seen]).toEqual(["saved"]); // no flicker while pushes go through
+    const release = auth.pause();
+    a.type("end", "slow");
+    await clock.advance(SAVING_AFTER_MS - 50); // waiting since the keystroke
+    expect(a.session.status).toBe("saved");
+    await clock.advance(100);
+    expect(a.session.status).toBe("saving");
+    release();
+    await clock.advance(200);
+    expect(a.session.status).toBe("saved");
+    b.session.onClosed({ noteId: "n1" });
+    await clock.advance(5000);
+    expect(b.session.status).toBe("none");
+  });
+
+  test("FR-NOTES-21 r1 at 32 KiB typing and a paste that won't fit are refused with 'Note is full'", async () => {
+    const { clock, eds } = await table(1, "");
+    const [a] = eds as [FakeEditor];
+    expect(a.type(0, "é".repeat(NOTE_BODY_MAX_BYTES / 2 - 10))).toBe(true); // 20 bytes short
+    await clock.advance(200);
+    expect(a.session.status).toBe("saved");
+    expect(a.type("end", "p".repeat(400))).toBe(false); // a paste that won't fit: nothing lands
+    await clock.advance(1);
+    expect(a.session.status).toBe("full");
+    expect(docBytes(a.state)).toBe(NOTE_BODY_MAX_BYTES - 20);
+    expect(a.type("end", "fits")).toBe(true); // what fits still goes in
+    await clock.advance(FULL_SHOWN_MS + 200);
+    expect(a.session.status).toBe("saved");
   });
 
   test("FR-NOTES-16 who is here follows open and close", async () => {

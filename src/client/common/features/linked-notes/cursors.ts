@@ -1,5 +1,7 @@
-// FR-NOTES-15: other people's carets (a line with a name tag) and selections, in their colour.
-// The window computes them (session `mapCursor`) and hands them to the editor as one effect.
+// FR-NOTES-15: other people's carets and selections, in their colour. The name tag shows for 2 s
+// after its person moves or types, and on hover (walkthrough r1, Google Docs style); otherwise the
+// coloured caret alone, so the tag never hides the line above for long. The window computes them
+// (session `mapCursor`, `showTag`) and hands them to the editor as one effect.
 import { type Extension, RangeSetBuilder, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 
@@ -9,6 +11,8 @@ export interface DrawnCursor {
   playerKey: string;
   label: string;
   color: string;
+  /** Show the name tag now (moved or typed in the last 2 s). */
+  tag: boolean;
   ranges: { anchor: number; head: number }[];
 }
 
@@ -22,7 +26,8 @@ class Caret extends WidgetType {
     return (
       other.c.clientId === this.c.clientId &&
       other.c.label === this.c.label &&
-      other.c.color === this.c.color
+      other.c.color === this.c.color &&
+      other.c.tag === this.c.tag
     );
   }
   toDOM(): HTMLElement {
@@ -31,9 +36,11 @@ class Caret extends WidgetType {
     wrap.dataset.testid = "notes-cursor";
     wrap.dataset.playerId = this.c.playerKey;
     wrap.dataset.clientId = this.c.clientId;
+    wrap.dataset.tag = this.c.tag ? "shown" : "hover";
     wrap.style.borderLeftColor = this.c.color;
     const tag = document.createElement("span");
     tag.className = "cm-remote-tag";
+    tag.dataset.testid = "notes-cursor-tag";
     tag.textContent = this.c.label;
     tag.style.backgroundColor = this.c.color;
     wrap.appendChild(tag);
@@ -102,6 +109,20 @@ const theme = EditorView.baseTheme({
     color: "var(--background)",
     pointerEvents: "none",
     userSelect: "none",
+    opacity: "0",
+    transition: "opacity 120ms",
+  },
+  // A wider invisible strip to hover, so the tag can be read on demand.
+  ".cm-remote-caret::after": {
+    content: '""',
+    position: "absolute",
+    top: "0",
+    bottom: "0",
+    left: "-4px",
+    width: "8px",
+  },
+  ".cm-remote-caret[data-tag=shown] .cm-remote-tag, .cm-remote-caret:hover .cm-remote-tag": {
+    opacity: "1",
   },
 });
 
