@@ -1,7 +1,7 @@
 # Proposed — Note co-writing: the server as the one authority, every change stored
 
-- **Status:** proposed, with [linked-notes](../../specs/linked-notes.md) (FR-NOTES-10, -13 to -19, -23).
-- **Date:** 2026-11-05 (revised after review 2).
+- **Status:** proposed, with [linked-notes](../../specs/linked-notes.md) (FR-NOTES-05 to -21).
+- **Date:** 2026-11-05 (revised after the DM's gate, [#444](../../decisions-log.md) and "full Google Docs, no private comments": every note shared, nothing private).
 - **Keeps:**
   - [ADR-0005](0005-server-authoritative-sync.md): the server owns the text and the order.
   - [ADR-0006](0006-persistence.md): session state survives a crash.
@@ -13,7 +13,7 @@
 
 ## Context
 
-Shared notes are co-written live by up to about 8 people, who see each other's cursors.
+Notes are co-written live by up to about 8 people, who see each other's cursors and who is in the note. Every note reaches the campaign's whole table and nothing else.
 
 What the hub already offers:
 
@@ -22,18 +22,9 @@ What the hub already offers:
 - **Client signals:** each can have an `audience` hook.
 - **Per-viewer server signals:** these skip connections that aren't `live` and are never queued.
 
-Limits:
+Limits: a client frame can be at most 64 KiB, and anything bigger closes the socket (`hub.ts`); the server buffers up to 4 MiB of outgoing frames.
 
-- A client frame can be at most 64 KiB; anything bigger closes the socket (`hub.ts`).
-- The server can buffer up to 4 MiB of outgoing frames.
-
-How `@codemirror/collab` works:
-
-- It needs a central authority.
-- A client sends its unconfirmed changes together with the version they're based on.
-- The authority accepts only at its current version.
-- A client that is behind receives the missing changes, rebases its own (`receiveUpdates`) and resends.
-- The authority needs only `@codemirror/state` (`ChangeSet`, `Text`), which has no DOM and runs in Bun.
+How `@codemirror/collab` works: a central authority accepts changes only at its current version. A client sends its unconfirmed changes with the version they're based on; a client that is behind receives the missing changes, rebases its own (`receiveUpdates`) and resends. The authority needs only `@codemirror/state` (`ChangeSet`, `Text`), which has no DOM and runs in Bun.
 
 ## Options
 
@@ -41,7 +32,7 @@ How `@codemirror/collab` works:
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. `@codemirror/collab`, with the server as the authority** | Matches ADR-0005. Small server code. Offline typing rebases | A client far behind has to reload |
+| **A. `@codemirror/collab`, with the server as the authority** | Matches ADR-0005. Small server code. Offline typing rebases. Its history undoes only local changes | A client far behind has to reload |
 | B. Yjs (CRDT) | Peers merge directly; offline-first | Not approved by the DM. The server becomes a relay instead of the authority, and the state grows with history |
 | C. Whole-body saves, last write wins | No new protocol | Typing at the same time overwrites; it isn't "Google Docs" |
 
@@ -49,74 +40,58 @@ How `@codemirror/collab` works:
 
 | Option | Pros | Cons |
 |---|---|---|
-| **P1. Store each accepted push as a `note_change` row in the push command's own transaction; fold rows into `body` now and then** | Nothing accepted is lost; restarts resume; no epoch; ADR-0006 and ADR-0016 hold; no timers, stop hook or hub change | ~30 small commits a second at 3 typists (below) |
-| P2. Keep the text in memory; save on a 2 s / 10 s timer and at shutdown | Fewer commits | Loses up to 10 s in a crash. Two ADR exceptions: session state that doesn't survive a crash (0006), and memory changed inside a transaction that can roll back (0016). Needs new core seams: a feature timer, an `onStop` before `hub.shutdown`, a connection-closed sweep. Also needs an epoch, which drops offline typing after every restart |
+| **P1. Store each accepted push as a `note_change` row in the push command's own transaction; fold rows into `body` now and then** | Nothing accepted is lost; restarts resume; ADR-0006 and ADR-0016 hold; no timers, stop hook or hub change | ~30 small commits a second at 3 typists (below) |
+| P2. Keep the text in memory; save on a 2 s / 10 s timer and at shutdown | Fewer commits | Loses up to 10 s in a crash. Two ADR exceptions (0006: state lost in a crash; 0016: memory changed inside a transaction that can roll back). Needs a feature timer, an `onStop` hook and a connection-closed sweep, plus an epoch that drops offline typing after every restart |
 
 ## Decision
 
-> **Suggested: A with P1.** Both are technical decisions; their product effects are the spec's OQ-NOTES-08.
+> **Suggested: A with P1.** Both are technical; their product effects are in the spec.
 
 ### Packages (exact)
 
 - **Direct:** `@codemirror/state`, `@codemirror/view`, `@codemirror/collab`, `@codemirror/commands` (history, `defaultKeymap`, `historyKeymap`).
-- **Pulled in:** `@codemirror/language`, `@codemirror/streamparser`, `@lezer/common`, `@lezer/lr`, `@lezer/highlight`, `crelt`, `style-mod`, `w3c-keyname`, `@marijn/find-cluster-break`. All are MIT (checked on npm, 2026-11-05).
-- **Not needed:** no `@codemirror/autocomplete` (the `[[` list is a `showTooltip`) and no Yjs.
-- **Where they're used:** the server imports only `@codemirror/state`. `src/shared` stays zod-only: changes travel as JSON (`ChangeSet.toJSON`).
+- **Pulled in:** `@codemirror/language`, `@codemirror/streamparser`, `@lezer/common`, `@lezer/lr`, `@lezer/highlight`, `crelt`, `style-mod`, `w3c-keyname`, `@marijn/find-cluster-break`. All MIT (checked on npm, 2026-11-05).
+- **Not needed:** no `@codemirror/autocomplete` (the `[[` / `@` list is a `showTooltip`), no `lang-markdown` (live preview is view decorations), no Yjs.
+- **Where:** the server imports only `@codemirror/state`. `src/shared` stays zod-only: changes travel as JSON (`ChangeSet.toJSON`). The link parser (`parseLinks(text, titleFolds)`) is plain TypeScript in `src/shared/linked-notes/`, used by both sides.
 
 ### Server
 
-- **The source of truth is the DB:** `note.body` up to `bodyVersion`, then the `note_change` rows up to `version`.
-- **In-memory session per open note:** the current `Text` and, per subscriber, its bound `clientId` and the last backlinks list it was sent. The session is a cache: it is refreshed after commit (CON-23 style) and rebuilt from the DB whenever it's missing.
-- **Intents** (all commands for the DM and players; `authorize` = can read the note, otherwise `not_found`):
-  - `notes.open {noteId, clientId, version?}`
-    - Subscribes the connection and binds `clientId`. At most 8 open notes per connection.
-    - If the client sent a `version` and the rows since it are still kept, the result is `{updates}`.
-    - Otherwise it is `{doc, version, backlinks}`.
-  - `notes.push {noteId, version, updates[{clientId, changes}]}`
-    - Refused (`invalid`) if `clientId` isn't the one bound to this connection.
-    - At the current version, the server applies the changes to a copy of the text. Over 32 KiB → `invalid` `note_full`.
-    - Then it inserts the `note_change` row and bumps `note.version`.
-    - If the link targets changed, it rewrites `note_link`.
-    - If ≥ 60 s have passed since the last bump, it bumps `updatedAt` / `updatedBy`, which upserts the `note` record.
-    - Every 100 unfolded changes it folds: it writes `body`, `bodyFold` and `bodyVersion`, and prunes `note_change` down to the last 1,000 rows or 1 MiB.
-    - Result `{accepted: true}`. At a stale version the result is `{accepted: false, updates}` (the changes since the client's version), or `{reload: true}` if those are no longer kept.
-  - `notes.close {noteId}` unsubscribes the connection.
-- **Delivery:** an accepted push emits `NoteEdited`, which is non-logged and has no record changes. A listener sends `notes.updates {noteId, from, updates}` through `sendServerSignal`. The payload is non-null only for subscribers that can read the note, the sender included. The sender treats its own `clientId` as the confirmation.
-- **A missed `notes.updates`** (signals aren't queued; a resync or a scene activation sends a snapshot): after every snapshot, the client re-opens each open note with its version. A stale push also gets the missing changes back. So no client stays stale.
-- **Pruning, with no timers or hooks:** every notes command first drops subscriptions whose connection isn't in `hub.connections()`, and drops sessions with no subscriber left. Nothing needs saving: every change is already stored.
+- **Source of truth is the DB:** `note.body` up to `bodyVersion`, then the `note_change` rows up to `version`.
+- **In-memory session per open note:** the current `Text`, and per subscriber its bound `clientId` and the last backlinks list it was sent. A cache: refreshed after commit, rebuilt from the DB when missing.
+- **Intents** (`not_found` for an unknown or deleted note):
+  - `notes.open {noteId, clientId, version?}`: subscribes and binds `clientId` (≤ 8 open notes per connection). Result `{updates}` if the client sent a `version` whose rows are still kept, else `{doc, version, backlinks}`; either way plus `here`, who has the note open.
+  - `notes.push {noteId, version, updates[{clientId, changes}]}`:
+    - `invalid` if `clientId` isn't the one bound to this connection.
+    - At the current version: apply to a copy of the text; over 32 KiB → `invalid` `note_full`. Insert the `note_change` row, bump `note.version`; if the parsed links changed, rewrite `note_link`; if ≥ 60 s since the last bump, bump `updatedAt` / `updatedBy` (a `note` upsert).
+    - Every 100 unfolded changes, fold: write `body`, `bodyFold`, `bodyVersion`, and prune `note_change` to the last 1,000 rows or 1 MiB.
+    - Result `{accepted: true}`; at a stale version `{accepted: false, updates}`, or `{reload: true}` if those rows are gone.
+  - `notes.close {noteId}`.
+- **Delivery:** an accepted push emits `NoteEdited` (non-logged, no record changes). A listener sends `notes.updates {noteId, from, updates}` via `sendServerSignal` to the note's subscribers, the sender included; the sender treats its own `clientId` as the confirmation.
+- **A missed `notes.updates`** (signals aren't queued; resync and scene activation send snapshots): after every snapshot the client re-opens each open note with its version, and a stale push gets the missing changes back.
+- **Pruning, no timers or hooks:** every notes command first drops subscriptions whose connection isn't in `hub.connections()`, drops sessions with no subscriber, and purges notes deleted more than 7 days ago (`ctx.clock`), with their changes and links.
 
-### Logged, saved
+### Links
 
-- **Nothing about notes goes into the event log.** Every note event is non-logged (FR-SYNC-16 allows this per spec).
-- Create, rename, share, copy-private and delete emit `NoteChanged`, which carries the `note` record change for the broadcaster and the owner gate.
-- A push stores its change in its own transaction (`synchronous = FULL`), so a crash loses nothing that was accepted.
-- On restart, sessions rebuild from `body` + `note_change`. Clients resume from their version, and offline typing is rebased as usual.
+- `parseLinks` returns `[[…]]` targets and `@` matches per FR-NOTES-06 (longest folded title at a non-alphanumeric boundary). Both clients and the server call it with the same title set.
+- `note_link` keeps `wiki` rows (target title) and `at` rows (the folded text after `@` to the line's end, ≤ 100 characters), so a new or renamed title re-resolves old `@` text with no re-parse: an `at` row links to the longest live title its text starts with at a boundary.
+- **Rename rewrite:** the rename command, in its own transaction, rewrites each linking note as a server change (`clientId: "server"`, one `note_change` row each), found through `note_link`. `@Old` becomes `@New`, or `[[New]]` where `@New` would match a longer title. Concurrent pushes go stale and rebase as usual.
+- **Backlinks:** on every `NoteChanged` (create, rename, delete, restore) and every push that changed links, a listener collects the affected titles (old and new targets and titles, plus live titles that are prefixes of them, for `@`), computes each affected open note's backlinks, and sends `notes.backlinks` only where a subscriber's list differs from the last one sent.
 
-### Backlinks
+### Presence: who is here, cursors, undo
 
-A listener runs on every `NoteChanged` and on every push that changed links:
+- **Who is here:** open, close and pruning send `notes.here {noteId, who[]}` (server signal) to the note's subscribers. Clients also drop a chip when live-sync presence shows that person offline, since pruning waits for the next notes command.
+- **Cursors:** `notes.cursor {noteId, version, ranges[≤ 10]}`, a client signal, throttled to 10 a second.
+- Its `audience` hook returns `{players: <players subscribed to the note>}`, so DM connections get it too (FR-SYNC-28); a missing or other campaign's note throws `not_found`. Colour from the server-stamped `from` (ADR-0055).
+- Receivers map ranges forward through the changes since `version` and drop any more than 50 versions old. A cursor goes 10 s after its last signal, or on `{left: true}`. Never stored.
+- **Undo:** `@codemirror/commands` history in each tab. `receiveUpdates` adds others' changes outside the history, so undo reverts only this tab's own changes, mapped over everyone else's.
 
-- It collects the affected titles: the old and new link targets, and the old and new title.
-- For each open note with one of those titles, it computes each subscriber's readable backlinks.
-- It sends `notes.backlinks` only to subscribers whose list differs from the one last sent.
+### Frames, delete, switch
 
-A save of someone else's private note therefore changes no one else's list and sends no frame. If the gate picks OQ-06 A (make private = vanish for others), make-private and delete share one code path, so the frames others get are byte-identical apart from `seq`. The FR-12 test then keeps a link target open.
-
-### Presence (cursors)
-
-- **The signal:** `notes.cursor {noteId, version, ranges[≤ 10]}` is a client signal, throttled on the client to 10 a second at most.
-- **Routing:** its `audience` hook returns `{players: <players subscribed to the note>}`, so DM connections get it too (FR-SYNC-28). For a private note, a missing note or another campaign's note, the hook throws `not_found` and nobody gets the signal.
-- **Colour:** looked up from the server-stamped `from` (ADR-0055).
-- **Receivers:** they map the ranges forward through the changes since `version` and drop any more than 50 versions old.
-- **Clean-up:** a cursor goes 10 s after its last signal, or straight away on `{left: true}`. Cursors are never stored.
-
-### Frames, closing, renames
-
-- **Push size:** the client sends a prefix of its unconfirmed changes, at most 48 KiB per frame, one push in flight, with 100 ms batching.
-- **Typing limit:** the editor stops typing at 32 KiB with a change filter. If the server refuses a push for size (two people's typing together went over), that client reloads and keeps its own text for Copy my text.
-- **Delete:** the command drops the note's session, and a listener sends `notes.closed {noteId}` to its subscribers. Later pushes get `not_found`.
-- **Campaign switch:** the switch closes every connection with 4409 before anything else (FR-SYNC-07). The client shows the banner from that close, and the listener drops the old campaign's sessions.
-- **Rename rewrite (OQ-04):** stored as a change with `clientId: "server"`, the same as a push.
+- **Push size:** a prefix of the unconfirmed changes, ≤ 48 KiB per frame, one push in flight, 100 ms batching. The editor stops typing at 32 KiB with a change filter; a size refusal reloads that client, keeping its text for Copy my text.
+- **Delete:** sets `deletedAt`, drops the session, and a listener sends `notes.closed {noteId}` to its subscribers. **Restore** clears it (adding " (restored)" on a title clash).
+- **Campaign switch:** closes every connection with 4409 first (FR-SYNC-07); the client shows the banner from that close, and the listener drops the old campaign's sessions.
+- **Campaign isolation:** every intent and the cursor `audience` check the note's `campaignId` against the connection's; subscribers are always connections of that campaign; REST search reads only the token's campaign. A future player removal ([OQ-CAMP-08](../../specs/campaign-management.md#15-open-questions)) only has to close that player's connections.
+- **Nothing about notes goes into the event log** (FR-SYNC-16 allows non-logged events per spec).
 
 ### Limits and load
 
@@ -126,14 +101,14 @@ A save of someone else's private note therefore changes no one else's list and s
 | Typing traffic | ≈ 24 KB/s up the DM's tunnel | 3 typists, 4 subscribers |
 | Cursor traffic | ≈ 18 KB/s | Review 2's estimate |
 | Disk writes | ≈ 30 commits a second at 3 typists, each a ~200 B insert plus a version update | — |
-| `fsync` time | ≈ 1–3 ms per commit on an SSD, so 3–9% of the server thread | An estimate, not measured; the first co-writing slice measures it |
-| WAL growth | Normal auto-checkpointing covers it, and folding prunes `note_change` | — |
-| Search | Matches stored `bodyFold` (open notes use their live text). No per-query fold: folding 1,300 × 32 KiB took 399 ms in review 2 | The search slice benches the cost at the limits; target ≤ 50 ms |
+| `fsync` time | ≈ 1–3 ms per commit on an SSD, 3–9% of the server thread | Estimate; the co-writing slice measures it |
+| WAL growth | Auto-checkpointing covers it; folding prunes `note_change` | — |
+| Search | Matches stored `bodyFold` (open notes use their live text), ≤ 1,000 × 32 KiB; no per-query fold | The search slice benches it; target ≤ 50 ms |
 
 ## Consequences
 
-- **New feature folder** `linked-notes`, with new tables only (#416).
-- **No hub, services or protocol-frame change:** commands, client signals and server signals already exist, and P1 needs no timers or stop hook.
-- **Dependencies:** `package.json` / `bun.lock` gain the four packages in the first co-writing slice.
-- **Test helpers:** a leak scan over raw frames (signals and acks), alongside `leakScan`'s record checks.
+- **New feature folder** `linked-notes`, new tables only (#416).
+- **No hub, services or protocol-frame change:** commands, client signals and server signals already exist. No owner gate: nothing in notes is private.
+- **Dependencies:** `package.json` / `bun.lock` gain the four packages in the co-writing slice.
+- **Test helpers:** a leak scan over raw frames (signals and acks) beside `leakScan`'s record checks, with a second campaign's clients as the outsiders.
 - **Revisit** if more than ~8 people co-write at once, if the measured `fsync` cost is high (then batch pushes at 200 ms), or if bodies need more than 32 KiB.
