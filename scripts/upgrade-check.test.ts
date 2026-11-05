@@ -7,6 +7,7 @@ import path from "node:path";
 import { defaultPlayDataDir, WORKTREE_ROOT } from "../src/server/config";
 import {
   annotation,
+  bundleChain,
   CannotRun,
   checkDataDir,
   DEFAULT_BUNDLE,
@@ -37,6 +38,16 @@ describe("BL-173 arguments", () => {
   test("BL-173 an unknown argument is a usage error", () => {
     expect(() => parseArgs(["--nope"])).toThrow(CannotRun);
     expect(() => parseArgs(["--base="])).toThrow(CannotRun);
+  });
+});
+
+describe("BL-173 the bundle", () => {
+  test("BL-173 N7 the default is session-sim-18; an older base falls back to sim-17, then base", () => {
+    expect(DEFAULT_BUNDLE).toBe("session-sim-18");
+    expect(bundleChain(DEFAULT_BUNDLE)).toEqual(["session-sim-18", "session-sim-17", "base"]);
+    expect(bundleChain("session-sim-17")).toEqual(["session-sim-17", "base"]);
+    expect(bundleChain("base")).toEqual(["base", "session-sim-17"]);
+    expect(bundleChain("combat")).toEqual(["combat", "session-sim-17", "base"]);
   });
 });
 

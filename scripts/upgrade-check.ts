@@ -32,9 +32,18 @@ import { readLock } from "../src/server/runtime/lock";
 import { manifestPath } from "../src/server/runtime/manifest";
 import { type ServerProcess, spawnServer } from "./lib/server-process";
 
-/** Fills the most tables of any registered bundle (39 of 49, measured 2026-10-31), in about 3 s. */
-export const DEFAULT_BUNDLE = "session-sim-17";
-const FALLBACK_BUNDLE = "base";
+/**
+ * Fills the most tables of any registered bundle: `session-sim-17`'s (39 of 49, measured
+ * 2026-10-31) + the notes tables (N7).
+ */
+export const DEFAULT_BUNDLE = "session-sim-18";
+/** Tried in order when the base lacks the requested bundle (an older base: sim-17, then `base`). */
+export const FALLBACK_BUNDLES = ["session-sim-17", "base"] as const;
+
+/** The bundles to try on the base, in order: the requested one, then the fallbacks. */
+export function bundleChain(requested: string): string[] {
+  return [requested, ...FALLBACK_BUNDLES.filter((b) => b !== requested)];
+}
 const SECRET = "upgrade-check-only-secret";
 const START_TIMEOUT_MS = 90_000;
 const FRAME_TIMEOUT_MS = 20_000;
@@ -437,15 +446,19 @@ async function runCheck(args: Args, temp: string): Promise<Outcome> {
   const base = resolveBase(args.base);
   const deps = await checkOutBase(base, tree);
 
-  let bundle = args.bundle;
-  let bundleNote = "";
-  if (!(await loadWithBase(tree, loadDir, bundle))) {
-    bundleNote = `the base has no bundle ${bundle}: used ${FALLBACK_BUNDLE}`;
-    bundle = FALLBACK_BUNDLE;
-    if (!(await loadWithBase(tree, loadDir, bundle))) {
-      throw new CannotRun(`the base has neither ${args.bundle} nor ${FALLBACK_BUNDLE}`);
+  const chain = bundleChain(args.bundle);
+  let bundle: string | undefined;
+  for (const b of chain) {
+    if (await loadWithBase(tree, loadDir, b)) {
+      bundle = b;
+      break;
     }
   }
+  if (bundle === undefined) {
+    throw new CannotRun(`the base has none of the bundles ${chain.join(", ")}`);
+  }
+  const bundleNote =
+    bundle === args.bundle ? "" : `the base has no bundle ${args.bundle}: used ${bundle}`;
   if (dataDir !== loadDir) cpSync(loadDir, dataDir, { recursive: true });
   const dbPath = path.join(dataDir, "pocket-plane.db");
   const before = rowCounts(dbPath);
