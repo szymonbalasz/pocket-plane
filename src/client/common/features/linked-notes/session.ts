@@ -13,6 +13,7 @@ import {
 } from "@codemirror/collab";
 import { history } from "@codemirror/commands";
 import {
+  type ChangeDesc,
   ChangeSet,
   EditorState,
   type Extension,
@@ -154,6 +155,8 @@ export class NoteSession {
   private pushTimer: unknown = null;
   private lastCursorAt = -Infinity;
   private cursorTimer: unknown = null;
+  /** We have sent a caret (so a late joiner gets it again, r2). */
+  private cursorShown = false;
   /** Since when unconfirmed text has waited (null = none). */
   private pendingSince: number | null = null;
   private statusTimer: unknown = null;
@@ -400,9 +403,15 @@ export class NoteSession {
   /** `notes.here`. */
   onHere(d: { noteId: string; here: NoteHere[] }): void {
     if (d.noteId !== this.noteId) return;
+    // r2 (late joiner): a new editor in the note gets our caret again, if we have shown one,
+    // so it sees where everyone sits without waiting for them to move.
+    const joined = d.here.some(
+      (h) => h.clientId !== this.clientId && !this.here.some((o) => o.clientId === h.clientId),
+    );
     this.here = d.here;
     for (const id of [...this.cursors.keys()])
       if (!d.here.some((h) => h.clientId === id)) this.cursors.delete(id);
+    if (joined && this.cursorShown) this.selectionChanged();
     this.changed();
   }
 
@@ -473,15 +482,33 @@ export class NoteSession {
       return;
     }
     this.lastCursorAt = this.t.now();
-    const sel = this.host.state.selection;
+    this.cursorShown = true;
     this.t.signal(NOTES_CURSOR_SIGNAL, {
       noteId: this.noteId,
       clientId: this.clientId,
       version: this.version,
-      ranges: sel.ranges
-        .slice(0, NOTES_CURSOR_RANGES_MAX)
-        .map((r) => ({ anchor: r.anchor, head: r.head })),
+      ranges: this.syncedSelection(),
     } satisfies NoteCursorSignal);
+  }
+
+  /**
+   * r2 (caret drift): our selection in the text at our synced version. The editor's selection
+   * already includes our unconfirmed typing, which receivers only get later as updates (and map
+   * the caret through them), so it goes back through those changes first.
+   */
+  syncedSelection(): { anchor: number; head: number }[] {
+    const state = this.host.state;
+    const mine = sendableUpdates(state);
+    let back: ChangeDesc | null = null;
+    if (mine.length > 0) {
+      let all = (mine[0] as (typeof mine)[number]).changes;
+      for (const u of mine.slice(1)) all = all.compose(u.changes);
+      back = all.invertedDesc;
+    }
+    return state.selection.ranges.slice(0, NOTES_CURSOR_RANGES_MAX).map((r) => ({
+      anchor: back ? back.mapPos(r.anchor, -1) : r.anchor,
+      head: back ? back.mapPos(r.head, -1) : r.head,
+    }));
   }
 
   /** A new snapshot (reconnect, resync, restart): re-open from our version (FR-NOTES-18). */

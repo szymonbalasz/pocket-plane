@@ -103,8 +103,8 @@ const theme = EditorView.baseTheme({
     left: "-2px",
     padding: "0 4px",
     borderRadius: "3px 3px 3px 0",
-    fontSize: "10px",
-    lineHeight: "14px",
+    fontSize: "0.75rem", // r2: the kit's smallest text (`text-xs`, 12 px)
+    lineHeight: "1rem",
     whiteSpace: "nowrap",
     color: "var(--background)",
     pointerEvents: "none",

@@ -320,19 +320,19 @@ function NarrowBin({ rows, now }: { rows: NoteRecord[]; now: number }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Tip content={`Recycle bin (${rows.length})`}>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8"
-          aria-label={`Recycle bin (${rows.length})`}
-          data-testid="notes-bin-narrow"
-          data-count={rows.length}
-          onClick={() => setOpen(true)}
-        >
-          <Trash2Icon className="size-3.5" />
-        </Button>
-      </Tip>
+      {/* r2: a text label (not a bare trash can that reads as "delete"), last in the header,
+          away from the note's Delete. */}
+      <Button
+        size="sm"
+        variant="ghost"
+        className="ml-1 h-8 shrink-0 gap-1 px-2 text-muted-foreground"
+        data-testid="notes-bin-narrow"
+        data-count={rows.length}
+        onClick={() => setOpen(true)}
+      >
+        <Trash2Icon className="size-3.5" />
+        Recycle bin ({rows.length})
+      </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm" data-testid="notes-bin-dialog">
           <DialogTitle>Recycle bin ({rows.length})</DialogTitle>

@@ -298,6 +298,73 @@ describe("linked-notes NoteSession (N3)", () => {
     expect(a.session.status).toBe("saved");
   });
 
+  test("FR-NOTES-15 r2 a typist's caret is drawn where they really are, before and after their text arrives (no drift)", async () => {
+    const { clock, auth, eds } = await table(2, "See [[Quest log]].");
+    const [a, b] = eds as [FakeEditor, FakeEditor];
+    const relay = () => {
+      const last = a.sent.filter((x) => x.name === NOTES_CURSOR_SIGNAL).at(-1);
+      if (last) b.session.onCursor(last.data as never, { role: "player", playerId: "tab-0" });
+    };
+    // a's caret at "See |[[Quest"; a types "abcde" and its caret signal goes out while the text
+    // is still unconfirmed (the push is held), as it does between keystroke and push.
+    let release = auth.pause();
+    a.setState(a.state.update({ selection: EditorSelection.cursor(4) }).state);
+    a.type(4, "abcde");
+    a.setState(a.state.update({ selection: EditorSelection.cursor(9) }).state);
+    await clock.advance(150);
+    a.session.selectionChanged();
+    relay();
+    // b hasn't got the text: the caret sits at the insertion point of b's text.
+    let c = b.session.cursors.get("tab-0");
+    expect(b.session.version).toBe(0);
+    expect(c && b.session.mapCursor(c)).toEqual([{ anchor: 4, head: 4 }]);
+    release();
+    await clock.advance(500); // a's update reaches b: the caret moves after "abcde", not past it
+    c = b.session.cursors.get("tab-0");
+    expect(b.doc).toBe("See abcde[[Quest log]].");
+    expect(c && b.session.mapCursor(c)).toEqual([{ anchor: 9, head: 9 }]);
+    // At a line's end: "ZQ" typed, signal while unconfirmed; drawn at the end, not past it.
+    release = auth.pause();
+    a.type("end", "ZQ");
+    a.setState(a.state.update({ selection: EditorSelection.cursor(a.state.doc.length) }).state);
+    await clock.advance(150);
+    a.session.selectionChanged();
+    relay();
+    release();
+    await clock.advance(500);
+    c = b.session.cursors.get("tab-0");
+    expect(b.doc).toBe(a.doc);
+    expect(c && b.session.mapCursor(c)).toEqual([
+      { anchor: b.state.doc.length, head: b.state.doc.length },
+    ]);
+    expect(a.session.syncedSelection()).toEqual([
+      { anchor: a.state.doc.length, head: a.state.doc.length },
+    ]);
+  });
+
+  test("FR-NOTES-15 FR-NOTES-16 r2 a late joiner gets the carets of people already there, without them moving", async () => {
+    const clock = new FakeClock();
+    const auth = new FakeAuthority("n1", "abcdef");
+    const a = new FakeEditor(auth, clock, "a");
+    const idle = new FakeEditor(auth, clock, "idle");
+    await a.session.open();
+    await idle.session.open();
+    await clock.advance(0);
+    a.setState(a.state.update({ selection: EditorSelection.cursor(3) }).state);
+    a.session.selectionChanged();
+    const before = a.sent.filter((x) => x.name === NOTES_CURSOR_SIGNAL).length;
+    const idleBefore = idle.sent.length;
+    await clock.advance(30_000);
+    const late = new FakeEditor(auth, clock, "late");
+    await late.session.open(); // the others get notes.here with "late"
+    await clock.advance(200);
+    const resent = a.sent.filter((x) => x.name === NOTES_CURSOR_SIGNAL);
+    expect(resent.length).toBe(before + 1);
+    expect(resent.at(-1)?.data).toMatchObject({ clientId: "a", ranges: [{ anchor: 3, head: 3 }] });
+    // Someone who never showed a caret sends none (no fake caret at the top).
+    expect(idle.sent.length).toBe(idleBefore);
+  });
+
   test("FR-NOTES-16 who is here follows open and close", async () => {
     const { clock, eds } = await table(2);
     const [a, b] = eds as [FakeEditor, FakeEditor];

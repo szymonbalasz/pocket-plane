@@ -85,6 +85,13 @@ test("FR-NOTES-14 FR-NOTES-15 FR-NOTES-16 FR-NOTES-17 three people type into Bur
   await dm.waitForTimeout(11_000);
   await expect(dmWin.locator('[data-testid="notes-cursor"]')).toHaveCount(idle);
   await expect(dmWin.locator('[data-testid="notes-cursor"][data-tag="shown"]')).toHaveCount(0);
+  // r2: name tags in the kit's smallest text, 12 px.
+  expect(
+    await dmWin
+      .getByTestId("notes-cursor-tag")
+      .first()
+      .evaluate((el) => getComputedStyle(el).fontSize),
+  ).toBe("12px");
   // r1 (FR-NOTES-16): a chip click jumps to an idle person's caret.
   await dmWin.getByTestId("notes-here").filter({ hasNotText: "You" }).first().click();
   await expect(p2Win.getByTestId("notes-here").filter({ hasText: "You" })).toHaveCount(1);
@@ -198,6 +205,7 @@ test("r1 FR-NOTES-13 the editor is framed, scrolls inside itself and is named af
   await expect(win.getByTestId("notes-picker-narrow")).toBeVisible();
   const bin = win.getByTestId("notes-bin-narrow");
   await expect(bin).toBeVisible();
+  await expect(bin).toContainText("Recycle bin"); // r2: a label, not a bare trash can
   await bin.click();
   const dialog = p1.getByTestId("notes-bin-dialog");
   const row = dialog.getByTestId("notes-bin-item").filter({ hasText: "Old rumours" });
@@ -205,4 +213,59 @@ test("r1 FR-NOTES-13 the editor is framed, scrolls inside itself and is named af
   await row.getByTestId("notes-restore").click();
   await expect(dialog).toHaveCount(0);
   await expect(win.getByTestId("notes-title")).toHaveText("Old rumours");
+});
+
+/** The text before `name`'s caret on its line, as drawn in `win` (other carets left out). */
+const beforeCaret = (win: Locator, name: string) =>
+  win.getByTestId("notes-editor").evaluate((el, who) => {
+    const caret = [...el.querySelectorAll(".cm-remote-caret")].find(
+      (c) => c.querySelector(".cm-remote-tag")?.textContent === who,
+    );
+    const line = caret?.closest(".cm-line");
+    if (!caret || !line) return null;
+    const range = document.createRange();
+    range.setStart(line, 0);
+    range.setEndBefore(caret);
+    const box = document.createElement("div");
+    box.appendChild(range.cloneContents());
+    for (const other of box.querySelectorAll(".cm-remote-caret")) other.remove();
+    return box.textContent;
+  }, name);
+
+test("r2 FR-NOTES-15 FR-NOTES-16 a late joiner sees where everyone sits and can jump there; a typist's caret is drawn where they really are", async ({
+  browser,
+}) => {
+  const { dm, p1, p2 } = await setup(browser);
+  const dmWin = await openNote(dm, "Duke Varen");
+  const p1Win = await openNote(p1, "Duke Varen");
+  await p1Win.locator(".cm-line").first().click(); // P1 sits in line 1, then stays idle
+  await expect(dmWin.locator('[data-testid="notes-cursor"]')).toHaveCount(1);
+  await p1.waitForTimeout(3_000);
+
+  // P2 opens the note after everyone settled: P1's caret is there without P1 moving.
+  const p2Win = await openNote(p2, "Duke Varen");
+  await expect(p2Win.locator('[data-testid="notes-cursor"]')).not.toHaveCount(0);
+  await expect(p2Win.locator(".cm-remote-tag", { hasText: "Player 1" })).toHaveCount(1);
+  await p2Win.getByTestId("notes-here").filter({ hasText: "Player 1" }).click();
+  await expect(
+    p2Win.locator(".cm-remote-caret", {
+      has: p2.locator(".cm-remote-tag", { hasText: "Player 1" }),
+    }),
+  ).toBeVisible();
+
+  // Drift: P2's caret after "Keeps ", types "abcde": others draw it right after "abcde".
+  await p2Win.locator(".cm-line").first().click();
+  await p2.keyboard.press("Home");
+  for (let i = 0; i < "Keeps ".length; i++) await p2.keyboard.press("ArrowRight");
+  await p2.keyboard.type("abcde", { delay: 20 });
+  await expect(p2Win.getByTestId("notes-status")).toHaveText("Saved");
+  for (const w of [dmWin, p1Win])
+    await expect.poll(() => beforeCaret(w, "Player 2"), { timeout: 5_000 }).toBe("Keeps abcde");
+  // At the line's end: "ZQ", drawn at the end, not on the next line.
+  await p2.keyboard.press("End");
+  await p2.keyboard.type("ZQ", { delay: 20 });
+  await expect(p2Win.getByTestId("notes-status")).toHaveText("Saved");
+  await expect
+    .poll(async () => (await beforeCaret(dmWin, "Player 2"))?.endsWith("ZQ"), { timeout: 5_000 })
+    .toBe(true);
 });
