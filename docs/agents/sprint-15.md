@@ -69,6 +69,27 @@ DM decision [#416](../decisions-log.md): items 1–4 of the [priority build list
 | 2026-11-01 | Window position memory merged (#438): failing replay cells DM 6 → 0, players 10 → 4 |
 | 2026-11-01 | Backfill BL-177 merged (#439). Stopped at the linked notes gate (#440) |
 
+## Playtest: Notes
+
+Restart `bun run play` in the main checkout (it backs up first, then builds). You and at least two players, each in their own browser; one on a narrow window or a tablet if you can.
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | Everyone: Notes from the launcher (or the command palette, "Open Notes"). You: New, title "Session notes" | Everyone sees it in their list at once |
+| 2 | All three type in it at the same time, on different lines | Everyone sees the others' coloured cursors and names; the text matches everywhere; status reads Saved |
+| 3 | A player sits still for a minute, then you click their name chip at the top | Your view jumps to their cursor |
+| 4 | Type `@`, then a few letters; pick a note, or "Create note …" | A link chip appears for everyone; clicking it opens the note; Backspace removes it whole |
+| 5 | Open the linked note | "Linked from" lists the note you came from |
+| 6 | Type `2d6` in a note and click its die | The game log shows "<name> · Note", never the note's title |
+| 7 | Rename the linked note while a player types in the note that links to it | The chip shows the new name for everyone; nobody's typing is lost |
+| 8 | Search a word someone typed a moment ago | Found, with the word highlighted |
+| 9 | A player deletes a note you have open | You see "This note was deleted" with Restore; the Recycle bin says who deleted it; Restore brings it back, text intact |
+| 10 | A player turns off their network for 10 s while typing, then back on | Offline, then Saved; their text reaches everyone |
+| 11 | Ctrl+Z after others typed | Only your own typing goes; Ctrl+Shift+Z or Ctrl+Y brings it back |
+| 12 | Open Notes at the table with the sheet, Dice tray and Initiative up | Notes sits beside them (narrower when space is tight), covering no buttons |
+
+Known and logged: after closing Notes a player's map may stay small (BL-189); a reload reopens Notes on its list, not the open note (BL-191); name tags can cover a line while someone types (BL-187).
+
 ## Playtest: sprint 15 fixes
 
 Restart `bun run play` in the main checkout (it backs up first, then builds). DM at 1440×900 and a player at 1280×720, in a fight.
@@ -85,3 +106,4 @@ Restart `bun run play` in the main checkout (it backs up first, then builds). DM
 | 8 | Pan PCs under the sheet's corner, close and reopen the sheet, shrink the browser, grow it back | The sheet returns to its spot; if dragged while small, it stays where dragged |
 | 9 | Use as attack on a plain roll; 4+ Pending lines; delete a used image; tick a 5etools book in a fight | One "Attack"; no half-cut row; "Used in" with no confirm; Import selected off, "End combat first" |
 | 2026-11-05 | Linked notes spec rewritten to the DM's reframe (#440, #442, #444, #445) and merged complete (#446): every note shared, live co-writing, Recycle bin, `@` picker. Build starts |
+| 2026-11-06 | Linked notes built (N1–N6, #447–#452) and session-sim-18 22 / 22 PASS (#453). Sprint 15 done |

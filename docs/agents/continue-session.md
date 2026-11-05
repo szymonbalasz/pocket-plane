@@ -41,7 +41,7 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 ## 2. Next, in order
 
 
-**Now: [sprint 15](sprint-15.md) (DM #416):** upgrade guards, play fixes and window position memory are merged. **Linked notes with backlinks** was reframed by the DM at the gate (#440): rewrite the spec once the DM picks how live shared notes are, then gate, build. **Then** the quest log, in-game calendar, session timeline and NPC directory, which now need re-reading against #440. The whole order is the [priority build list](../roadmap.md#priority-build-list-2026-10-31). Backlog candidates are in status.md. Work on the CI loop (AGENTS §9.4.1).
+**Now: [sprint 15](sprint-15.md) is done** (#453): upgrade guards, play fixes, window position memory and **linked notes** (every note shared, live co-writing on CodeMirror collab, `@` links, backlinks, search, Recycle bin) are merged; session-sim-18 22 / 22 PASS. **Next:** the DM's notes playtest, then the quest log, in-game calendar, session timeline and NPC directory, which need re-reading against #440–#446. The whole order is the [priority build list](../roadmap.md#priority-build-list-2026-10-31). Backlog candidates are in status.md. Work on the CI loop (AGENTS §9.4.1).
 
 *(Done, #366–#381.)* Sprint 14 on the CI test loop: fix pack F1–F4, Spell FX pulled in (#374), AoE cell origin, Map effects default Full; Agent / MCP API in a parallel session.
 
@@ -59,6 +59,10 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 **Idle slots (#204, #205, #286, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill)):** the goal is the sprint's milestones. When an agent slot is idle and nothing in the sprint queue can start (DM #286: "pull more stories from the backlog when there are idle agents"), pick one small eligible item from [backlog](backlog.md) without asking (max two at once; sprint work always wins the next slot); stop picking once the last sprint slices are in flight. If nothing fits, ask the DM.
 
 Lessons from sprint 15 (2026-10-31/11-01), on top of the ones below:
+- **Git Bash mangles slash commands sent to agents:** `herdr agent prompt <name> "/clear"` arrives as `C:/Program Files/Git/clear`, so the agent never cleared (one builder reached 93% of its context). Prefix with `MSYS_NO_PATHCONV=1`.
+- **A sim agent needs the browser tools:** `startagent.sh` starts builders with `--strict-mcp-config` and no Playwright; a session-sim or walkthrough agent starts with `--strict-mcp-config --mcp-config .mcp.json` (as `starttest.sh`).
+- **Ask the DM to describe a feature in their words before the spec:** linked notes went from a world builder (spec 1) to private and shared notes (spec 2) to shared notes only with live co-writing, over four short gate answers. Short gate pages (under 30 lines, plain words) made each answer quick.
+- **Joint walkthroughs save rounds:** a slice whose functional walkthrough passed can merge, and its polish is re-checked live in the next slice's walkthrough or the sim.
 - **Never chain a push after a merge with `;`:** a conflicted merge went on to commit and push conflict markers to `main` (scenes-map.md, fixed forward within minutes). Land through one script that aborts on a conflict or a marker and pushes nothing.
 - **Several sessions pushing to `main` cancel each other's CI runs:** `ci:watch <sha>` keeps saying superseded. Wait for the first finished, non-cancelled run on a commit that contains your merge (`git merge-base --is-ancestor`).
 - **`waitrep.sh` can miss a finished agent** (no "copy reply" in its output now) and a builder sits `done` with a CI watch in the background: wait on a report file's mtime with the agent not working.
