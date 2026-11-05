@@ -4549,3 +4549,16 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-13 – -16, -18 – -21, 
 - **Campaign switch:** every connection closes 4409 (FR-SYNC-07); a listener drops the other campaigns' sessions.
 - **Push frames:** `pushPrefix` (shared) = the longest prefix of unconfirmed updates within 48 KiB (one bigger update goes alone; the hub's 64 KiB frame limit still applies).
 - **Measured** (`fsync.slow.test.ts`, 3 typists, file DB, WAL + `synchronous = FULL`, Windows SSD): 484 commits/s sustained, 2.05 ms a push (p95 2.11 ms): ≈ 6% of the server thread at 30 pushes/s.
+
+## 198. Linked notes search (build/notes-search)
+
+From [linked-notes](../specs/linked-notes.md) FR-NOTES-22, §9 and [ADR-0078](../architecture/adr/0078-note-co-writing.md#limits-and-load) / [ADR-0079](../architecture/adr/0079-no-virtual-tables-under-push.md) (option A: the shared matcher, no FTS5). **Built by `build/notes-search` (slice N4).** One REST route (mount appended in `src/server/app.ts`), one after-commit hook; schemas in `src/shared/linked-notes/search.ts` (zod only). No intent, event, signal or table.
+
+| Route | Auth | Query → answer | Rule |
+|---|---|---|---|
+| `GET /api/notes/search` | As compendium search (FR-CMP-13): `Authorization: Bearer <DM secret>` → the active campaign; `Authorization: Player <link token>` → the link's campaign, inactive → 409; checked on every call. Missing / wrong → 401; a wrong DM secret counts toward the DM throttle (429) | `?q=` (≤ 100 characters, required; anything else → 400) → `{results: [{id, title, snippet}] (≤ 50), more}` | The campaign's **live** notes only (binned skipped). Every query word (`queryWords`, ≤ 8) must match the title or the body (`searchTier`: word starts, the plural rule; body words need ≥ 3 letters). Order: tier, then folded title, then ID. `more`: other notes matched. A query with no word → `{results: [], more: false}`. `Cache-Control: private, no-cache` |
+
+- **Body = the live text:** an open note's session text; else the stored `bodyFold` when folded up to `version`; else `body` + the `note_change` rows past it (a note closed before its next fold).
+- **Snippet:** ≤ 140 characters of the body (whitespace collapsed, "…" at a cut) from a little before the first word a query word starts; the body's start for a title-only match; `""` for an empty body.
+- **Cache (server memory, per services instance):** per campaign its live notes' `{id, title, titleFold}`, per note its folded title and sorted body words. After-commit hook `linked-notes.search` drops a note's entry on `NoteEdited` / `NoteChanged`, and the campaign's list on `NoteChanged`; an entry also rebuilds when an open note's session moved past it. A search reads only its campaign's rows: another campaign's notes are never read.
+- **Measured** (`search.bench.ts`, 1,000 live notes × 32 KiB, file DB, Windows): warm p95 0.9–16.5 ms per search (50 snippets the most); the same with `campaign-second` also at the caps. Cold (the first search after a start, every note's words read): ≈ 1.2 s, ≈ 5 s with both campaigns at the caps.

@@ -12,6 +12,7 @@ import { compendiumImportRoutes } from "./features/compendium/import-route";
 import { compendiumRoutes } from "./features/compendium/routes";
 import { petRoutes } from "./features/entities/pets";
 import { entityRoutes } from "./features/entities/routes";
+import { noteRoutes } from "./features/linked-notes/routes";
 import { sceneRoutes } from "./features/scenes-map/routes";
 import { errorBody, errorResponse } from "./http";
 import type { Services } from "./services";
@@ -29,6 +30,7 @@ export function createApi(s: Services) {
       .route("/api", compendiumImportRoutes(s))
       .route("/api", compendiumHomebrewRoutes(s))
       .route("/api", petRoutes(s))
+      .route("/api", noteRoutes(s))
   );
 }
 

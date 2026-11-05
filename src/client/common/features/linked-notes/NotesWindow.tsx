@@ -2,7 +2,7 @@
 // the editor. Left: + New, the live notes (last changed first) and the Recycle bin fold-out
 // (newest first, Restore). Right: the open note: title, who-is-here chips, status, Rename,
 // Delete, banners, the editor. Narrow (< 520 px): the list becomes a dropdown. DM view = player
-// view. No search box (N4), no links (N5).
+// view. The search box is ./NotesSearch.tsx (N4). No links (N5).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { NOTE_TYPE, type NoteRecord, type RestoreNoteResult } from "@shared/linked-notes/schemas";
@@ -43,6 +43,8 @@ import {
   STATUS_TEXT,
 } from "./logic";
 import { type EditorHandle, NoteEditor } from "./NoteEditor";
+import { NarrowNoteSearch, NoteSearchBox, NoteSearchResults } from "./NotesSearch";
+import { isSearch } from "./search";
 import { notesUi } from "./ui";
 
 const LOST = "Connection lost — check the note before trying again";
@@ -511,6 +513,7 @@ export default function NotesWindow() {
   const newRequest = useStore(notesUi, (s) => s.newRequest);
   const live = useLive();
   const [creating, setCreating] = useState(false);
+  const [q, setQ] = useState("");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -531,17 +534,20 @@ export default function NotesWindow() {
 
   const list = (
     <div className="flex min-h-0 flex-col gap-1">
-      <Button
-        size="sm"
-        className="h-8"
-        data-testid="notes-new"
-        disabled={!live}
-        onClick={() => setCreating(true)}
-      >
-        <PlusIcon className="size-3.5" /> New
-      </Button>
+      <div className="flex items-center gap-1">
+        <NoteSearchBox q={q} onChange={setQ} />
+        <Button
+          size="sm"
+          className="h-8 shrink-0"
+          data-testid="notes-new"
+          disabled={!live}
+          onClick={() => setCreating(true)}
+        >
+          <PlusIcon className="size-3.5" /> New
+        </Button>
+      </div>
       <ScrollArea className="min-h-0 flex-1">
-        <div className="flex flex-col gap-0.5 py-1">
+        <div className="flex flex-col gap-0.5 py-1" hidden={isSearch(q)}>
           {state === "loading" && [0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
           {loaded && live_.length === 0 && (
             <p className="px-2 py-1 text-sm text-muted-foreground" data-testid="notes-empty">
@@ -552,6 +558,15 @@ export default function NotesWindow() {
             <NoteRow key={n.id} note={n} selected={n.id === selected} now={now} />
           ))}
         </div>
+        {isSearch(q) && (
+          <div className="py-1">
+            <NoteSearchResults
+              q={q}
+              refresh={live_}
+              onPick={(id) => notesUi.getState().select(id)}
+            />
+          </div>
+        )}
       </ScrollArea>
       {loaded && <RecycleBin rows={bin} now={now} />}
     </div>
@@ -597,6 +612,7 @@ export default function NotesWindow() {
             <PlusIcon className="size-3.5" />
           </Button>
         </Tip>
+        <NarrowNoteSearch refresh={live_} />
         {loaded && <NarrowBin rows={bin} now={now} />}
       </div>
       <div className="flex min-h-0 flex-1">
