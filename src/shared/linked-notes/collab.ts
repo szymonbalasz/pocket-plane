@@ -94,10 +94,16 @@ export type PushNoteResult =
 export const CloseNoteIntent = z.strictObject({ noteId: Id });
 
 /** Server signal `notes.updates`: accepted updates starting at version `from`. */
+/** An update as the server sends it: any editor ID, "server" included (N6's rename rewrite). */
+export const NoteUpdateOut = z.strictObject({
+  clientId: z.string().min(1).max(64),
+  changes: ChangeJson,
+});
+
 export const NoteUpdatesSignal = z.strictObject({
   noteId: z.string(),
   from: z.int().min(0),
-  updates: z.array(NoteUpdate),
+  updates: z.array(NoteUpdateOut),
 });
 export type NoteUpdatesSignal = z.infer<typeof NoteUpdatesSignal>;
 

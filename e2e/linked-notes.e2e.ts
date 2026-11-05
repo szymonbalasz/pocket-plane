@@ -432,3 +432,42 @@ test("N5 FR-NOTES-07 – -12 FR-NOTES-23 the @ picker links for everyone; chips 
   await expect(fresh.getByTestId("notes-title")).toHaveText("Empty page");
   await expect(fresh.getByTestId("notes-backlinks")).toContainText("No links here yet");
 });
+
+test("N6 FR-NOTES-11 the DM renames a note while P1 types in a note linking to it: the chip follows for all three, solid, and P1's typing stays", async ({
+  browser,
+}) => {
+  const { dm, p1, p2 } = await setup(browser);
+  const p1Win = await openNote(p1, "Burnt Ledger");
+  const p2Win = await openNote(p2, "Burnt Ledger");
+  const chip = (w: Locator, title: string) =>
+    w.locator(`[data-testid="notes-link"][data-title="${title}"]`);
+  await expect(chip(p1Win, "Quest log")).toHaveCount(1);
+
+  // The DM opens Quest log and renames it while P1 is typing in Burnt Ledger.
+  const dmWin = await openNote(dm, "Quest log");
+  await dmWin.getByTestId("notes-rename").click();
+  await dm.getByTestId("notes-title-input").fill("Quest journal");
+  await p1Win
+    .locator(".cm-line")
+    .first()
+    .click({ position: { x: 3, y: 6 } });
+  await p1.keyboard.press("End");
+  const typing = p1.keyboard.type(" [typed during the rename]", { delay: 40 });
+  await dm.getByTestId("notes-title-save").click();
+  await typing;
+  await expect(p1Win.getByTestId("notes-status")).toHaveText("Saved");
+
+  for (const w of [p1Win, p2Win]) {
+    await expect(chip(w, "Quest journal")).toHaveCount(1);
+    await expect(chip(w, "Quest journal")).toHaveAttribute("data-missing", "false");
+    await expect(chip(w, "Quest journal")).toHaveText("Quest journal");
+    await expect(chip(w, "Quest log")).toHaveCount(0);
+  }
+  const dmLedger = await openNote(dm, "Burnt Ledger");
+  await expect(chip(dmLedger, "Quest journal")).toHaveAttribute("data-missing", "false");
+  for (const w of [p1Win, p2Win, dmLedger]) {
+    await expect.poll(() => docText(w), { timeout: 5_000 }).toContain("[[Quest journal]]");
+    expect(await docText(w)).toContain("[typed during the rename]");
+  }
+  expect(await docText(p2Win)).toBe(await docText(p1Win));
+});

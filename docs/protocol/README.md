@@ -4565,3 +4565,11 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-07 – -13, -23 and [ADR-
 
 - **Client only:** chips (atomic; a click follows, never moves the caret; Alt+click or arrowing in shows the raw text until the caret leaves; Backspace after / Delete before removes one whole; dotted when missing, a click creates it with `notes.create {ifMissing: true}` and opens it); the `@` / `[[` title picker (shared matcher, ≤ 8 notes, "Create note "…"" last); die buttons after dice notation (`findNotation`): a click sends `dice.roll {expression, mode, category: "other", label: "Note"}`, Alt+click or physical-dice mode stages it in the dice tray with the same label; headings (`#`–`###`), `**bold**` and list lines styled in place.
 - **Test IDs:** `notes-link` (`data-title`, `data-missing`), `notes-picker`, `notes-picker-item` (`data-record-id`), `notes-picker-create`, `notes-die` (`data-value`), `notes-backlinks` (`data-count`), `notes-backlink` (`data-record-id`).
+
+## 199. Linked notes rename rewrite (build/notes-rename)
+
+From [linked-notes](../specs/linked-notes.md) FR-NOTES-11 and [ADR-0078](../architecture/adr/0078-note-co-writing.md) "Rename rewrite". **Built by `build/notes-rename` (slice N6).** No new intent, signal, event or table.
+
+- **`notes.rename`**, when the folded title changes, rewrites in its **own transaction** every note of the campaign with a `note_link` row for the old folded title, **binned notes included**: `[[Old]]` → `[[New]]`, `[[Old|label]]` → `[[New|label]]` (any spelling of the old title). Each rewritten note gets one **server-authored change** (editor ID `"server"`): a `note_change` row, `note.version` + 1, folding as a push does, its `note_link` rows, and a `NoteEdited` (`clientId: "server"`, `linksChanged: true`). Open editors receive it in `notes.updates` and rebase their own typing over it (it is not in their undo history); the search cache sees every body change. A case-only rename (same fold) rewrites nothing. A title clash refuses before anything is written. A crash before the commit leaves none of it, after it all of it (`PP_TEST_CRASH=notes.rename:*`).
+- **`notes.updates`** updates may carry `clientId: "server"` (schema `NoteUpdateOut`; clients still can't bind it).
+- **Client:** a renamed note's old folded title resolves to it for 5 s, so chips stay solid until the rewrite lands.

@@ -42,7 +42,7 @@ import { stageTray } from "../dice-extras/store";
 import { usePhysicalDice } from "../dice-roll-log/physical";
 import { relativeTime } from "../notifications/logic";
 import { intentFailure } from "../party-board/logic";
-import { titlesByFold } from "./link-state";
+import { type PickTitle, titlesByFold } from "./link-state";
 import type { LinkHost } from "./link-view";
 import {
   bannerText,
@@ -52,7 +52,9 @@ import {
   hereChips,
   liveNotes,
   nameOf,
+  renamedAliases,
   STATUS_TEXT,
+  withAliases,
 } from "./logic";
 import { type EditorHandle, NoteEditor } from "./NoteEditor";
 import { notesUi } from "./ui";
@@ -373,7 +375,16 @@ function useLinkHost(live: readonly NoteRecord[]): { host: LinkHost; titlesKey: 
   const connection = useSync((s) => s.connection);
   const [physical] = usePhysicalDice();
   const titles = useMemo(() => live.map((n) => ({ id: n.id, title: n.title })), [live]);
-  const byFold = useMemo(() => titlesByFold(titles), [titles]);
+  // N6: a renamed note's record can land a moment before its links' rewrite: its old title keeps
+  // resolving for a few seconds, so those chips stay solid.
+  const aliases = useRef(new Map<string, { note: PickTitle; until: number }>());
+  const previous = useRef(new Map<string, string>());
+  const byFold = useMemo(() => {
+    const now = Date.now();
+    renamedAliases(previous.current, titles, now, aliases.current);
+    previous.current = new Map(titles.map((t) => [t.id, t.title]));
+    return withAliases(titlesByFold(titles), aliases.current, now);
+  }, [titles]);
   const titlesKey = titles.map((t) => `${t.id}:${t.title}`).join("|");
   const create = async (title: string): Promise<string | null> => {
     try {
