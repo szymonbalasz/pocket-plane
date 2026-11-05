@@ -158,7 +158,7 @@ DM picks #351 (ADR-0069), #355–#356 (Gilt & Stone default, Simple Dark; kit pa
 
 | Spec | Prefix | Status | Owner |
 |---|---|---|---|
-| [Class resources](class-resources.md) | CRES | draft: pact slots, sorcery points, feature uses with a cost; open questions for the DM | spec-class-resources |
+| [Class resources](class-resources.md) | CRES | in-review: pact slots, sorcery points, feature uses with a cost, pact weapons; DM decisions 2026-11-05 | spec-class-resources |
 
 ## Post-MVP
 

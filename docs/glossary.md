@@ -179,6 +179,11 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Apply hook** | An append-only server registry entry that settles offered parts inside `cbt.applyCard`'s transaction. | Roll hook |
 | **Mark** | A preset a `targetMarked` filter names (e.g. Hunter's Mark on the hunted creature). | — |
 | **Toggle** | A character preset the owner or DM switches on / off, creating or ending its effect. | Preset |
+| **Pact slot** | A warlock spell slot: all one level, back on a short rest; its own pool beside the spell slots ([class-resources](specs/class-resources.md)). | Spell slot |
+| **Sorcery points** | The feature row marked as a sorcerer's points pool; Flexible Casting converts slots to points and back ([class-resources](specs/class-resources.md)). | Feature use |
+| **Created slot** | A spell slot made from sorcery points; spent before normal slots of its level, gone on a long rest. | — |
+| **Spend link** | A feature row's cost: N uses of another row, a pact slot or any slot, spent by its Use button with one game-log line. | — |
+| **Pact weapon** | An attack row marked as the warlock's pact weapon (any weapon, ranged too); rule triggers match it with the `pactWeapon` filter. | — |
 | **Roll hook** | An append-only server registry entry that adds modifier parts to a roll inside the rolling command's transaction ([ADR-0038](architecture/adr/0038-effect-modifiers.md)). | Rule hook |
 | **Concentration** | An Effect marking that a creature maintains a concentration spell (one per creature); damage raises a Concentration card. | — |
 | **Concentration card** | A notification kind with a "Roll save" action (DC max(10, half the damage)) sent to the PC's owner or the DM. | Damage card |
