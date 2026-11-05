@@ -23,8 +23,8 @@
 > Suggested: **A**.
 
 - Viewer key: `{role: "dm"}` for DM connections; `{role: "player", playerId}` for players.
-- `leakScan` already flags a held row that `view()` hides, so DM clients become scannable. Add DM clients to the notes leak tests.
-- The MCP server is a DM connection, so it receives the DM's own private notes. No tool returns them, and the MCP client drops frames of types its tools don't read (spec OQ-NOTES-13).
+- `leakScan` flags a held row that `view()` hides only if the provider returns that row (`scanRecords` skips other IDs). So an owner-gated type's provider returns **every row of the campaign** and lets `view()` filter, never a per-viewer query. Leak tests also assert that held IDs ⊆ readable IDs. DM clients join the scans.
+- The MCP server is a DM connection, so it can receive the DM's own private notes: that is the DM acting as themselves. A player's note never reaches it, because the gate runs before the DM rule. A tool that sends notes to the model is OQ-NOTES-10.
 
 ## Consequences
 

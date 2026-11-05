@@ -25,7 +25,7 @@ The server compares `schema.ts` with the live DB at every start. Would an FTS5 t
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. No virtual tables in the main DB while push runs; search with the shared matcher on the server** | No schema risk; same results as compendium and pickers; reads only the searcher's readable notes (shared + own private, two indexed reads), so other people's private notes can't change results or time | Folds every readable body per search (≤ ~1,300 notes × 32 KiB at the caps; ~1–2 MB typical); no stemming beyond the plural rule |
+| **A. No virtual tables in the main DB while push runs; search with the shared matcher on the server** | No schema risk; same results as compendium and pickers; reads only the searcher's readable notes (shared + own private, two indexed reads), so other people's private notes can't change results or time | Scans every readable note's stored `bodyFold` on each search (≤ ~1,300 × 32 KiB at the limits; benched in the search slice); no stemming beyond the plural rule |
 | A2. Same rule, with a plain `note_word` table | Survives push (ordinary table); filter by join | Hundreds of thousands of rows at the caps (an estimate); each save rewrites its rows; `searchTier`'s tiers to redo in SQL |
 | B. FTS5 in an attached sidecar file | Real FTS; survives push | A second DB file for backup, reset, digest, Windows locks; a different matcher; BM25 corpus statistics include other people's private notes |
 | C. Teach `push.ts` to ignore virtual tables and shadows | FTS5 in one file | Shared-core change on the path every real upgrade takes; the rename prompt returns with each later table; the guard must parse `sqlite_master` |
