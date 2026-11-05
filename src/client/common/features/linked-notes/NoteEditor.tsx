@@ -4,7 +4,7 @@
 // browser's spell check; re-opens after every snapshot; typing carries on offline.
 import { defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { Compartment, Transaction } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import { EditorView, keymap, placeholder } from "@codemirror/view";
 import {
   NOTES_BACKLINKS_SIGNAL,
   NOTES_CLOSED_SIGNAL,
@@ -25,6 +25,9 @@ import { type NoteHost, NoteSession, type NoteTransport } from "./session";
 
 /** How often the name tags' 2 s window is re-checked. */
 const TAG_CHECK_MS = 250;
+
+/** An empty note's hint (N5 r1). */
+export const NOTE_PLACEHOLDER = "Type @ to link a note · # heading · **bold** · - list";
 
 /** What the pane around the editor reads and does. */
 export interface EditorHandle {
@@ -166,6 +169,8 @@ export const NoteEditor = forwardRef<EditorHandle, NoteEditorProps>(function Not
       named.of(nameAttr(titleRef.current)),
       keymap.of([...historyKeymap, ...defaultKeymap]),
       EditorView.lineWrapping,
+      // r1: linking is discoverable from an empty note.
+      placeholder(NOTE_PLACEHOLDER),
       EditorView.contentAttributes.of({ spellcheck: "true", "data-testid": "notes-editor-text" }),
       remoteCursors,
       noteLinks({

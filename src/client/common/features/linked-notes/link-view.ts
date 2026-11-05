@@ -1,7 +1,9 @@
 // Links, dice and styling in the editor, the view side (FR-NOTES-07 – -10, -13, -23; slice N5).
-// Chips replace `[[…]]` (title or label; dotted when the note is missing) and are atomic; a click
-// follows (never moves the caret), Alt+click shows the raw text. The `@` / `[[` picker is a tooltip
-// under the caret. Dice notation gets a die button; headings, bold and lists are styled in place.
+// Chips replace `[[…]]` (title or label; dashed and muted when the note is missing) and are atomic;
+// a click follows (never moves the caret), Alt+click or a long-press on touch shows the raw text.
+// The `@` / `[[` picker is a tooltip under the caret. Dice notation gets a die button. Headings,
+// bold and lists show as a live preview (Obsidian style): their markers hide off the caret's line.
+// Hover hints use the kit Tooltip's bubble (`data-slot="tooltip-content"`, same classes, 400 ms).
 
 import {
   type EditorState,
@@ -56,6 +58,66 @@ export interface LinkHost {
 /** Live titles changed: chips re-resolve, the picker re-filters. */
 export const refreshLinks = StateEffect.define<null>();
 
+/** Hover hints' wait, as the kit Tooltip (`TOOLTIP_DELAY_MS`). */
+export const HINT_DELAY_MS = 400;
+/** FR-NOTES-09: a press this long on touch edits a chip's raw text. */
+export const LONG_PRESS_MS = 500;
+export const CHIP_HINT = "Open · Alt+click to edit";
+export const MISSING_HINT = "No note yet · click to create";
+export const dieHint = (expression: string) => `Roll ${expression}`;
+
+// ---------- hover hints (the kit Tooltip's bubble on editor parts) ----------
+
+const setHint = StateEffect.define<{ pos: number; text: string } | null>();
+
+const hintField = StateField.define<{ pos: number; text: string } | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setHint)) return e.value;
+    if (!value) return null;
+    return tr.docChanged ? null : value;
+  },
+  provide: (f) =>
+    showTooltip.from(f, (hint) =>
+      hint === null
+        ? null
+        : {
+            pos: hint.pos,
+            above: true,
+            arrow: false,
+            create() {
+              const dom = document.createElement("div");
+              dom.dataset.slot = "tooltip-content";
+              dom.dataset.testid = "ui-tooltip";
+              dom.className =
+                "cm-note-hint rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground";
+              dom.textContent = hint.text;
+              return { dom };
+            },
+          },
+    ),
+});
+
+/** Shows `text` over `el` after the kit's delay while the pointer rests on it. */
+function hoverHint(view: EditorView, el: HTMLElement, text: () => string): void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  el.addEventListener("pointerenter", (e) => {
+    if (e.pointerType === "touch") return;
+    timer = setTimeout(() => {
+      timer = null;
+      if (el.isConnected)
+        view.dispatch({ effects: setHint.of({ pos: view.posAtDOM(el), text: text() }) });
+    }, HINT_DELAY_MS);
+  });
+  el.addEventListener("pointerleave", () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (view.state.field(hintField, false)) view.dispatch({ effects: setHint.of(null) });
+  });
+}
+
+// ---------- chips ----------
+
 class Chip extends WidgetType {
   constructor(
     readonly link: NoteLink,
@@ -81,20 +143,51 @@ class Chip extends WidgetType {
     el.setAttribute("role", "link");
     el.setAttribute(
       "aria-label",
-      this.missing ? `${this.link.target} (no such note yet)` : this.link.target,
+      this.missing ? `${this.link.target}: ${MISSING_HINT}` : `${this.link.target}: ${CHIP_HINT}`,
     );
-    // FR-NOTES-09: a click follows and never moves the caret; Alt+click edits the raw text.
+    const current = () => {
+      const at = view.posAtDOM(el);
+      return chipsOf(view.state).find((l) => l.from === at) ?? this.link;
+    };
+    const edit = () => {
+      view.dispatch(revealAt(view.state, current()));
+      view.focus();
+    };
+    // FR-NOTES-09: a tap follows; a long-press edits the raw text (touch).
+    let pointer = "mouse";
+    let press: ReturnType<typeof setTimeout> | null = null;
+    const cancel = () => {
+      if (press) clearTimeout(press);
+      press = null;
+    };
+    el.addEventListener("pointerdown", (e) => {
+      pointer = e.pointerType;
+      if (e.pointerType !== "touch") return;
+      cancel();
+      press = setTimeout(() => {
+        press = null;
+        edit();
+      }, LONG_PRESS_MS);
+    });
+    el.addEventListener("pointerup", (e) => {
+      if (e.pointerType !== "touch" || !press) return;
+      cancel();
+      this.host.follow(current());
+    });
+    el.addEventListener("pointercancel", cancel);
+    el.addEventListener("contextmenu", (e) => {
+      if (pointer === "touch") e.preventDefault();
+    });
+    // A click follows and never moves the caret; Alt+click edits the raw text.
     el.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
-      const at = view.posAtDOM(el);
-      const link = chipsOf(view.state).find((l) => l.from === at) ?? this.link;
-      if (e.altKey) {
-        view.dispatch(revealAt(view.state, link));
-        view.focus();
-      } else this.host.follow(link);
+      if (pointer === "touch") return;
+      if (e.altKey) edit();
+      else this.host.follow(current());
     });
+    hoverHint(view, el, () => (this.missing ? MISSING_HINT : CHIP_HINT));
     return el;
   }
   override ignoreEvent(): boolean {
@@ -102,8 +195,10 @@ class Chip extends WidgetType {
   }
 }
 
+// ---------- die buttons ----------
+
 const DIE_SVG =
-  '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>';
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>';
 
 class Die extends WidgetType {
   constructor(
@@ -115,19 +210,20 @@ class Die extends WidgetType {
   override eq(o: Die): boolean {
     return o.expression === this.expression;
   }
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "cm-note-die";
     b.dataset.testid = "notes-die";
     b.dataset.value = this.expression;
-    b.setAttribute("aria-label", `Roll ${this.expression}`);
+    b.setAttribute("aria-label", dieHint(this.expression));
     b.innerHTML = DIE_SVG;
     b.addEventListener("mousedown", (e) => e.preventDefault());
     b.addEventListener("click", (e) => {
       e.preventDefault();
       this.host.roll(this.expression, e);
     });
+    hoverHint(view, b, () => dieHint(this.expression));
     return b;
   }
   override ignoreEvent(): boolean {
@@ -135,14 +231,47 @@ class Die extends WidgetType {
   }
 }
 
-const HEADING = /^(#{1,3})[ \t]+\S/;
-const LIST = /^[ \t]*(?:[-*]|\d+\.)[ \t]+/;
+class Bullet extends WidgetType {
+  override eq(): boolean {
+    return true;
+  }
+  toDOM(): HTMLElement {
+    const s = document.createElement("span");
+    s.className = "cm-note-bullet";
+    s.textContent = "•";
+    s.setAttribute("aria-hidden", "true");
+    return s;
+  }
+}
+
+// ---------- live preview ----------
+
+const HEADING = /^(#{1,3})([ \t]+)\S/;
+const BULLET = /^([ \t]*)([-*])([ \t]+)/;
+const NUMBERED = /^([ \t]*)(\d+\.)([ \t]+)/;
 const BOLD = /\*\*([^*\r\n]+)\*\*/g;
 const syntax = Decoration.mark({ class: "cm-note-md" });
+const hide = Decoration.replace({});
 const bold = Decoration.mark({ class: "cm-note-bold" });
+const bullet = Decoration.replace({ widget: new Bullet() });
 
-/** Every decoration of the text: chips, die buttons, headings, bold, list markers. */
-function build(state: EditorState, host: LinkHost): DecorationSet {
+/** The lines a selection touches: their markdown markers show as typed (live preview). */
+export function caretLines(state: EditorState): Set<number> {
+  const out = new Set<number>();
+  for (const r of state.selection.ranges) {
+    const a = state.doc.lineAt(r.from).number;
+    const b = state.doc.lineAt(r.to).number;
+    for (let n = a; n <= b; n++) out.add(n);
+  }
+  return out;
+}
+
+/**
+ * Every decoration of the text: chips, die buttons, and the live preview: off the caret's lines
+ * the `#` / `**` markers hide and list markers become a bullet (numbers stay), with an indent; on
+ * them the markers show, muted, to edit.
+ */
+export function buildDecorations(state: EditorState, host: LinkHost): DecorationSet {
   const out: Range<Decoration>[] = [];
   const chips = chipsOf(state);
   const byFold = host.byFold();
@@ -159,31 +288,49 @@ function build(state: EditorState, host: LinkHost): DecorationSet {
     if (inChip(m.start, m.end)) continue;
     out.push(Decoration.widget({ widget: new Die(m.expression, host), side: 1 }).range(m.end));
   }
+  const caret = caretLines(state);
+  const preview = (pos: number) => !caret.has(state.doc.lineAt(pos).number);
   for (const m of text.matchAll(BOLD)) {
     const from = m.index ?? 0;
     const to = from + m[0].length;
     if (inChip(from, to)) continue;
-    out.push(syntax.range(from, from + 2), bold.range(from + 2, to - 2), syntax.range(to - 2, to));
+    const marker = preview(from) ? hide : syntax;
+    out.push(marker.range(from, from + 2), bold.range(from + 2, to - 2), marker.range(to - 2, to));
   }
   for (let n = 1; n <= state.doc.lines; n++) {
     const line = state.doc.line(n);
+    const live = !caret.has(n);
     const h = HEADING.exec(line.text);
     if (h) {
       const level = (h[1] as string).length;
       out.push(Decoration.line({ class: `cm-note-h cm-note-h${level}` }).range(line.from));
-      out.push(syntax.range(line.from, line.from + level));
+      const end = line.from + level + (h[2] as string).length;
+      out.push(live ? hide.range(line.from, end) : syntax.range(line.from, line.from + level));
       continue;
     }
-    const li = LIST.exec(line.text);
-    if (li) {
+    const b = BULLET.exec(line.text);
+    if (b) {
       out.push(Decoration.line({ class: "cm-note-li" }).range(line.from));
+      const at = line.from + (b[1] as string).length;
+      const end = at + (b[2] as string).length + (b[3] as string).length;
       out.push(
-        Decoration.mark({ class: "cm-note-li-mark" }).range(line.from, line.from + li[0].length),
+        live ? bullet.range(at, end) : Decoration.mark({ class: "cm-note-li-mark" }).range(at, end),
+      );
+      continue;
+    }
+    const num = NUMBERED.exec(line.text);
+    if (num) {
+      out.push(Decoration.line({ class: "cm-note-li" }).range(line.from));
+      const at = line.from + (num[1] as string).length;
+      out.push(
+        Decoration.mark({ class: "cm-note-li-mark" }).range(at, at + (num[2] as string).length),
       );
     }
   }
   return Decoration.set(out, true);
 }
+
+// ---------- the picker ----------
 
 function pickerTooltip(state: EditorState, host: LinkHost): Tooltip | null {
   const p = state.field(pickerField, false);
@@ -275,39 +422,53 @@ function pickerKeys(host: LinkHost) {
 }
 
 const theme = EditorView.baseTheme({
+  // Tight, so punctuation sits right after it ("Duke Varen's").
   ".cm-note-chip": {
-    display: "inline-block",
-    padding: "0 6px",
-    borderRadius: "9999px",
+    padding: "0 3px",
+    borderRadius: "4px",
     border: "1px solid var(--border)",
     backgroundColor: "var(--accent)",
     color: "var(--accent-foreground)",
-    lineHeight: "1.35",
     cursor: "pointer",
   },
+  // "No note yet": dashed and muted, no fill, reads at a glance in every theme.
   ".cm-note-chip-missing": {
-    borderStyle: "dotted",
+    borderStyle: "dashed",
+    borderColor: "var(--muted-foreground)",
     backgroundColor: "transparent",
     color: "var(--muted-foreground)",
+    fontStyle: "italic",
   },
+  // The kit's minimum hit target (24 px), without growing the line.
   ".cm-note-die": {
     display: "inline-flex",
     alignItems: "center",
+    justifyContent: "center",
     verticalAlign: "middle",
-    margin: "0 2px",
-    padding: "1px",
+    minWidth: "24px",
+    minHeight: "24px",
+    margin: "-6px 1px",
+    padding: "0",
     border: "none",
     borderRadius: "4px",
     background: "transparent",
     color: "var(--primary)",
     cursor: "pointer",
   },
+  ".cm-note-die:hover": { backgroundColor: "var(--accent)" },
   ".cm-note-md": { color: "var(--muted-foreground)" },
   ".cm-note-bold": { fontWeight: "700" },
   ".cm-note-h": { fontWeight: "700" },
   ".cm-note-h1": { fontSize: "1.3em" },
   ".cm-note-h2": { fontSize: "1.15em" },
   ".cm-note-h3": { fontSize: "1.05em" },
+  ".cm-note-li": { paddingLeft: "1.4em !important", textIndent: "-1em" },
+  ".cm-note-bullet": {
+    display: "inline-block",
+    width: "1em",
+    textIndent: "0",
+    color: "var(--primary)",
+  },
   ".cm-note-li-mark": { color: "var(--primary)" },
   ".cm-tooltip.cm-note-picker, .cm-note-picker": {
     minWidth: "200px",
@@ -321,19 +482,23 @@ const theme = EditorView.baseTheme({
   },
   ".cm-note-picker-row": { padding: "3px 8px", borderRadius: "4px", cursor: "pointer" },
   ".cm-note-picker-row[aria-selected=true]": { backgroundColor: "var(--accent)" },
+  ".cm-tooltip.cm-note-hint": { border: "none" },
 });
+
+const linesKey = (state: EditorState) => [...caretLines(state)].join(",");
 
 /** The N5 editor extensions. */
 export function noteLinks(host: LinkHost): Extension {
   const decorations = StateField.define<DecorationSet>({
-    create: (state) => build(state, host),
+    create: (state) => buildDecorations(state, host),
     update(set, tr) {
       if (
         tr.docChanged ||
         tr.effects.some((e) => e.is(refreshLinks)) ||
-        tr.startState.field(revealField, false) !== tr.state.field(revealField, false)
+        tr.startState.field(revealField, false) !== tr.state.field(revealField, false) ||
+        (tr.selection && linesKey(tr.startState) !== linesKey(tr.state))
       )
-        return build(tr.state, host);
+        return buildDecorations(tr.state, host);
       return set;
     },
     provide: (f) => [
@@ -355,6 +520,7 @@ export function noteLinks(host: LinkHost): Extension {
   return [
     revealField,
     pickerField,
+    hintField,
     decorations,
     picker,
     Prec.highest(pickerKeys(host)),

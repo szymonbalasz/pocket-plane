@@ -33,14 +33,20 @@ async function openNote(page: Page, title: string): Promise<Locator> {
   return win;
 }
 
-/** The editor's text, without other people's caret name tags. */
+/**
+ * The note's text as the editor holds it (N5: the live preview draws it differently per caret,
+ * so the drawn lines aren't the text). CodeMirror's own back-reference on its content element
+ * (`cmTile.root.view`, as `EditorView.findFromDOM`; the version is pinned by the lockfile).
+ */
 const docText = (win: Locator) =>
   win.getByTestId("notes-editor").evaluate((el) => {
-    const content = el.querySelector(".cm-content");
-    if (!content) return "";
-    const copy = content.cloneNode(true) as HTMLElement;
-    for (const tag of copy.querySelectorAll(".cm-remote-caret")) tag.remove();
-    return [...copy.querySelectorAll(".cm-line")].map((l) => l.textContent ?? "").join("\n");
+    type Doc = { toString(): string };
+    const content = el.querySelector(".cm-content") as
+      | (Element & { cmTile?: { root?: { view?: { state: { doc: Doc } } } } })
+      | null;
+    const view = content?.cmTile?.root?.view;
+    if (!view) throw new Error("no editor view");
+    return view.state.doc.toString();
   });
 
 /** Types at the end of line `line` (1-based), as a person would. */
@@ -148,6 +154,9 @@ test("FR-NOTES-04 FR-NOTES-05 FR-NOTES-20 delete while another reads it: their b
 
   await bin.click();
   const row = p1Win.getByTestId("notes-bin-item").filter({ hasText: "Duke Varen" });
+  // r1: "Deleted by … · when" stays on one line at the default width.
+  const line = await row.getByTestId("notes-bin-deleted").boundingBox();
+  expect(line && line.height < 20).toBe(true);
   await row.getByTestId("notes-restore").click();
   await expect(bin).toHaveAttribute("data-count", String(before));
   await expect(p2Win.getByTestId("notes-list-item").filter({ hasText: "Duke Varen" })).toHaveCount(
@@ -324,6 +333,18 @@ test("N5 FR-NOTES-07 – -12 FR-NOTES-23 the @ picker links for everyone; chips 
   await expect(p2Win.getByTestId("notes-picker")).toHaveCount(0);
   for (const w of [p2Win, p1Win])
     await expect(w.locator('[data-testid="notes-link"][data-title="Duke Varen"]')).toHaveCount(1);
+  // r1: live preview (caret elsewhere): "# Quest log" shows no "#", "- Recover" a bullet.
+  await expect(p2Win.locator(".cm-line.cm-note-h1")).toHaveText(/^Quest log/);
+  await expect(p2Win.locator(".cm-line.cm-note-li .cm-note-bullet")).toHaveText("•");
+  // r1: a chip's hint, and no gap before what follows it.
+  const duke = p1Win.locator('[data-testid="notes-link"][data-title="Duke Varen"]');
+  await duke.hover();
+  await expect(
+    p1.getByTestId("ui-tooltip").filter({ hasText: "Open · Alt+click to edit" }),
+  ).toBeVisible();
+  expect(await duke.evaluate((el) => getComputedStyle(el).paddingRight)).toBe("3px");
+  await p1.mouse.move(0, 0);
+
   // FR-NOTES-12: the DM reading Duke Varen sees "Quest log" join its backlinks, live.
   await expect(dmWin.getByTestId("notes-backlinks")).toHaveAttribute(
     "data-count",
@@ -356,8 +377,16 @@ test("N5 FR-NOTES-07 – -12 FR-NOTES-23 the @ picker links for everyone; chips 
   const missing = p2Win.locator('[data-testid="notes-link"][data-title="Lost tomb"]');
   await expect(missing).toHaveAttribute("data-missing", "true");
   await expect(p2Win.getByTestId("notes-status")).toHaveText("Saved");
+  // r1: dashed, with its hint.
+  expect(await missing.evaluate((el) => getComputedStyle(el).borderTopStyle)).toBe("dashed");
+  await missing.hover();
+  await expect(
+    p2.getByTestId("ui-tooltip").filter({ hasText: "No note yet · click to create" }),
+  ).toBeVisible();
   await missing.click();
   await expect(p2Win.getByTestId("notes-title")).toHaveText("Lost tomb");
+  // r1: an empty note says how to link.
+  await expect(p2Win.locator(".cm-placeholder")).toContainText("Type @ to link a note");
   await expect(p1Win.getByTestId("notes-list-item").filter({ hasText: "Lost tomb" })).toHaveCount(
     1,
   );
@@ -369,12 +398,37 @@ test("N5 FR-NOTES-07 – -12 FR-NOTES-23 the @ picker links for everyone; chips 
   // A chip click follows it (the caret stays where it was).
   await p1Win.locator('[data-testid="notes-link"][data-title="Duke Varen"]').click();
   await expect(p1Win.getByTestId("notes-title")).toHaveText("Duke Varen");
+  // FR-NOTES-09 r1: a long-press on touch shows the chip's raw text to edit.
+  const theLedger = p1Win.locator('[data-testid="notes-link"][data-title="Burnt Ledger"]');
+  await theLedger.dispatchEvent("pointerdown", {
+    pointerType: "touch",
+    button: 0,
+    isPrimary: true,
+  });
+  await p1.waitForTimeout(700);
+  // (The chip is gone by now: the finger lifts on the raw text.)
+  await expect(theLedger).toHaveCount(0);
+  await expect(p1Win.locator(".cm-line").first()).toContainText("[[Burnt Ledger|the ledger]]");
+  await expect(p1Win.getByTestId("notes-title")).toHaveText("Duke Varen"); // not followed
 
   // FR-NOTES-13, -23: Burnt Ledger's "2d6" has a die; a click rolls, the log reads "Note".
   const ledger = await openNote(p1, "Burnt Ledger");
   const log = await openWindow(dm, "dice.log");
-  await ledger.locator('[data-testid="notes-die"][data-value="2d6"]').click();
+  const die = ledger.locator('[data-testid="notes-die"][data-value="2d6"]');
+  const box = await die.boundingBox();
+  expect(box && box.width >= 24 && box.height >= 24).toBe(true); // r1: the kit's minimum target
+  await die.hover();
+  await expect(p1.getByTestId("ui-tooltip").filter({ hasText: "Roll 2d6" })).toBeVisible();
+  await die.click();
   const entry = log.getByTestId("dice-log-entry").last();
   await expect(entry).toContainText("Note");
   await expect(entry).not.toContainText("Burnt Ledger");
+
+  // r1: a note nothing links to says so.
+  const fresh = await openWindow(dm, "notes.main");
+  await fresh.getByTestId("notes-new").click();
+  await dm.getByTestId("notes-title-input").fill("Empty page");
+  await dm.getByTestId("notes-title-save").click();
+  await expect(fresh.getByTestId("notes-title")).toHaveText("Empty page");
+  await expect(fresh.getByTestId("notes-backlinks")).toContainText("No links here yet");
 });

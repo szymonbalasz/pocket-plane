@@ -48,6 +48,7 @@ import {
   bannerText,
   binnedNotes,
   deletedLine,
+  deletedParts,
   hereChips,
   liveNotes,
   nameOf,
@@ -271,8 +272,15 @@ function BinRows({
         >
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm">{n.title}</div>
-            <div className="text-xs text-muted-foreground" data-testid="notes-bin-deleted">
-              {deletedLine(n, players, now)}
+            {/* r1: one line at the list's width: the name truncates, the time never wraps. */}
+            <div
+              className="flex min-w-0 text-xs text-muted-foreground"
+              data-testid="notes-bin-deleted"
+            >
+              <span className="truncate">{deletedParts(n, players, now).who}</span>
+              <span className="shrink-0 whitespace-nowrap">
+                &nbsp;· {deletedParts(n, players, now).when}
+              </span>
             </div>
           </div>
           <Button
@@ -582,7 +590,7 @@ function NotePane({
         data-count={session?.backlinks.length ?? 0}
       >
         <span>Linked from:</span>
-        {(session?.backlinks ?? []).length === 0 && <span>no other note yet</span>}
+        {(session?.backlinks ?? []).length === 0 && <span>No links here yet</span>}
         {(session?.backlinks ?? []).map((b) => (
           <Button
             key={b.id}
