@@ -674,7 +674,14 @@ test("N8 FR-NOTES-25 FR-NOTES-26 FR-NOTES-27 FR-NOTES-28 FR-NOTES-30 categories:
   // the keyboard picks Faction (Enter takes the highlighted one).
   const p1Win = await openNote(p1, "Burnt Ledger");
   await newLine(p1, p1Win);
-  await p1.keyboard.type("Ask @Tidewatch", { delay: 20 });
+  // r2: in the title list, the pointer highlights a row as the arrows do.
+  await p1.keyboard.type("Ask @", { delay: 20 });
+  const titleRows = p1.getByTestId("notes-picker-item");
+  await titleRows.nth(1).hover();
+  await expect(titleRows.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(titleRows.first()).toHaveAttribute("aria-selected", "false");
+  await p1.mouse.move(0, 0);
+  await p1.keyboard.type("Tidewatch", { delay: 20 });
   await expect(p1.getByTestId("notes-picker-create")).toHaveText('Create note "Tidewatch"');
   await p1.keyboard.press("Enter");
   const step = p1.locator('[data-testid="notes-picker"][data-step="category"]');
@@ -696,6 +703,12 @@ test("N8 FR-NOTES-25 FR-NOTES-26 FR-NOTES-27 FR-NOTES-28 FR-NOTES-30 categories:
   await p1.keyboard.press("ArrowUp"); // wraps to Other
   await p1.keyboard.press("ArrowUp"); // Player
   await p1.keyboard.press("ArrowUp"); // Faction
+  await expect(step.locator('[data-category="faction"]')).toHaveAttribute("aria-selected", "true");
+  // r2: the pointer moves the highlight too, and the arrows carry on from it.
+  await step.locator('[data-category="player"]').hover();
+  await expect(step.locator('[data-category="player"]')).toHaveAttribute("aria-selected", "true");
+  await expect(step.locator('[data-category="faction"]')).toHaveAttribute("aria-selected", "false");
+  await p1.keyboard.press("ArrowUp");
   await expect(step.locator('[data-category="faction"]')).toHaveAttribute("aria-selected", "true");
   await p1.keyboard.press("Enter");
   await expect(step).toHaveCount(0);
@@ -830,8 +843,25 @@ test("N8 FR-NOTES-25 FR-NOTES-26 FR-NOTES-27 FR-NOTES-28 FR-NOTES-30 categories:
   await allReachable(picks);
   await p1.keyboard.press("ArrowUp"); // Other, the last: still in view
   await expect(step.locator('[data-category="other"]')).toBeInViewport({ ratio: 1 });
-  await p1.keyboard.press("Escape");
+  // r2: hovering a category highlights it; Enter takes the hovered one.
+  await step.locator('[data-category="location"]').hover();
+  await expect(step.locator('[data-category="location"]')).toHaveAttribute("aria-selected", "true");
+  await expect(step.locator('[data-category="other"]')).toHaveAttribute("aria-selected", "false");
+  await p1.keyboard.press("Enter");
   await expect(step).toHaveCount(0);
+  await expect(p1Win.locator('[data-testid="notes-link"][data-title="Keelhaul"]')).toHaveAttribute(
+    "data-missing",
+    "false",
+  );
+  await expect(
+    dmWin.locator('[data-testid="notes-group"][data-category="location"]'),
+  ).toHaveAttribute("data-count", /\d+/);
+  await expandGroups(dmWin);
+  await expect(
+    dmWin.locator('[data-testid="notes-list-item"][data-category="location"]', {
+      hasText: "Keelhaul",
+    }),
+  ).toHaveCount(1);
 });
 
 /** r1: each row fully on screen and the topmost element at its centre (nothing over it). */

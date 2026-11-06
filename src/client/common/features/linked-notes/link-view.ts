@@ -398,12 +398,26 @@ function pickerTooltip(state: EditorState, host: LinkHost): Tooltip | null {
       dom.className = "cm-note-picker";
       dom.dataset.testid = "notes-picker";
       dom.setAttribute("role", "listbox");
+      let drawn = "";
       const draw = () => {
         const cur = view.state.field(pickerField, false);
         const q = cur ? pickerQuery(view.state, cur) : null;
-        dom.replaceChildren();
-        if (!cur || q === null) return;
+        if (!cur || q === null) {
+          dom.replaceChildren();
+          drawn = "";
+          return;
+        }
         const rows = pickerRows(q, host.titles());
+        // r2: the same rows → only the highlight moves (the row under the pointer stays put).
+        const key = rows
+          .map((r) => `${r.kind}:${r.kind === "note" ? r.id : ""}:${r.title}`)
+          .join("|");
+        if (key === drawn) {
+          highlight(dom, Math.min(cur.index, rows.length - 1));
+          return;
+        }
+        drawn = key;
+        dom.replaceChildren();
         rows.forEach((row, i) => {
           const item = document.createElement("div");
           item.setAttribute("role", "option");
@@ -416,6 +430,11 @@ function pickerTooltip(state: EditorState, host: LinkHost): Tooltip | null {
             e.preventDefault();
             choose(view, row);
           });
+          // r2: the pointer highlights a row as the arrows do; Enter then takes it.
+          item.addEventListener("mousemove", () => {
+            const p = view.state.field(pickerField, false);
+            if (p && p.index !== i) view.dispatch({ effects: setPicker.of({ ...p, index: i }) });
+          });
           dom.appendChild(item);
         });
         showHighlighted(dom);
@@ -424,6 +443,14 @@ function pickerTooltip(state: EditorState, host: LinkHost): Tooltip | null {
       return { dom, update: () => draw() };
     },
   };
+}
+
+/** r2: marks row `index` of `dom`'s options highlighted, in place, and keeps it in view. */
+function highlight(dom: HTMLElement, index: number): void {
+  dom.querySelectorAll('[role="option"]').forEach((el, i) => {
+    el.setAttribute("aria-selected", String(i === index));
+  });
+  showHighlighted(dom);
 }
 
 /** r1: the highlighted row stays in view when the list scrolls (a short viewport). */
@@ -491,10 +518,21 @@ function categoryTooltip(state: EditorState, host: LinkHost): Tooltip | null {
       const list = document.createElement("div");
       list.setAttribute("role", "listbox");
       dom.appendChild(list);
+      let drawn: string | null = null;
       const draw = () => {
         const cur = view.state.field(categoryField, false);
+        if (!cur) {
+          list.replaceChildren();
+          drawn = null;
+          return;
+        }
+        // r2: the same note → only the highlight moves (the row under the pointer stays put).
+        if (cur.title === drawn) {
+          highlight(list, cur.index);
+          return;
+        }
+        drawn = cur.title;
         list.replaceChildren();
-        if (!cur) return;
         head.textContent = categoryPrompt(cur.title);
         list.setAttribute("aria-label", categoryPrompt(cur.title));
         NOTE_CATEGORIES.forEach((category, i) => {
@@ -509,6 +547,12 @@ function categoryTooltip(state: EditorState, host: LinkHost): Tooltip | null {
             e.preventDefault();
             const now = view.state.field(categoryField, false);
             if (now) void chooseCategory(view, host, now, category);
+          });
+          // r2: the pointer highlights a row as the arrows do; Enter then takes it.
+          item.addEventListener("mousemove", () => {
+            const a = view.state.field(categoryField, false);
+            if (a && a.index !== i)
+              view.dispatch({ effects: setCategoryAsk.of({ ...a, index: i }) });
           });
           list.appendChild(item);
         });
