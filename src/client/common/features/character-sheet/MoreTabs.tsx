@@ -11,6 +11,7 @@ import {
 } from "@shared/character-sheet/sheet";
 import { WALLET_TYPE, type WalletRecord } from "@shared/party-loot/schemas";
 import { useState } from "react";
+import { Checkbox } from "../../components/ui/controls";
 import { Tip } from "../../components/ui/tip";
 import { useRecords, useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
@@ -18,6 +19,7 @@ import { SheetShare } from "../log-share/SheetShare";
 import { useOpenPartyTab } from "../party-board/open-tab";
 import { Box } from "./boxes";
 import { CompendiumName } from "./compendium-links";
+import { ConvertMenu } from "./convert-menu";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
 import { OverspendPopover, OverspentTip } from "./overspend";
 import { AddRow, RowTools, useRowPut } from "./rows";
@@ -111,6 +113,8 @@ function FeatureUses({ f }: { f: FeatureRow }) {
           Reset
         </button>
       )}
+      {/* FR-CRES-06, -07: Flexible Casting on the sorcery-points row. */}
+      {counters && f.pool === "sorcery-points" && <ConvertMenu f={f} />}
     </span>
   );
 }
@@ -123,6 +127,27 @@ function FeatureText({ f }: { f: FeatureRow }) {
     <p className="text-xs [overflow-wrap:anywhere] whitespace-pre-wrap text-muted-foreground">
       <DiceText text={f.text} context={notationContext(ctx, f.name)} />
     </p>
+  );
+}
+
+/** FR-CRES-05: marks the row as the sorcery points (one per sheet; needs uses). */
+function PoolBox({ f, put }: { f: FeatureRow; put(p: Partial<FeatureRow>): Promise<unknown> }) {
+  const live = useSync((s) => s.state === "live");
+  const busy = useBusy();
+  return (
+    <span className="flex h-8 items-center gap-1.5 text-xs text-muted-foreground">
+      <Checkbox
+        data-testid="cres-pool"
+        data-record-id={f.id}
+        aria-label="Sorcery points"
+        checked={f.pool === "sorcery-points"}
+        disabled={!live || busy.busy || !f.usesMax}
+        onCheckedChange={(on) =>
+          busy.run(() => put({ pool: on === true ? "sorcery-points" : undefined }))
+        }
+      />
+      Sorcery points
+    </span>
   );
 }
 
@@ -179,6 +204,7 @@ function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count:
               ]}
               commit={(reset) => put({ reset: reset ?? undefined })}
             />
+            <PoolBox f={f} put={put} />
           </div>
           <TextField
             path={`features.${f.id}.text`}

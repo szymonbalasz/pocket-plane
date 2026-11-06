@@ -12,7 +12,9 @@ phase: post-mvp
 
 > **DM decisions (2026-11-05).** Spending a slot from the spell row comes later (OQ-CRES-04 B). Use lines are seen by everyone (OQ-CRES-05 A). The other open questions go as suggested. New: **pact weapons** (FR-CRES-14–16), because Soel's pact weapon is a hand crossbow, so "melee" can't stand in for "pact weapon".
 
-> **Built, slice 1 (`build/cres-pact`, 2026-11-06):** pact slots and pact weapons, FR-CRES-01–04 and -14–16. Tests `FR-CRES-…` in `pact-slots.test.ts`, `pact-weapon.test.ts` (server and shared), `pact.test.ts`; e2e `class-resources.e2e.ts`; bundle `class-resources`. Next: sorcery points (FR-CRES-05–08), then spend links (FR-CRES-09–13).
+> **Built, slice 1 (`build/cres-pact`, 2026-11-06):** pact slots and pact weapons, FR-CRES-01–04 and -14–16. Tests `FR-CRES-…` in `pact-slots.test.ts`, `pact-weapon.test.ts` (server and shared), `pact.test.ts`; e2e `class-resources.e2e.ts`; bundle `class-resources`.
+>
+> **Built, slice 2 (2026-11-06):** sorcery points and Flexible Casting, FR-CRES-05–08 (`char.convertSlot`, `char.createSlot`; Convert menu on the sorcery-points row; created-slot pips). Tests in `sorcery.test.ts` (server and shared); e2e `class-resources.e2e.ts`. The game-log lines for conversions come with slice 3 (FR-CRES-12). Next: spend links (FR-CRES-09–13).
 
 ## 1. Summary
 

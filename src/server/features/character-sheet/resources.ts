@@ -8,8 +8,11 @@ import {
   CHARX_INTENTS,
   CharUseResourceIntent,
   type CharUseResourceResult,
+  type CreatedSlotLevel,
   type CreatureSheetRecord,
 } from "@shared/character-sheet/sheet";
+import { tickSlots } from "@shared/character-sheet/sorcery";
+import type { SpellLevelKey } from "@shared/entities/schemas";
 import { CharacterResourceUsed } from "@shared/events/character-sheet";
 import { defineCommand } from "../../commands/commands";
 import { notFound } from "../../commands/errors";
@@ -24,6 +27,29 @@ export const charUseResource = defineCommand({
   execute(input, env): CharUseResourceResult {
     const c = counterCharacter(env, input.characterId);
     const { before: row, sheet } = sheetOrNew(env, c);
+    // FR-CRES-08: ticking a level with created slots spends those first (they disappear).
+    const created =
+      "slot" in input.resource && (input.delta ?? 0) > 0
+        ? (sheet.slotsCreated[String(input.resource.slot) as CreatedSlotLevel] ?? 0)
+        : 0;
+    if (created > 0 && "slot" in input.resource) {
+      const level = String(input.resource.slot) as SpellLevelKey;
+      const t = tickSlots(sheet, c.statBlock, level, input.delta ?? 0);
+      const before = sheet.slotsUsed[level] ?? 0;
+      const after = t.slotsUsed[level] ?? 0;
+      const change = writeSheet(env, row, {
+        ...sheet,
+        slotsUsed: t.slotsUsed,
+        slotsCreated: t.slotsCreated,
+      });
+      env.emit({
+        type: CharacterResourceUsed.type,
+        campaignId: c.campaignId,
+        payload: { characterId: c.id, resource: input.resource, before, after },
+        changes: mergeChanges([change]),
+      });
+      return { before, after };
+    }
     const counter = counterOf(sheet, c.statBlock, input.resource);
     if (!counter) throw notFound("Feature was deleted");
     const before = counter.used;

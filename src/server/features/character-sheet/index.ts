@@ -17,6 +17,7 @@ import { charApprove, charCreate, charSetLock } from "./lifecycle";
 import { creatureSheetRecordType } from "./records";
 import { charUseResource } from "./resources";
 import { charRest } from "./rest";
+import { charConvertSlot, charCreateSlot } from "./sorcery";
 
 export type { AdjustHpResult } from "./hp";
 
@@ -42,6 +43,8 @@ export const characterSheet: Feature = {
     r.command(charMoveRowCommand(hooks), { intent: true });
     r.command(charUseResource, { intent: true });
     r.command(charRest, { intent: true });
+    r.command(charConvertSlot, { intent: true });
+    r.command(charCreateSlot, { intent: true });
     r.recordType(creatureSheetRecordType(r.services.log));
   },
 };

@@ -11,7 +11,7 @@ const vex = (r: Parameters<typeof entityOf>[0]) => entityOf(r, "char-vex");
 /**
  * class-resources §13 `char-vex`: "Vex", owner `player-1`, Sorcerer 5 / Warlock 2, CHA 18;
  * slots 1st ×4, 2nd ×3, 3rd ×2 and 2 pact slots of 1st level (FR-CRES-01); attacks "Pact blade"
- * (pact weapon, FR-CRES-14) and "Dagger"; feature "Font of Magic" (5 uses, long); trigger "Smite"
+ * (pact weapon, FR-CRES-14) and "Dagger"; feature "Font of Magic" (the sorcery points, 5, long; FR-CRES-05); trigger "Smite"
  * (hit with a pact weapon, the DM checks, once per turn, 2d8 force; FR-CRES-15).
  */
 export default defineFixture({
@@ -63,7 +63,13 @@ export default defineFixture({
     putRowStep((r) => ({
       creatureId: vex(r),
       list: "features",
-      row: { name: "Font of Magic", source: "Sorcerer 2", usesMax: 5, reset: "long" },
+      row: {
+        name: "Font of Magic",
+        source: "Sorcerer 2",
+        usesMax: 5,
+        reset: "long",
+        pool: "sorcery-points",
+      },
     })),
     step(
       putTrigger,

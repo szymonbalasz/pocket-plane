@@ -84,3 +84,68 @@ test("FR-CRES-02 FR-CRES-03 FR-CRES-04 FR-CRES-14 pact slots: player ticks, DM s
   await dm.context().close();
   await p1.context().close();
 });
+
+test("FR-CRES-06 FR-CRES-07 FR-CRES-08 Flexible Casting: create a slot, convert a pact slot, created slot spent first, gone on a long rest", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const vex = recordId("char-vex", "entity");
+  const p1 = await rolePage(browser);
+  await p1.setViewportSize({ width: 1440, height: 900 });
+  await p1.goto(link("Player 1"));
+  await live(p1);
+  const own = await openWindow(p1, "char.sheet");
+  await expect(own.getByTestId("char-sheet")).toHaveAttribute("data-record-id", vex);
+
+  const font = () => own.getByTestId("charx-feature").filter({ hasText: "Font of Magic" }).first();
+  const left = () => font().getByTestId("charx-feature-left");
+  const menu = p1.getByTestId("cres-convert-menu");
+  await tab(own, "features");
+  await expect(left()).toHaveAttribute("data-value", "5");
+
+  // Full points: converting is disabled; creating a 1st-level slot costs 2.
+  await font().getByTestId("cres-convert").click();
+  await expect(menu).toBeVisible();
+  await expect(menu.locator('[data-testid="cres-convert-slot"][data-value="pact"]')).toBeDisabled();
+  await expect(menu.locator('[data-testid="cres-create-slot"][data-value="3"]')).toBeEnabled();
+  await expect(menu.locator('[data-testid="cres-create-slot"][data-value="4"]')).toBeDisabled();
+  await menu.locator('[data-testid="cres-create-slot"][data-value="1"]').click();
+  await expect(menu).toHaveCount(0);
+  await expect(left()).toHaveAttribute("data-value", "3");
+
+  // Pact slot → +1 point.
+  await font().getByTestId("cres-convert").click();
+  await menu.locator('[data-testid="cres-convert-slot"][data-value="pact"]').click();
+  await expect(left()).toHaveAttribute("data-value", "4");
+
+  // Actions: one created 1st-level pip; ticking the level spends it first.
+  await tab(own, "actions");
+  await expect(pactPip(own)).toHaveAttribute("data-used", "1");
+  const created = own.locator('[data-testid="cres-created-pip"][data-value="1"]');
+  await expect(created).toHaveCount(1);
+  // The first test left one 1st-level slot spent; ticking takes the created slot instead.
+  const usedBefore = (await slotPip(own, "1").getAttribute("data-used")) ?? "";
+  await slotPip(own, "1").click();
+  await expect(created).toHaveCount(0);
+  await expect(slotPip(own, "1")).toHaveAttribute("data-used", usedBefore);
+
+  // A second created slot, then the DM's long rest: gone, points back to 5.
+  await tab(own, "features");
+  await font().getByTestId("cres-convert").click();
+  await menu.locator('[data-testid="cres-create-slot"][data-value="1"]').click();
+  await expect(left()).toHaveAttribute("data-value", "2");
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+  const sheet = await openWindow(dm, "char.sheet");
+  await pickSheet(sheet, vex);
+  await sheet.getByTestId("charx-rest").click();
+  await dm.locator('[data-testid="charx-rest-kind"][data-value="long"]').click();
+  await dm.getByTestId("charx-rest-confirm").click();
+  await expect(left()).toHaveAttribute("data-value", "5");
+  await tab(own, "actions");
+  await expect(own.getByTestId("cres-created-pip")).toHaveCount(0);
+  await dm.context().close();
+  await p1.context().close();
+});
