@@ -36,15 +36,22 @@ describe("FR-DICEX-106 fire and cold dice", () => {
     expect(dieFxOf("necrotic")?.rich).toBeUndefined();
   });
 
-  test("FR-DICEX-106 a flying die leaves a trail behind it", () => {
+  test("FR-DICEX-106 particles move with their die, no trail behind it", () => {
     for (const kind of KINDS) {
-      const sim = richSim(kind, 1, 7);
-      const [die] = fly(sim, 1, 0.6);
+      const sim = richSim(kind, 2, 7);
+      const dice = fly(sim, 2, 0.6);
       expect(sim.count).toBeGreaterThan(30);
-      // Most particles sit behind the die (it moves along +x).
+      // The dice fly along +x at 12 units / s: every particle stays around its own die, as many
+      // ahead of it as behind (a trail would leave them strung out behind).
       let behind = 0;
-      for (let i = 0; i < sim.count; i++) if (sim.drawn(i, 1).x < (die as SimDie).x) behind++;
-      expect(behind / sim.count).toBeGreaterThan(0.7);
+      for (let i = 0; i < sim.count; i++) {
+        const p = sim.drawn(i, 1);
+        const near = dice.filter((d) => Math.hypot(p.x - d.x, p.z - d.z) < d.r * 4);
+        expect(near.length).toBeGreaterThan(0);
+        if (p.x < (near[0] as SimDie).x) behind++;
+      }
+      expect(behind / sim.count).toBeGreaterThan(0.3);
+      expect(behind / sim.count).toBeLessThan(0.7);
     }
   });
 

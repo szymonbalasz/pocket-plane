@@ -1,6 +1,6 @@
 // FR-DICEX-106: the full effect of fire and cold dice, a particle simulation with no
-// three.js in it (tested headless). Each die sheds particles while it flies (left where they
-// were born, so they trail behind it) and bursts once when it lands; the burst is over within
+// three.js in it (tested headless). Each die sheds particles while it flies and bursts once when
+// it lands; every particle moves with its own die (no trail behind it); the burst is over within
 // LAND_S of rest, before the hand-off copies the dice (FR-DICEX-35). Big rolls share one budget:
 // fewer particles per die as the dice add up, and never more than MAX_PARTICLES live.
 
@@ -22,8 +22,6 @@ export interface Species {
   size: readonly [number, number];
   /** Speed outward at birth, die radii per second, min and max. */
   speed: readonly [number, number];
-  /** Share of the die's velocity a particle keeps at birth (0: stays where born, a trail). */
-  inherit: number;
   /** Velocity lost per second. */
   drag: number;
   /** Steady drift, die radii per second, screen x and y (+y = down). */
@@ -71,7 +69,6 @@ const FIRE: RichPreset = {
       life: [0.3, 0.55],
       size: [1.1, 1.9],
       speed: [0.4, 1.4],
-      inherit: 0.08,
       drag: 2.5,
       drift: [0, -1.4],
       spin: 3,
@@ -93,7 +90,6 @@ const FIRE: RichPreset = {
       life: [0.6, 1.3],
       size: [0.24, 0.08],
       speed: [1.2, 3.8],
-      inherit: 0.2,
       drag: 1.3,
       drift: [0, -1.8],
       spin: 0,
@@ -114,7 +110,6 @@ const FIRE: RichPreset = {
       life: [0.9, 1.4],
       size: [1, 2.8],
       speed: [0.2, 0.6],
-      inherit: 0.05,
       drag: 1,
       drift: [0, -0.7],
       spin: 1,
@@ -148,7 +143,6 @@ const FROST: RichPreset = {
       life: [0.9, 1.5],
       size: [1.2, 3.2],
       speed: [0.2, 0.6],
-      inherit: 0.05,
       drag: 1,
       drift: [0, 0.25],
       spin: 0,
@@ -168,7 +162,6 @@ const FROST: RichPreset = {
       life: [1, 1.7],
       size: [0.5, 0.32],
       speed: [0.4, 1.2],
-      inherit: 0.1,
       drag: 1.2,
       drift: [0, 0.5],
       spin: 2.5,
@@ -189,7 +182,6 @@ const FROST: RichPreset = {
       life: [0.4, 0.9],
       size: [0.4, 0.12],
       speed: [0.3, 1.5],
-      inherit: 0.15,
       drag: 2,
       drift: [0, 0.2],
       spin: 1,
@@ -209,7 +201,6 @@ const FROST: RichPreset = {
       life: [0.3, 0.6],
       size: [0.55, 0.15],
       speed: [2, 4],
-      inherit: 0,
       drag: 3,
       drift: [0, 0],
       spin: 4,
@@ -338,12 +329,15 @@ export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim
   const spin = f();
   const phase = f();
   const sp = new Uint8Array(cap);
+  /** The die a particle belongs to: its position is an offset from that die's. */
+  const owner = new Uint16Array(cap);
   let n = 0;
-  /** Per die: fractional particles owed per emitter, and its last position (velocity). */
+  /** Per die: fractional particles owed per emitter. */
   const owed: number[][] = [];
-  const prev: ({ x: number; z: number } | null)[] = [];
+  /** Per die: where it is now. */
+  let at: readonly SimDie[] = [];
 
-  const spawn = (s: number, d: SimDie, dvx: number, dvz: number, speedMul: number) => {
+  const spawn = (s: number, k: number, d: SimDie, speedMul: number) => {
     if (n >= cap) return;
     const spec = preset.species[s] as Species;
     const a = rand() * Math.PI * 2;
@@ -351,11 +345,12 @@ export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim
     const sa = Math.sin(a);
     const from = d.r * lerp(spec.from[0], spec.from[1], rand());
     const speed = d.r * lerp(spec.speed[0], spec.speed[1], rand()) * speedMul;
-    px[n] = d.x + ca * from;
-    pz[n] = d.z + sa * from;
-    py[n] = spec.lift === null ? FLOOR_Y : d.y + spec.lift * d.r;
-    vx[n] = ca * speed + dvx * spec.inherit;
-    vz[n] = sa * speed + dvz * spec.inherit;
+    px[n] = ca * from;
+    pz[n] = sa * from;
+    py[n] = spec.lift === null ? 0 : spec.lift * d.r;
+    vx[n] = ca * speed;
+    vz[n] = sa * speed;
+    owner[n] = k;
     age[n] = 0;
     life[n] = lerp(spec.life[0], spec.life[1], rand());
     rad[n] = d.r * lerp(0.75, 1.25, rand());
@@ -381,6 +376,7 @@ export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim
     spin[i] = spin[j] as number;
     phase[i] = phase[j] as number;
     sp[i] = sp[j] as number;
+    owner[i] = owner[j] as number;
   };
 
   return {
@@ -389,6 +385,7 @@ export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim
       return n;
     },
     step(dt, dice, flying) {
+      at = dice;
       if (dt <= 0) return;
       // Move and age.
       for (let i = n - 1; i >= 0; i--) {
@@ -408,18 +405,14 @@ export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim
         rot[i] = (rot[i] as number) + (spin[i] as number) * dt;
       }
       // Shed.
+      if (!flying) return;
       dice.forEach((d, k) => {
-        const last = prev[k];
-        const dvx = last ? (d.x - last.x) / dt : 0;
-        const dvz = last ? (d.z - last.z) / dt : 0;
-        prev[k] = { x: d.x, z: d.z };
-        if (!flying) return;
         const debt = owed[k] ?? preset.emitters.map(() => rand());
         owed[k] = debt;
         preset.emitters.forEach((e, j) => {
           let due = (debt[j] as number) + e.rate * scale * dt;
           while (due >= 1) {
-            spawn(e.species, d, dvx, dvz, 1);
+            spawn(e.species, k, d, 1);
             due -= 1;
           }
           debt[j] = due;
@@ -427,12 +420,13 @@ export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim
       });
     },
     burst(dice) {
-      for (const d of dice) {
+      at = dice;
+      dice.forEach((d, k) => {
         for (const e of preset.emitters) {
           const count = Math.round(e.burst * scale);
-          for (let i = 0; i < count; i++) spawn(e.species, d, 0, 0, e.burstSpeed);
+          for (let i = 0; i < count; i++) spawn(e.species, k, d, e.burstSpeed);
         }
-      }
+      });
     },
     drawn(i, fade) {
       const spec = preset.species[sp[i] as number] as Species;
@@ -442,10 +436,11 @@ export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim
         spec.twinkle > 0
           ? 0.55 + 0.45 * Math.sin((age[i] as number) * spec.twinkle * 6.283 + (phase[i] as number))
           : 1;
+      const d = at[owner[i] as number] ?? { x: 0, y: 0, z: 0, r: 0 };
       return {
-        x: px[i] as number,
-        y: py[i] as number,
-        z: pz[i] as number,
+        x: d.x + (px[i] as number),
+        y: spec.lift === null ? FLOOR_Y : d.y + (py[i] as number),
+        z: d.z + (pz[i] as number),
         size: (rad[i] as number) * lerp(spec.size[0], spec.size[1], t),
         rot: rot[i] as number,
         tile: spec.tile,

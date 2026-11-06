@@ -1,7 +1,7 @@
 // FR-DICEX-106: fire and cold dice on the shared canvas, in the lazy chunk only. Per throw: one
 // particle draw that adds light (flames, embers, glitter) and one that covers (smoke, mist,
-// flakes), both from fx-sim.ts, plus one shader aura per die (fire: flame tongues streaming
-// behind the die; cold: an icy rim with frost veins and mist). The die's own material glows (and
+// flakes), both from fx-sim.ts and moving with their die, plus one shader aura per die (fire:
+// flame tongues all round it; cold: an icy rim with frost veins and mist). The die's own material glows (and
 // frosts over). It runs in the throw's loop and, after rest, for the short landing only.
 import {
   AdditiveBlending,
@@ -209,14 +209,12 @@ float fbm(vec3 p) {
   return s / 0.875;
 }`;
 
-/** Shared by both auras: q in die radii (screen x right, y down), d the trail-stretched distance. */
+/** Shared by both auras: q in die radii (screen x right, y down), d its distance from the die. */
 const AURA_HEAD = /* glsl */ `
 uniform float uTime;
 uniform float uAmp;
 uniform float uHalf;
 uniform float uSeed;
-uniform vec2 uDir;
-uniform float uSpeed;
 varying vec2 vUv;
 ${NOISE}
 `;
@@ -224,10 +222,7 @@ ${NOISE}
 const AURA_SHAPE = /* glsl */ `
   vec2 q = (vUv * 2.0 - 1.0) * uHalf;
   q.y = -q.y;
-  float back = dot(q, -uDir);
-  float lat = dot(q, vec2(-uDir.y, uDir.x));
-  float bs = back > 0.0 ? back / (1.0 + uSpeed) : back;
-  float d = length(vec2(bs, lat));
+  float d = length(q);
   vec2 dn = q / max(length(q), 1e-3);
 `;
 
@@ -292,8 +287,6 @@ interface AuraUniforms {
   uAmp: { value: number };
   uHalf: { value: number };
   uSeed: { value: number };
-  uDir: { value: [number, number] };
-  uSpeed: { value: number };
 }
 
 interface Body {
@@ -341,8 +334,6 @@ export function richLayer(dice: readonly RichDie[], seed: number): RichLayer | n
       uAmp: { value: 0 },
       uHalf: { value: sim.preset.aura },
       uSeed: { value: (k * 13.37) % 50 },
-      uDir: { value: [0, 1] },
-      uSpeed: { value: 0 },
     };
     const auraMat = new ShaderMaterial({
       uniforms: { ...u },
@@ -376,8 +367,6 @@ export function richLayer(dice: readonly RichDie[], seed: number): RichLayer | n
   const tints = new Map(
     bodies.map((b) => [b, b.sim.preset.tint ? new Color(b.sim.preset.tint.color) : null]),
   );
-  /** Per die: its smoothed screen direction and speed (the aura's trail). */
-  const heading = bodies.map(() => ({ x: 0, z: 1, speed: 0, px: 0, pz: 0, seen: false }));
 
   let last: number | null = null;
   let landedAt: number | null = null;
@@ -464,31 +453,11 @@ export function richLayer(dice: readonly RichDie[], seed: number): RichLayer | n
           m.color.copy(b.base).lerp(tint, p.tint.amount * Math.min(1, amp));
         }
         const { x, y, z } = b.mesh.position;
-        const h = heading[k] as (typeof heading)[number];
-        if (h.seen && dt > 0) {
-          const vx = (x - h.px) / dt;
-          const vz = (z - h.pz) / dt;
-          const sp = Math.hypot(vx, vz);
-          if (sp > 1e-3) {
-            const ease = Math.min(1, dt * 8);
-            h.x += (vx / sp - h.x) * ease;
-            h.z += (vz / sp - h.z) * ease;
-            const len = Math.hypot(h.x, h.z) || 1;
-            h.x /= len;
-            h.z /= len;
-          }
-          h.speed += (Math.min(2, sp / (b.radius * 8)) - h.speed) * Math.min(1, dt * 6);
-        }
-        h.px = x;
-        h.pz = z;
-        h.seen = true;
         b.aura.position.set(x, y, z);
         b.aura.scale.set(b.radius * p.aura, 1, b.radius * p.aura);
         const u = b.u;
         u.uTime.value = t;
         u.uAmp.value = amp;
-        u.uDir.value = [h.x, h.z];
-        u.uSpeed.value = since === null ? h.speed : h.speed * (1 - Math.min(1, since * 4));
       });
       write(unit, since === null ? 1 : landFade(since));
     },
