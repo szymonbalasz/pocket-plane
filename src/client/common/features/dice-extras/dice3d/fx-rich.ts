@@ -4,7 +4,8 @@
 // from fx-sim.ts and moving with their die; per die a shader aura (fire: flame tongues all round
 // it; cold: an icy rim with frost veins and mist) and its own material's glow (cold: frosting
 // over); per kind an optional extra (custom three.js objects). It runs in the throw's loop and,
-// after rest, for the short landing only.
+// after rest, for the landing only: LAND_S real seconds with everything in it (particles, the
+// kinds' timelines, glow, auras) slowed to LAND_PACE, the landing clock (DM, 2026-11-06).
 import {
   AdditiveBlending,
   BufferGeometry,
@@ -26,7 +27,9 @@ import type { RichExtra, RichKindDef } from "./fx-kinds/kind";
 import { AURA_VERT } from "./fx-kinds/shaders";
 import { atlasCanvas, atlasLayout } from "./fx-kinds/tiles";
 import {
+  LAND_PACE,
   LAND_S,
+  landClock,
   landFade,
   MAX_PARTICLES,
   type RichSim,
@@ -309,15 +312,20 @@ export function richLayer(dice: readonly RichDie[], seed: number): RichLayer | n
           }
         }
       }
-      const since = landedAt === null ? null : t - landedAt;
-      if (since !== null && since >= LAND_S) {
+      const real = landedAt === null ? null : t - landedAt;
+      if (real !== null && real >= LAND_S) {
         clear();
         return;
       }
+      // After rest it all runs on the landing clock: `since` and the effect's own time `ft`
+      // (continuous at rest) at LAND_PACE, so each kind's timeline plays slower as a whole.
+      const since = real === null ? null : landClock(real);
+      const ft = landedAt === null || since === null ? t : landedAt + since;
+      const fdt = since === null ? dt : dt * LAND_PACE;
       for (const r of runs) {
-        r.sim.step(dt, simDice(r.kind), landedAt === null);
+        r.sim.step(fdt, simDice(r.kind), landedAt === null);
         if (r.extra && (r.def.whileRolling || since !== null)) {
-          r.extra.update(t, progress, unit, since);
+          r.extra.update(ft, progress, unit, since);
         }
       }
       bodies.forEach((b, k) => {
@@ -326,7 +334,7 @@ export function richLayer(dice: readonly RichDie[], seed: number): RichLayer | n
         if (glow && b.glows) {
           // The die may wear a new material by now (dropped dice dim at rest): drive its current one.
           const m = b.mesh.material as MeshStandardMaterial;
-          const level = richFlicker(glow, t, k);
+          const level = richFlicker(glow, ft, k);
           m.emissiveIntensity =
             (glow.range[0] + (glow.range[1] - glow.range[0]) * level) * Math.min(1, amp);
           if (b.base && b.tint && glow.tint) {
@@ -337,7 +345,7 @@ export function richLayer(dice: readonly RichDie[], seed: number): RichLayer | n
           const { x, y, z } = b.mesh.position;
           b.aura.mesh.position.set(x, y, z);
           b.aura.mesh.scale.set(b.radius * b.aura.size, 1, b.radius * b.aura.size);
-          b.aura.u.uTime.value = t;
+          b.aura.u.uTime.value = ft;
           b.aura.u.uAmp.value = amp;
         }
       });

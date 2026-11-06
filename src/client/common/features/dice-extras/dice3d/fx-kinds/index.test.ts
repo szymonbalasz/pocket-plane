@@ -4,7 +4,15 @@ import { MODIFIER_DAMAGE_TYPES } from "@shared/effect-modifiers/schemas";
 import type { Mesh, MeshStandardMaterial } from "three";
 import { type DieFx, dieFxOf, RICH_KINDS, type RichKind, richKindOf } from "../../die-fx";
 import { splitFx } from "../fx-layer";
-import { LAND_S, landFade, MAX_PARTICLES, rampAt, richSim } from "../fx-sim";
+import {
+  LAND_CLOCK_S,
+  LAND_PACE,
+  LAND_S,
+  landFade,
+  MAX_PARTICLES,
+  rampAt,
+  richSim,
+} from "../fx-sim";
 import { RICH_DEFS } from ".";
 import { fire } from "./fire";
 import type { RichExtra, RichKindDef } from "./kind";
@@ -119,6 +127,33 @@ describe("FR-DICEX-106 full effects, one kind per damage type", () => {
     expect(log).not.toContain("update flight");
   });
 
+  test("FR-DICEX-106 the landing runs slowed: an extra's sinceRest and time run at LAND_PACE, to LAND_CLOCK_S by LAND_S", () => {
+    const seen: { t: number; since: number }[] = [];
+    const def = popKind([]);
+    const make = def.extra;
+    if (!make) throw new Error("extra");
+    def.extra = (dice, seed) => {
+      const e = make(dice, seed);
+      const update = e.update;
+      e.update = (t, p, u, since) => {
+        if (since !== null) seen.push({ t, since });
+        update(t, p, u, since);
+      };
+      return e;
+    };
+    const { layer } = runLayer("slashing", def, { rollS: 0.5 });
+    layer.land();
+    let t = 0.5;
+    for (; t < 0.5 + LAND_S + 2 * DT; t += DT) layer.update(t, 1, 50);
+    expect(layer.active()).toBe(false);
+    const k = Math.round(1 / DT); // 1 s of real time after rest
+    expect(seen[0]).toEqual({ t: 0.5, since: 0 });
+    expect(seen[k]?.since ?? 0).toBeCloseTo(k * DT * LAND_PACE, 6);
+    expect(seen[k]?.t ?? 0).toBeCloseTo(0.5 + k * DT * LAND_PACE, 6);
+    expect(Math.max(...seen.map((s) => s.since))).toBeLessThan(LAND_CLOCK_S);
+    expect(Math.max(...seen.map((s) => s.since))).toBeGreaterThan(LAND_CLOCK_S - 2 * DT);
+  });
+
   test("FR-DICEX-106 a die glows in flight and lands clean", () => {
     const { layer, meshes } = runLayer("fire", fire, { rollS: 0.5 });
     const m = meshes[0]?.material as MeshStandardMaterial;
@@ -181,7 +216,7 @@ describe("FR-DICEX-106 full effects, one kind per damage type", () => {
         fly(still, 1, 0.5);
         expect(still.count).toBe(0);
       }
-      expect(landFade(LAND_S)).toBe(0);
+      expect(landFade(LAND_CLOCK_S)).toBe(0);
     }
   });
 });

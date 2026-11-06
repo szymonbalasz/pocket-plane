@@ -21,7 +21,7 @@ export interface ThrowPlan {
   draw: "3d" | "flat";
   /** FR-DICEX-17: roller name, label and total in the zone, only while popups are off. */
   caption: boolean;
-  /** FR-DICEX-35: popups on → rest 1 s + hand-off 0.4 s; off → rest 1.5 s + fade. */
+  /** FR-DICEX-35: popups on → rest 1.5 s + hand-off 0.4 s; off → rest 2 s + fade. */
   handoff: boolean;
 }
 

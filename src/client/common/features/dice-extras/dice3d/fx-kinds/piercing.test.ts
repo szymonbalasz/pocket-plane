@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { richKindOf } from "../../die-fx";
-import { LAND_S } from "../fx-sim";
+import { LAND_S, landClock } from "../fx-sim";
 import { ARROW_GONE_S, ARROW_HIT_S, piercing } from "./piercing";
 import { DT, runLayer } from "./test-kit";
 
@@ -25,7 +25,7 @@ describe("FR-DICEX-106 piercing dice", () => {
     for (; t < 0.5 + LAND_S + 2 * DT; t += DT) {
       layer.update(t, 1, 50);
       seen.push({
-        since: t - 0.5,
+        since: landClock(t - 0.5),
         tip: Math.hypot(pivot.position.x - 2, pivot.position.z + 1),
         along: arrow.position.x,
         opacity: (arrow.material as MeshBasicMaterial).opacity,

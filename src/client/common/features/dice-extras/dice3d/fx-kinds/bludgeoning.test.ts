@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { richKindOf } from "../../die-fx";
-import { LAND_S } from "../fx-sim";
+import { LAND_CLOCK_S, LAND_S, landClock } from "../fx-sim";
 import { bludgeoning, HAMMER_GONE_S, HAMMER_HIT_S } from "./bludgeoning";
 import { DT, runLayer } from "./test-kit";
 
@@ -33,13 +33,13 @@ describe("FR-DICEX-106 bludgeoning dice", () => {
     let shownLate = 0;
     for (; t < end; t += DT) {
       layer.update(t, 1, 50);
-      const since = t - 0.5;
+      const since = landClock(t - 0.5);
       const opacity = (hammer.material as MeshBasicMaterial).opacity;
       if (since > HAMMER_HIT_S && since < HAMMER_HIT_S + 0.05) {
         squashed = Math.max(squashed, die.scale.x - 1);
         shownAtHit = Math.max(shownAtHit, opacity);
       }
-      if (since > HAMMER_GONE_S && since < LAND_S) shownLate = Math.max(shownLate, opacity);
+      if (since > HAMMER_GONE_S && since < LAND_CLOCK_S) shownLate = Math.max(shownLate, opacity);
     }
     expect(squashed).toBeGreaterThan(0.05);
     expect(shownAtHit).toBeGreaterThan(0.9);
