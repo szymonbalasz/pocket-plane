@@ -16,6 +16,8 @@ phase: post-mvp-7
 
 > **Sprint 7 (track FU, BL-48; DM [#311](../decisions-log.md)).** Decided, not open: the Rage toggle's double minus and the Sneak Attack roll line without its damage type. New **FR-MOD-68**, **-69**. Tests `FR-MOD-68 uses shown once` (DOM: `uses-rage-spent` at −1 / 3 → one "−1 / 3", no extra Badge in that row), `FR-MOD-69 trigger roll line typed` (integration, `trg-thorn`: Thorn's Sneak Attack roll entry label names "piercing"; an untyped part on an untyped attack unchanged); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. 0 B (label text only). Edge cases: client-only display (FR-MOD-68); FR-MOD-69's label is written in the trigger roll's existing transaction (crash: all or nothing, as today); reconnect re-renders from the store. No open question.
 
+> **Class resources (2026-11-06, [class-resources](class-resources.md) FR-CRES-15).** New owner-side filter `{if: "pactWeapon"}` on `hit` and `roll` triggers: the roll's row (by name, as `row`) is one of the owner's attack rows marked `pactWeapon`; spell rows never match. Words: "with a pact weapon".
+
 ## 1. Summary
 
 - CBTX **effects** carry typed **modifiers**: bonus dice (Bless +1d4), flat bonuses (+2 damage), advantage / disadvantage, resistance / vulnerability / immunity, AC bonus. Applied by the server as roll-time riders through the `rollHooks` registry; lines name them ("+ 3 Bless"). *(Tier 1 built; tiers 2–3 sprint 3.)*

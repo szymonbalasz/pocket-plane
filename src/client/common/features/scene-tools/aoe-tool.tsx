@@ -9,7 +9,9 @@
 // line, cube) or resizes it (sphere; a cylinder kept before FR-SCN-57 too); release sends one `scn.updateTemplate`
 // (FR-SCN-45). The panel: shape, size / width with ±5 nudges, label, Keep, Clear; for a selected
 // kept template: resize, rotate, Delete and (DM) Hide / Reveal; DM: DM-only and "Clear templates
-// on this scene" (confirm + scope, FR-SCN-44).
+// on this scene" (confirm + scope, FR-SCN-44). FR-VFX-40: while a placement request is on (a
+// spell cast into a template), a press always places, the release sends it, and the panel shows
+// only the request (its title, the hint and Cancel).
 
 import {
   AOE_TEMPLATE_TYPE,
@@ -54,7 +56,18 @@ import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
 import { useMapTool } from "../scenes-map/tool-store";
 import type { CanvasToolDef, ToolPointer } from "../scenes-map/tools";
 import { type AoeOrigin, aoeOrigin, footprintOf, mapCells, type SnapOptions } from "./aoe-snap";
-import { bindAoe, cancelAoe, editTemplate, endOwn, keepOwn, showOwn, useAoe } from "./aoe-store";
+import {
+  bindAoe,
+  cancelAoe,
+  editTemplate,
+  endOwn,
+  endRequest,
+  keepOwn,
+  type PlaceRequest,
+  sendRequest,
+  showOwn,
+  useAoe,
+} from "./aoe-store";
 import { FreeChip } from "./free-chip";
 import {
   AOE_TOOL_SHAPES,
@@ -119,7 +132,8 @@ function down(e: ToolPointer): void {
   last = e;
   const st = useAoe.getState();
   const p = gridPoint(e.grid, e.x, e.y);
-  const onScene = st.editable.filter((t) => t.sceneId === e.scene.id);
+  // FR-VFX-40: a placement request always places (kept templates are not picked).
+  const onScene = st.request ? [] : st.editable.filter((t) => t.sceneId === e.scene.id);
   // FR-SCN-45: the selected template's end handle first, then any editable origin.
   const selected = onScene.find((t) => t.id === st.selectedId);
   if (selected && handleAt(selected, p, true) === "end") {
@@ -173,6 +187,7 @@ function up(e: ToolPointer): void {
   move(e);
   const g = useAoe.getState().gesture;
   useAoe.setState({ gesture: null, originCell: null });
+  if (g?.kind === "place" && useAoe.getState().request) void sendRequest();
   if (!g || g.kind === "place") return;
   const kept = keptById(g.id);
   if (!kept) return;
@@ -336,6 +351,8 @@ export function AoePanel() {
   const step = TEMPLATE_ANGLE.step;
   const rotate = (by: number) =>
     selected && update({ angle: (((selected.angle + by) % 360) + 360) % 360 });
+  const request = useAoe((s) => s.request);
+  if (request) return <RequestPanel request={request} isDm={isDm} dmOnly={dmOnly} />;
   return (
     <div
       data-testid="scn-aoe-panel"
@@ -499,6 +516,62 @@ export function AoePanel() {
       <p data-testid="scn-aoe-hint-clear" className="text-muted-foreground text-xs">
         Right-click a template to remove it
       </p>
+      <FreeChip enabled onCtrl={aoeCtrl} />
+    </div>
+  );
+}
+
+/**
+ * FR-VFX-40: the panel while a placement request is on: its title, the size, how to place, the
+ * DM's DM-only switch and Cancel (as Esc).
+ */
+function RequestPanel({
+  request,
+  isDm,
+  dmOnly,
+}: {
+  request: PlaceRequest;
+  isDm: boolean;
+  dmOnly: boolean;
+}) {
+  return (
+    <div
+      data-testid="scn-aoe-panel"
+      data-request="true"
+      className="flex w-64 flex-col gap-2 rounded-md border bg-background/95 p-2 shadow-md backdrop-blur"
+    >
+      <p data-testid="scn-aoe-request" className="font-medium text-sm">
+        Place {request.title}
+      </p>
+      <p className="text-muted-foreground text-xs">
+        {request.size} ft {request.shape}.{" "}
+        {request.shape === "cube" ? "Press a grid corner" : "Press a square"}, drag to aim, release
+        to cast.
+      </p>
+      {isDm && (
+        <div className="flex items-center gap-2">
+          <Switch
+            id="scn-aoe-dm-only"
+            data-testid="scn-aoe-dm-only"
+            checked={dmOnly}
+            onCheckedChange={(v) => useAoe.setState({ dmOnly: v })}
+          />
+          <Label htmlFor="scn-aoe-dm-only" className="text-xs">
+            DM only
+          </Label>
+        </div>
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        data-testid="scn-aoe-request-cancel"
+        onClick={() => {
+          if (useAoe.getState().own) endOwn();
+          endRequest(true);
+        }}
+      >
+        Cancel
+      </Button>
       <FreeChip enabled onCtrl={aoeCtrl} />
     </div>
   );

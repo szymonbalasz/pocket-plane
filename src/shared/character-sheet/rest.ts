@@ -12,7 +12,7 @@ export interface RestState {
   tempHp: number;
   deathSuccesses: number;
   deathFailures: number;
-  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features">;
+  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features" | "pactUsed">;
 }
 
 export interface RestStats {
@@ -37,7 +37,10 @@ export const hitDiceRegainOf = (stats: Pick<RestStats, "classes">): number =>
  * size first (d12, d10, d8, d6). `used` is clamped to the class levels first (FR-CHARX-17).
  */
 export function regainHitDice(used: HitDiceUsed, stats: Pick<RestStats, "classes">): HitDiceUsed {
-  const clamped = clampCounters({ slotsUsed: {}, hitDiceUsed: used }, stats).hitDiceUsed;
+  const clamped = clampCounters(
+    { slotsUsed: {}, hitDiceUsed: used, pactUsed: 0 },
+    stats,
+  ).hitDiceUsed;
   let left = hitDiceRegainOf(stats);
   const out: HitDiceUsed = {};
   for (const die of DICE_DOWN) {
@@ -57,25 +60,31 @@ const resetsOn = (f: FeatureRow, kind: RestKind): boolean =>
  * FR-CHARX-121: the state after the rest. **Short**: feature rows with `reset: short` → `used 0`
  * (also below zero, FR-CHARX-58). **Long**: HP → `hpMax`, temp HP 0, death saves 0 / 0, every
  * slot `used 0`, rows with `reset` short or long → `used 0`, hit dice per `regainHitDice`.
+ * Both: pact slots `used 0` (FR-CRES-03).
  */
 export function restOutcome(kind: RestKind, s: RestState, stats: RestStats): RestState {
   const features = s.sheet.features.map(
     (f): FeatureRow => (f.used !== 0 && resetsOn(f, kind) ? { ...f, used: 0 } : f),
   );
-  if (kind === "short") return { ...s, sheet: { ...s.sheet, features } };
+  if (kind === "short") return { ...s, sheet: { ...s.sheet, features, pactUsed: 0 } };
   const slotsUsed: SlotsUsed = {};
   return {
     hpCurrent: stats.hpMax,
     tempHp: 0,
     deathSuccesses: 0,
     deathFailures: 0,
-    sheet: { features, slotsUsed, hitDiceUsed: regainHitDice(s.sheet.hitDiceUsed, stats) },
+    sheet: {
+      features,
+      slotsUsed,
+      hitDiceUsed: regainHitDice(s.sheet.hitDiceUsed, stats),
+      pactUsed: 0,
+    },
   };
 }
 
 /** FR-CHARX-123: the confirm's line of what the rest resets. */
 export const REST_TEXT: Record<RestKind, string> = {
-  short: "Resets short-rest feature uses. Spend hit dice on the sheet.",
+  short: "Resets short-rest feature uses and pact slots. Spend hit dice on the sheet.",
   long: "Restores HP, spell slots, feature uses and half the hit dice; clears temp HP and death saves.",
 };
 

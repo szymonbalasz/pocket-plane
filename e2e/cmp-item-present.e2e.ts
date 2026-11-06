@@ -1,5 +1,5 @@
 // e2e-bundle: item-present
-// Thin entry present flow (CMP §13, #455): player-1 connects to the waiting Moonlit Lantern
+// Thin entry present flow (CMP §13, #457): player-1 connects to the waiting Moonlit Lantern
 // (`entry-present-1`) → popup over the map with its 2 images (Prev / Next), Close → gone, also
 // after a reload; the DM awards Potion of Healing with Add to party (Show it on players' screens
 // ticked by default) → player-1's popup "The party receives" shows it, Open in Compendium → the

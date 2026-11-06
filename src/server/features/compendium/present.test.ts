@@ -1,4 +1,4 @@
-// CMP §13 integration (in-process), entry present (FR-CMP-78–82; DM #455): `cmp.presentEntry`,
+// CMP §13 integration (in-process), entry present (FR-CMP-78–82; DM #457): `cmp.presentEntry`,
 // `cmp.closeEntryPresent`, unshare / delete closing rows, the `entry-present` record through the
 // registry (snapshot, filtered changes) and the crash hook.
 import { describe, expect, test } from "bun:test";

@@ -67,6 +67,8 @@ export const Attack = z.strictObject({
   /** FR-CHARX-54 (sprint 4): absent = 0 / none, so old rows parse and behave as before. */
   bonus: int(0, ATTACK_BONUS_MAX).optional(),
   extraDamage: z.array(ExtraDamage).max(EXTRA_DAMAGE_MAX).optional(),
+  /** FR-CRES-14: the warlock's pact weapon (any weapon); absent = false. */
+  pactWeapon: z.boolean().optional(),
 });
 export type Attack = z.infer<typeof Attack>;
 
@@ -201,10 +203,20 @@ export const SPELL_LEVELS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as con
 export const SpellLevelKey = z.enum(SPELL_LEVELS);
 export type SpellLevelKey = z.infer<typeof SpellLevelKey>;
 
-/** Slot maxima per spell level (absent = 0); needs `abilities`. */
+/** FR-CRES-01: a warlock's pact slots, all one level, back on a short rest. */
+export const PACT_LEVEL_MAX = 5;
+export const PACT_SLOTS_MAX = 4;
+export const PactSlots = z.strictObject({
+  level: int(1, PACT_LEVEL_MAX),
+  slots: int(1, PACT_SLOTS_MAX),
+});
+export type PactSlots = z.infer<typeof PactSlots>;
+
+/** Slot maxima per spell level (absent = 0); needs `abilities`. `pact`: FR-CRES-01. */
 export const Spellcasting = z.strictObject({
   ability: Ability,
   slots: z.partialRecord(SpellLevelKey, int(0, 9)),
+  pact: PactSlots.optional(),
 });
 export type Spellcasting = z.infer<typeof Spellcasting>;
 
@@ -636,7 +648,8 @@ export const REDACTED_CHARACTER_KEYS = Object.keys(
 ) as readonly (keyof RedactedCharacter)[];
 
 /** FR-CBT-26's health band; a pet's for other players (FR-ENT-37), a monster combatant's. */
-export const HealthBand = z.enum(["healthy", "bloodied", "down"]);
+/** `critical` = above 0 but under 15 % of max (shown in `hp.down` red). */
+export const HealthBand = z.enum(["healthy", "bloodied", "critical", "down"]);
 export type HealthBand = z.infer<typeof HealthBand>;
 
 /**

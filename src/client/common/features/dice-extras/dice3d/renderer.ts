@@ -480,6 +480,7 @@ export function playThrow(o: PlayOptions): PlayHandle {
       const mesh = meshes[i];
       return die && mesh ? [{ mesh, fx: die, radius: geometryOf(d.shape).radius }] : [];
     }),
+    o.seed,
   );
   if (fx) {
     group.add(fx.object);
@@ -515,7 +516,10 @@ export function playThrow(o: PlayOptions): PlayHandle {
   const rest = () => {
     rested = true;
     pose(last);
-    fx?.clear();
+    // FR-DICEX-106: a short landing burst (fire, cold), drawn by the loop until it ends; a
+    // miniature copies its still at once, so it lands clean.
+    if (o.onStill) fx?.clear();
+    else fx?.land();
     meshes.forEach((m, i) => {
       if (o.dice[i]?.kept) return;
       const dim = m.material.clone();
@@ -545,18 +549,23 @@ export function playThrow(o: PlayOptions): PlayHandle {
     arena: o.arena,
     ...(o.view && { view: o.view }),
     fitted: { w: 0, h: 0 },
-    moving: () => !rested && !released,
+    moving: () => !released && (!rested || (fx?.active() ?? false)),
     tick(time) {
       if (start === null) start = time;
+      const unit = o.rect().w / Math.max(1e-6, camera.right - camera.left);
+      if (rested) {
+        // The landing, after rest: the dice stay put.
+        fx?.update((time - start) / 1000, 1, unit);
+        return fx?.active() ?? false;
+      }
       if (prev !== null) deltas.push(time - prev);
       prev = time;
       const f = ((time - start) / 1000) * STEP_HZ * speed;
       if (f >= last) {
         rest();
-        return false;
+        return fx?.active() ?? false;
       }
       pose(f);
-      const unit = o.rect().w / Math.max(1e-6, camera.right - camera.left);
       fx?.update((time - start) / 1000, f / Math.max(1, last), unit);
       return true;
     },
@@ -599,6 +608,7 @@ export function playThrow(o: PlayOptions): PlayHandle {
     handoff() {
       if (released) return null;
       if (!rested) rest();
+      fx?.clear();
       let still: Still | null = null;
       if (!s.lost) {
         draw(s);

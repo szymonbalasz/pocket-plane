@@ -853,7 +853,7 @@ One applied HP change to one target: the stats unit (#54, gate I9). Written by `
 | Effective public settings | settings row, else all false | FR-DICE-12 |
 | Difficulty rating, base / adjusted XP, thresholds, total CR | `difficultyMethods` (`dmg-2014`): party levels + monster CRs (XP table, CR 0 = 10) | FR-CBT-03, #136, gate I27 |
 | Party | `partyCharacterIds`, `null` = all characters at read time (*(sprint 1, built, fix/charx-combat-routes)* but drafts, a `creature-sheet` with `status: draft`) | FR-CBT-02 |
-| Health band | `down` if hp = 0; `bloodied` if 2 × hp ≤ hpMax; else `healthy`; computed in the visibility fn | [FR-CBT-26](../specs/combat-tracker.md#6-functional-requirements), #139 P9 |
+| Health band | `down` if hp = 0; `critical` if 20 × hp < 3 × hpMax (under 15 %); `bloodied` if 2 × hp ≤ hpMax; else `healthy`; computed in the visibility fn | [FR-CBT-26](../specs/combat-tracker.md#6-functional-requirements), #139 P9 |
 | Eligible turns; hit hint | not removed and not a monster at 0 HP; nat 20 hit, nat 1 miss, else total ≥ AC (per target) | FR-CBT-14, [FR-CBT-33](../specs/combat-tracker.md#6-functional-requirements) |
 | Sheet values | signed bonuses, "Down", roll specs `characterRolls(statBlock, kind, ability?)` (`@shared/character-sheet`; `check` / `save` kinds and `char.roll` built, #149) | [FR-CHAR-05](../specs/character-sheet.md#6-functional-requirements), CHAR §8 |
 | Pending for me, unread count | notifications × seen marker | FR-NOTE-18 |
@@ -936,6 +936,7 @@ From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`
 | items | **JSON leaf** 0–80 rows `{id, name, qty 0–9999, equipped, notes ≤ 120}` | No weight | CHARX §8.2 |
 | notes | text ≤ 4000, default "" | Rendered as text | CHARX §8.2 |
 | slotsUsed, hitDiceUsed | **JSON leaf** `{1…9: int}`, `{d6…d12: int}` | ≤ slot max / levels with that die; lowering a max clamps `used` in the same tx | [FR-CHARX-17](../specs/character-sheet-full.md#6-functional-requirements) |
+| pactUsed | int 0–4, default 0 | ≤ `spellcasting.pact.slots`; back on a short or long rest ([§155](#155-class-resources-pact-slots-and-pact-weapons-buildcres-pact)) | [FR-CRES-02](../specs/class-resources.md#6-functional-requirements) |
 | createdAt, updatedAt | timestamp | `ctx.clock` | CHARX §8.2 |
 
 - **Caps:** row ≤ 48 KB, stat block ≤ 12 KB, else `invalid` "Sheet is full" ([FR-CHARX-03](../specs/character-sheet-full.md#6-functional-requirements)). Typical 5–15 KB.
@@ -998,7 +999,7 @@ From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD, `comple
 | Table / leaf | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|
 | `effect` | + `modifiers` (**JSON leaf** Modifier[] 0–6), `preset_key` (text ≤ 40 \| null: built-in key or preset id, soft) | `[]`, null | DM full; players iff PC effect (`targetCharacterId` set), `presetKey` built-in keys only | [FR-MOD-03](../specs/effect-modifiers.md#6-functional-requirements), [FR-MOD-21](../specs/effect-modifiers.md#6-functional-requirements) |
-| `effect` *(spell-fx, built, fix/vfx-core, [§142](#142-spell-fx-core-effectfx-spellsfx-vfx-core))* | + `fx` (**JSON leaf** `{preset, params, spellId?}` ≤ 200 B \| null) | null | Rides the effect's rule; the player redaction gains `fx` | [FR-VFX-03](../specs/spell-fx.md#61-presets-and-the-map-effect) |
+| `effect` *(spell-fx, built, fix/vfx-core, [§142](#142-spell-fx-core-effectfx-spellsfx-vfx-core))* | + `fx` (**JSON leaf** `{preset, params, spellId?}` ≤ 200 B \| null; *#456:* `templateId?` = the kept `aoe-template` a template preset was cast into, FR-VFX-40) | null | Rides the effect's rule; the player redaction gains `fx` | [FR-VFX-03](../specs/spell-fx.md#61-presets-and-the-map-effect) |
 | `effect_preset` (new, record type `effect-preset`) | see below | — | DM full; player own rows (`ownerPlayerId`) | [FR-MOD-22](../specs/effect-modifiers.md#6-functional-requirements) |
 | `game_log_entry.payload` (`roll` items) | + optional `mods [{label \| null, value, expression?, auto?, rollId?}]`, `modes [label \| null]`; `total` includes the parts | absent; old rows parse | as the payload (labels null for effects players don't receive) | [FR-MOD-19](../specs/effect-modifiers.md#6-functional-requirements) |
 | `game_log_entry.dmPayload` (`roll`) | new: `{items: [{mods: [{effectId, label}], modes?}]}` | null (no parts) | DM only | FR-MOD-19, [FR-DICE-28](../specs/dice-roll-log.md#6-functional-requirements) |
@@ -2941,9 +2942,24 @@ Index: `note_campaign_title` (`campaign_id`, `title_fold`).
 - **Fixtures:** `notes-shared`, `notes-binned`, `notes-second-campaign`; bundle `notes`. Bodies are set by `notes.seedBody`, a fixtures-only command (not an intent) until co-writing exists.
 - **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap.
 
-## 155. Entry present (build/item-present, DM #455)
+## 155. Class resources: pact slots and pact weapons (build/cres-pact)
 
-### Entry present (`entry_present`, record type `entry-present`, **in the snapshot**) — owner [compendium](../specs/compendium.md#62-entry-present-an-awarded-item-pops-up-dm-455-2026-11-06)
+From [class-resources](../specs/class-resources.md) FR-CRES-01–04, -14, -15. **One new column on an existing table; no new table or record type.**
+
+| Field | Type | Default | Rule | Source |
+|---|---|---|---|---|
+| `creature_sheet.pact_used` (`pactUsed`) | int 0–4 | 0 | ≤ `spellcasting.pact.slots`; lowering it (or removing `pact`) clamps in the same tx (CHARX definition hook). `char.rest` short **and** long set it to 0 | FR-CRES-02, -03 |
+| `entity.statBlock.spellcasting.pact` (JSON leaf, zod) | `{level 1–5, slots 1–4}` optional | absent | The pact slots' level and count, beside `slots`; both kinds | FR-CRES-01 |
+| `entity.statBlock.attacks[].pactWeapon` (JSON leaf, zod) | bool optional | absent (= false) | Any number of rows | FR-CRES-14 |
+| `rule_trigger.rule.when[]` (JSON leaf, zod) | + `{if: "pactWeapon"}` | — | `hit` and `roll` triggers only; holds when the roll's row (by name, as `row`) is one of the owner's `pactWeapon` attack rows; never a spell row | FR-CRES-15 |
+
+- **Upgrade:** the column is added by push with its default; existing sheets read 0. No boot copy.
+- **Visibility:** as the sheet (DM + owner) and the stat block.
+- **Fixtures:** `char-vex` (Sorcerer 5 / Warlock 2, pact `{1, 2}`, "Pact blade" pact weapon, "Smite" trigger); bundle `class-resources`.
+
+## 156. Entry present (build/item-present, DM #457)
+
+### Entry present (`entry_present`, record type `entry-present`, **in the snapshot**) — owner [compendium](../specs/compendium.md#62-entry-present-an-awarded-item-pops-up-dm-457-2026-11-06)
 
 | Field | Type | Rule | Source |
 |---|---|---|---|

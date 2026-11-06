@@ -1,4 +1,4 @@
-// CMP §13 fixtures (#455): bundle `item-present` from empty: `entry-present-1` opens the shared
+// CMP §13 fixtures (#457): bundle `item-present` from empty: `entry-present-1` opens the shared
 // Moonlit Lantern on every Fixture Campaign player's screen (one `entry-present` row each, none in
 // the second campaign), deterministic ids.
 import { afterAll, describe, expect, test } from "bun:test";
@@ -39,7 +39,7 @@ async function read() {
   return out;
 }
 
-describe("item-present fixtures (CMP §13, #455)", () => {
+describe("item-present fixtures (CMP §13, #457)", () => {
   test("FR-CMP-79 entry-present-1: Moonlit Lantern open for every Fixture Campaign player; deterministic", async () => {
     const a = await read();
     expect(a.manifest.fixtures).toEqual(

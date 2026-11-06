@@ -1,4 +1,4 @@
-// Entry present (CMP §6.2, FR-CMP-78–83; DM #455): `cmp.presentEntry` (DM) opens a compendium
+// Entry present (CMP §6.2, FR-CMP-78–83; DM #457): `cmp.presentEntry` (DM) opens a compendium
 // entry on every player's screen; `cmp.closeEntryPresent` (DM, player) closes a row; an unshare
 // or delete of a homebrew entry closes its rows (FR-CMP-82). Record `entry-present` is in the
 // snapshot (it must reach a player who never opens the Compendium): DM every row, a player only

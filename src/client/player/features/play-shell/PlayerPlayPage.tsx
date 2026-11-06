@@ -28,7 +28,7 @@ export function PlayerPlayPage({
       )}
       {/* FR-PARTY-36: a handout the DM presents, over every window and toast (seams S4). */}
       <PlayerPresentPopup />
-      {/* FR-CMP-82 (#455): an entry the DM shows (an awarded item), after any handout popup. */}
+      {/* FR-CMP-82 (#457): an entry the DM shows (an awarded item), after any handout popup. */}
       <PlayerEntryPresentPopup />
     </ShellProvider>
   );

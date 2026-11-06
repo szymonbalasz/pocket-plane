@@ -306,6 +306,8 @@ export const creatureSheet = sqliteTable(
     slotsUsed: text("slots_used", { mode: "json" }).notNull(),
     /** `{d6…d12: int}` */
     hitDiceUsed: text("hit_dice_used", { mode: "json" }).notNull(),
+    /** FR-CRES-02 (class-resources): pact slots used. Added column, default 0. */
+    pactUsed: integer("pact_used").notNull().default(0),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -1693,7 +1695,7 @@ export const compendiumEntry = sqliteTable(
 );
 
 /**
- * Entry present (compendium, `entry-present`, FR-CMP-78; DM #455): a compendium entry open on one
+ * Entry present (compendium, `entry-present`, FR-CMP-78; DM #457): a compendium entry open on one
  * player's screen until closed, like `handout_present`. At most one row per player (unique
  * `(campaignId, playerId)`); a row exists only while its player may read the entry (FR-CMP-82,
  * kept by the commands; the cascade is the backstop for a homebrew delete).

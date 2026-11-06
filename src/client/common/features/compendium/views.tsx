@@ -461,7 +461,7 @@ export function EntryView({
   data: EntryResponse;
   viewer: Role;
   actions?: ReactNode;
-  /** *(#455)* No actions row (the player's entry popup, FR-CMP-80: its menus would open under it). */
+  /** *(#457)* No actions row (the player's entry popup, FR-CMP-80: its menus would open under it). */
   bare?: boolean;
 }) {
   const e = data.entry;

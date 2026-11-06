@@ -28,7 +28,7 @@ export function addToPartyHint(e: EntryLike): string | null {
   return `Players will see ${partyItemName(e.name)} in the party inventory`;
 }
 
-/** FR-CMP-80 (#455): the tick's label. */
+/** FR-CMP-80 (#457): the tick's label. */
 export const SHOW_TICK = "Show it on players' screens";
 
 /**

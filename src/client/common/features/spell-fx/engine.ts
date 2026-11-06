@@ -27,11 +27,15 @@ export const PARTICLE_BUDGET = 400;
 /** FR-VFX-12: the DM draws a hidden token's aura at the hidden-token opacity (TokensLayer). */
 export const HIDDEN_ALPHA = 0.45;
 
-/** A token as drawn now: top-left (map px) and footprint side. */
+/**
+ * A token as drawn now: top-left (map px) and footprint side. FR-VFX-40: a template anchor = its
+ * square unrotated about the centre, with `angle` (radians).
+ */
 export interface DrawnBox {
   x: number;
   y: number;
   size: number;
+  angle?: number;
 }
 
 export interface FxView {
@@ -396,6 +400,7 @@ export class FxEngine {
       x: still ? box.x + box.size / 2 : a.x,
       y: still ? box.y + box.size / 2 : a.y,
       size: box.size,
+      ...(box.angle ? { angle: box.angle } : {}),
       cell: this.view.cell,
       radius: ((a.spec.radiusFt ?? 0) / 5) * this.view.cell + box.size / 2,
       t: still ? STILL_T : this.now,

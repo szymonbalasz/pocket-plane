@@ -1,7 +1,7 @@
 // Compendium (CMP, ADR-0046): import kinds for the pipeline, `cmp.import` /
 // `cmp.importRecorded`, homebrew `cmp.putEntry` / `cmp.deleteEntry`, `cmp.deriveMonster` (REST,
 // routes mounted in app.ts), the WS intent `cmp.addToSheet` (FR-CMP-28) and the search index's
-// drop listener (FR-CMP-34). *(#455)* Entry present: `cmp.presentEntry` / `cmp.closeEntryPresent`
+// drop listener (FR-CMP-34). *(#457)* Entry present: `cmp.presentEntry` / `cmp.closeEntryPresent`
 // and the `entry-present` record (in the snapshot).
 import type { Feature } from "../../services";
 import { addToSheet } from "./add-to-sheet";
@@ -24,7 +24,7 @@ export const compendium: Feature = {
     r.command(deleteEntry);
     r.command(deriveMonster);
     r.command(addToSheet, { intent: true });
-    // FR-CMP-78–82 (DM #455): an entry open on players' screens.
+    // FR-CMP-78–82 (DM #457): an entry open on players' screens.
     r.command(presentEntry, { intent: true });
     r.command(closeEntryPresent, { intent: true });
     r.command(presentEntryByName);

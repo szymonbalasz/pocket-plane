@@ -1,6 +1,8 @@
 // FR-DICEX-106: what a damage die does while it rolls, per damage type: a subtle glow on the die
-// and a few motes around it (fire: rising embers, lightning: hard flashes), gone by the time it
-// rests so the value reads clean. Physical types have none. Pure: the 3D renderer and the flat die
+// and a few motes around it (lightning: hard flashes), gone by the time it rests so the value
+// reads clean. Fire and cold have the full effect instead in 3D (`rich`: flames or frost around
+// the die, a trail, a short landing burst; dice3d/fx-sim.ts); their numbers here still drive the
+// flat die's glow. Physical types have none. Pure: the 3D renderer and the flat die
 // draw from these numbers; every client computes the same from the roll's type (no server part).
 import type { PartDamageType } from "@shared/effect-modifiers/schemas";
 
@@ -25,6 +27,8 @@ export interface DieFx {
   spread: number;
   /** A mote's life (seconds). */
   life: number;
+  /** The full 3D effect (dice3d/fx-rich.ts) in place of the glow and motes. */
+  rich?: "fire" | "frost";
 }
 
 const DIE_FX: Record<PartDamageType, DieFx | null> = {
@@ -48,6 +52,7 @@ const DIE_FX: Record<PartDamageType, DieFx | null> = {
     drift: [0, 0.35],
     spread: 1,
     life: 1.1,
+    rich: "frost",
   },
   fire: {
     color: 0xff6a1a,
@@ -57,6 +62,7 @@ const DIE_FX: Record<PartDamageType, DieFx | null> = {
     drift: [0, -1.6],
     spread: 0.7,
     life: 0.7,
+    rich: "fire",
   },
   force: {
     color: 0x5f7bff,

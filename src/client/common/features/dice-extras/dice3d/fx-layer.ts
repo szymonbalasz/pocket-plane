@@ -1,7 +1,8 @@
 // FR-DICEX-106: a throw's damage effects on the shared canvas, in the lazy chunk only: each die's
 // own glow (a clone of its material), a soft halo under it and a few motes around it, as one Points
 // draw each for the whole throw. Built only when a die has an effect; no extra frames (it runs in
-// the throw's loop) and gone at rest, so the stills and hand-off copies stay clean.
+// the throw's loop) and gone at rest, so the stills and hand-off copies stay clean. Fire and cold
+// dice get the full effect instead (fx-rich.ts), which ends in a short landing burst after rest.
 import {
   BufferGeometry,
   CanvasTexture,
@@ -15,6 +16,7 @@ import {
   SRGBColorSpace,
 } from "three";
 import { type DieFx, fxEnvelope, fxGlow, fxMote } from "../die-fx";
+import { richLayer } from "./fx-rich";
 
 const MOTES = 6;
 /** The halo's height: above the shadow floor, below any die. */
@@ -36,7 +38,11 @@ export interface FxLayer {
   own: { dispose(): void }[];
   /** `t` seconds in, at `progress` (0–1) of the throw, `unit` px per world unit. */
   update(t: number, progress: number, unit: number): void;
-  /** At rest: nothing of it stays on the dice. */
+  /** At rest: the landing (fire and cold burst once), while `active()`; the rest is gone. */
+  land(): void;
+  /** Still landing: the throw's loop keeps drawing. */
+  active(): boolean;
+  /** Nothing of it stays on the dice (a still or hand-off copy, release). */
   clear(): void;
 }
 
@@ -77,7 +83,37 @@ function pointsOf(n: number, map: CanvasTexture) {
 }
 
 /** The layer for these dice, or null when none has an effect. */
-export function fxLayer(dice: readonly FxDie[]): FxLayer | null {
+export function fxLayer(dice: readonly FxDie[], seed = 0): FxLayer | null {
+  const rich = richLayer(
+    dice.flatMap(({ mesh, fx, radius }) => (fx.rich ? [{ mesh, kind: fx.rich, radius }] : [])),
+    seed,
+  );
+  const plain = plainLayer(dice.filter((d) => !d.fx.rich));
+  if (!rich) return plain;
+  if (!plain) return rich;
+  const object = new Group();
+  object.add(plain.object, rich.object);
+  return {
+    object,
+    own: [...plain.own, ...rich.own],
+    update(t, progress, unit) {
+      plain.update(t, progress, unit);
+      rich.update(t, progress, unit);
+    },
+    land() {
+      plain.land();
+      rich.land();
+    },
+    active: () => rich.active(),
+    clear() {
+      plain.clear();
+      rich.clear();
+    },
+  };
+}
+
+/** The subtle glow and motes (every type but fire and cold). */
+function plainLayer(dice: readonly FxDie[]): FxLayer | null {
   if (dice.length === 0) return null;
   const map = new CanvasTexture(dotCanvas());
   map.colorSpace = SRGBColorSpace;
@@ -130,6 +166,10 @@ export function fxLayer(dice: readonly FxDie[]): FxLayer | null {
         a.needsUpdate = true;
       }
     },
+    land() {
+      this.clear();
+    },
+    active: () => false,
     clear() {
       object.visible = false;
       for (const m of glows) m.emissiveIntensity = 0;

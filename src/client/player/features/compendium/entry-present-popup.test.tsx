@@ -1,4 +1,4 @@
-// Player entry popup (FR-CMP-80, -83; DM #455): which row it shows (own row only, after a
+// Player entry popup (FR-CMP-80, -83; DM #457): which row it shows (own row only, after a
 // presented handout, not while paused, not after a local close in this snapshot generation) and
 // its title. The Dialog itself, Close and "Open in Compendium": e2e/cmp-item-present.e2e.ts.
 import { describe, expect, test } from "bun:test";
