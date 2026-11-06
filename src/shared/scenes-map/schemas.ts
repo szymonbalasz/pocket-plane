@@ -225,6 +225,11 @@ const tokenFields = {
   /** Server copy: every footprint cell fogged (FR-FOG-10); on the wire only when true. */
   fogged: z.literal(true).optional(),
   /**
+   * FR-MAP-151: marked dead (the DM's token menu; combat End on a monster at 0 HP): the red X
+   * outside combat too. Everyone who receives the token gets it; on the wire only when true.
+   */
+  dead: z.literal(true).optional(),
+  /**
    * FR-MAP-65, -66 (sprint 5): this turn's combat trail, written by combat through
    * `appendTrail` / `clearTrails`; null outside combat. Players get it on player tokens only
    * (absent on every other token they receive).
@@ -348,6 +353,8 @@ export const UpdateTokenInput = z.strictObject({
   size: TokenSize.optional(),
   /** FR-ENT-27: a type or `"initials"`; null is never sent (it only means "not known yet"). */
   creatureType: TokenCreatureType.optional(),
+  /** FR-MAP-151: the token menu's Mark dead / Mark alive. */
+  dead: z.boolean().optional(),
 });
 export type UpdateTokenInput = z.input<typeof UpdateTokenInput>;
 

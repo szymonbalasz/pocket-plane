@@ -848,6 +848,7 @@ export function updateTokenCommand(hooks: TokenHooks) {
       }
       if (input.shape !== undefined) set.shape = input.shape;
       if (input.creatureType !== undefined) set.creatureType = input.creatureType;
+      if (input.dead !== undefined) set.dead = input.dead;
       if (input.size !== undefined) {
         const s = findScene(tx, cid, before.sceneId) as SceneRecord;
         assertOnMap(s, before.col, before.row, input.size);

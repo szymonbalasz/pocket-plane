@@ -1,5 +1,5 @@
 // scenes-map's token menu entries (FR-MAP-18): rename, image, shape (FR-MAP-35), size (FR-MAP-150),
-// owner, hide/reveal, teleport (FR-MAP-121), duplicate, delete (no confirm). Each sends one `map.*` intent; the server decides.
+// owner, hide/reveal, mark dead / alive (FR-MAP-151), teleport (FR-MAP-121), duplicate, delete (no confirm). Each sends one `map.*` intent; the server decides.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
   MAP_INTENTS,
@@ -27,10 +27,12 @@ import {
   EyeIcon,
   EyeOffIcon,
   FlipHorizontal2Icon,
+  HeartPulseIcon,
   ImageIcon,
   PencilIcon,
   ScalingIcon,
   ShapesIcon,
+  SkullIcon,
   Trash2Icon,
   UserIcon,
   WandSparklesIcon,
@@ -240,6 +242,23 @@ export const scenesMapTokenMenu: readonly TokenMenuEntry[] = [
           }
         >
           {token.hidden ? <EyeIcon /> : <EyeOffIcon />} {token.hidden ? "Reveal" : "Hide"}
+        </DropdownMenuItem>
+      );
+    },
+  },
+  {
+    id: "map.dead",
+    order: 46,
+    Item: function DeadItem({ token }: TokenMenuItemProps) {
+      const send = useSend();
+      const dead = token.dead === true;
+      return (
+        <DropdownMenuItem
+          data-testid="map-token-menu-dead"
+          data-dead={dead}
+          onSelect={() => void send(MAP_INTENTS.updateToken, { tokenId: token.id, dead: !dead })}
+        >
+          {dead ? <HeartPulseIcon /> : <SkullIcon />} {dead ? "Mark alive" : "Mark dead"}
         </DropdownMenuItem>
       );
     },

@@ -500,6 +500,8 @@ export const token = sqliteTable(
     invisible: integer("invisible", { mode: "boolean" }).notNull().default(false),
     /** FR-MAP-150 (#429): the DM set this token's size; the definition's no longer follows. Never on a wire. */
     sizeOverridden: integer("size_overridden", { mode: "boolean" }).notNull().default(false),
+    /** FR-MAP-151: the DM marked it dead (combat End marks monsters at 0 HP); the red X stays. */
+    dead: integer("dead", { mode: "boolean" }).notNull().default(false),
     /**
      * FR-MAP-65 (sprint 5): JSON leaf `{cells}` (2–21) | null: this turn's combat trail, written
      * only by scenes-map's `appendTrail` / `clearTrails` (combat calls them). Players: player
