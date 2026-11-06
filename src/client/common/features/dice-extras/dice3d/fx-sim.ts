@@ -1,19 +1,16 @@
-// FR-DICEX-106: the full effect of fire and cold dice, a particle simulation with no
-// three.js in it (tested headless). Each die sheds particles while it flies and bursts once when
-// it lands; every particle moves with its own die (no trail behind it); the burst is over within
-// LAND_S of rest, before the hand-off copies the dice (FR-DICEX-35). Big rolls share one budget:
-// fewer particles per die as the dice add up, and never more than MAX_PARTICLES live.
-
-export type RichKind = "fire" | "frost";
-
-/** Sprite tiles of the particle atlas (fx-rich.ts draws them). */
-export const TILE = { dot: 0, flame: 1, flake: 2, star: 3 } as const;
+// FR-DICEX-106: the full effect of a damage die, a particle simulation with no three.js in it
+// (tested headless). Each die sheds particles while it flies and bursts once when it lands; every
+// particle moves with its own die (no trail behind it); the burst is over within LAND_S of rest,
+// before the hand-off copies the dice (FR-DICEX-35). Big rolls share one budget: fewer particles
+// per die as the dice add up, and never more than MAX_PARTICLES live per kind. The kinds' looks
+// (presets, sprites, auras) live in fx-kinds/<kind>.ts.
 
 /** A colour stop over a particle's life: at (0–1), r, g, b, a (0–1). */
-type Stop = readonly [number, number, number, number, number];
+export type Stop = readonly [number, number, number, number, number];
 
 export interface Species {
-  tile: number;
+  /** The sprite, by name: a core tile (fx-kinds/tiles.ts: dot, star) or one of the kind's own. */
+  tile: string;
   /** Adds light (fire, glitter) or covers what is under it (smoke, mist, flakes). */
   additive: boolean;
   /** Seconds, min and max. */
@@ -38,6 +35,7 @@ export interface Species {
 }
 
 export interface Emitter {
+  /** Index into the preset's `species`. */
   species: number;
   /** Per second per die while it flies (before the budget). */
   rate: number;
@@ -47,188 +45,25 @@ export interface Emitter {
   burstSpeed: number;
 }
 
-export interface RichPreset {
-  species: readonly Species[];
-  emitters: readonly Emitter[];
-  /** The die's own glow while it flies. */
+/** The die's own glow while it flies (and its flare at the landing). */
+export interface DieGlow {
   emissive: number;
-  glow: readonly [number, number];
+  /** Emissive intensity, low and high. */
+  range: readonly [number, number];
+  /** Flicker speed. */
   hz: number;
   /** The die's body tinted toward this colour by `amount` while it flies (frost). */
   tint?: { color: number; amount: number };
-  /** The shader aura around the die: its half size in die radii. */
-  aura: number;
 }
 
-const FIRE: RichPreset = {
-  species: [
-    {
-      // Flames: licking off the die, left behind as a burning trail.
-      tile: TILE.flame,
-      additive: true,
-      life: [0.3, 0.55],
-      size: [1.1, 1.9],
-      speed: [0.4, 1.4],
-      drag: 2.5,
-      drift: [0, -1.4],
-      spin: 3,
-      from: [0.4, 0.95],
-      lift: 0,
-      ramp: [
-        [0, 1, 0.95, 0.75, 0],
-        [0.12, 1, 0.82, 0.4, 0.95],
-        [0.45, 1, 0.45, 0.08, 0.75],
-        [0.8, 0.7, 0.12, 0.02, 0.3],
-        [1, 0.4, 0.05, 0, 0],
-      ],
-      twinkle: 0,
-    },
-    {
-      // Embers: hot sparks thrown off, rising and cooling.
-      tile: TILE.dot,
-      additive: true,
-      life: [0.6, 1.3],
-      size: [0.24, 0.08],
-      speed: [1.2, 3.8],
-      drag: 1.3,
-      drift: [0, -1.8],
-      spin: 0,
-      from: [0.5, 1],
-      lift: 1.5,
-      ramp: [
-        [0, 1, 1, 0.85, 1],
-        [0.3, 1, 0.72, 0.25, 1],
-        [0.75, 1, 0.35, 0.05, 0.8],
-        [1, 0.6, 0.1, 0, 0],
-      ],
-      twinkle: 11,
-    },
-    {
-      // Smoke: on the floor, under the dice.
-      tile: TILE.flame,
-      additive: false,
-      life: [0.9, 1.4],
-      size: [1, 2.8],
-      speed: [0.2, 0.6],
-      drag: 1,
-      drift: [0, -0.7],
-      spin: 1,
-      from: [0.3, 0.8],
-      lift: null,
-      ramp: [
-        [0, 0.24, 0.2, 0.18, 0],
-        [0.25, 0.22, 0.19, 0.17, 0.3],
-        [1, 0.2, 0.18, 0.17, 0],
-      ],
-      twinkle: 0,
-    },
-  ],
-  emitters: [
-    { species: 0, rate: 95, burst: 44, burstSpeed: 3 },
-    { species: 1, rate: 26, burst: 38, burstSpeed: 2 },
-    { species: 2, rate: 10, burst: 10, burstSpeed: 2.5 },
-  ],
-  emissive: 0xff5a10,
-  glow: [0.35, 0.75],
-  hz: 9,
-  aura: 3.2,
-};
+export interface RichPreset {
+  species: readonly Species[];
+  emitters: readonly Emitter[];
+  /** None: the die keeps its own look. */
+  glow?: DieGlow;
+}
 
-const FROST: RichPreset = {
-  species: [
-    {
-      // Cold mist rolling along the floor.
-      tile: TILE.dot,
-      additive: false,
-      life: [0.9, 1.5],
-      size: [1.2, 3.2],
-      speed: [0.2, 0.6],
-      drag: 1,
-      drift: [0, 0.25],
-      spin: 0,
-      from: [0.3, 0.9],
-      lift: null,
-      ramp: [
-        [0, 0.62, 0.84, 1, 0],
-        [0.25, 0.66, 0.86, 1, 0.3],
-        [1, 0.75, 0.9, 1, 0],
-      ],
-      twinkle: 0,
-    },
-    {
-      // Snowflakes, slowly turning and drifting down.
-      tile: TILE.flake,
-      additive: false,
-      life: [1, 1.7],
-      size: [0.5, 0.32],
-      speed: [0.4, 1.2],
-      drag: 1.2,
-      drift: [0, 0.5],
-      spin: 2.5,
-      from: [0.7, 1.2],
-      lift: 1.4,
-      ramp: [
-        [0, 0.85, 0.95, 1, 0],
-        [0.15, 0.85, 0.95, 1, 0.95],
-        [0.7, 0.75, 0.9, 1, 0.8],
-        [1, 0.7, 0.88, 1, 0],
-      ],
-      twinkle: 0,
-    },
-    {
-      // Ice glitter: tiny twinkling stars.
-      tile: TILE.star,
-      additive: true,
-      life: [0.4, 0.9],
-      size: [0.4, 0.12],
-      speed: [0.3, 1.5],
-      drag: 2,
-      drift: [0, 0.2],
-      spin: 1,
-      from: [0.6, 1.1],
-      lift: 1.5,
-      ramp: [
-        [0, 1, 1, 1, 1],
-        [0.5, 0.7, 0.92, 1, 0.9],
-        [1, 0.45, 0.75, 1, 0],
-      ],
-      twinkle: 10,
-    },
-    {
-      // Ice shards: only when the die lands, flung out fast.
-      tile: TILE.star,
-      additive: true,
-      life: [0.3, 0.6],
-      size: [0.55, 0.15],
-      speed: [2, 4],
-      drag: 3,
-      drift: [0, 0],
-      spin: 4,
-      from: [0.8, 1],
-      lift: 1.2,
-      ramp: [
-        [0, 1, 1, 1, 1],
-        [1, 0.5, 0.8, 1, 0],
-      ],
-      twinkle: 0,
-    },
-  ],
-  emitters: [
-    { species: 0, rate: 14, burst: 14, burstSpeed: 4 },
-    { species: 1, rate: 16, burst: 14, burstSpeed: 1.8 },
-    { species: 2, rate: 40, burst: 30, burstSpeed: 2.5 },
-    { species: 3, rate: 0, burst: 26, burstSpeed: 1 },
-  ],
-  emissive: 0x7fd4ff,
-  glow: [0.25, 0.45],
-  hz: 1.5,
-  tint: { color: 0x9ed8ff, amount: 0.45 },
-  aura: 2.8,
-};
-
-export const RICH: Record<RichKind, RichPreset> = { fire: FIRE, frost: FROST };
-
-/** Live particles of one throw, all dice together. */
+/** Live particles of one kind in one throw, all its dice together. */
 export const MAX_PARTICLES = 1400;
 /** The landing is over this long after rest (well before the 1 s hand-off, FR-DICEX-35). */
 export const LAND_S = 0.9;
@@ -268,7 +103,7 @@ export interface Drawn {
   /** Diameter, world units. */
   size: number;
   rot: number;
-  tile: number;
+  tile: string;
   additive: boolean;
   r: number;
   g: number;
@@ -310,9 +145,16 @@ export function rampAt(ramp: readonly Stop[], t: number): [number, number, numbe
 /** Height of the floor particles: above the shadow floor and the old halo, below any die. */
 const FLOOR_Y = 0.06;
 
-/** The simulation for `dieCount` dice of `kind`. */
-export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim {
-  const preset = RICH[kind];
+/**
+ * The simulation for `dieCount` dice of one kind. `whileRolling` false: nothing is shed in flight,
+ * only the landing burst (physical types).
+ */
+export function richSim(
+  preset: RichPreset,
+  dieCount: number,
+  seed: number,
+  whileRolling = true,
+): RichSim {
   const rand = prng(seed);
   const scale = budgetScale(dieCount);
   const cap = MAX_PARTICLES;
@@ -405,7 +247,7 @@ export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim
         rot[i] = (rot[i] as number) + (spin[i] as number) * dt;
       }
       // Shed.
-      if (!flying) return;
+      if (!flying || !whileRolling) return;
       dice.forEach((d, k) => {
         const debt = owed[k] ?? preset.emitters.map(() => rand());
         owed[k] = debt;
@@ -470,7 +312,18 @@ export function landGlow(sinceRest: number): number {
   return 1.25 * (1 - u) * (1 - u);
 }
 
+/**
+ * The aura's and the die's glow strength: in over the first moments of the throw and at full until
+ * the landing flares it out (`sinceRest`: null in flight). `whileRolling` false: none in flight.
+ */
+export function richAmp(whileRolling: boolean, progress: number, sinceRest: number | null): number {
+  if (sinceRest !== null) return landGlow(sinceRest);
+  return whileRolling ? Math.min(1, progress / 0.06) : 0;
+}
+
 /** The die's glow level (0–1) `t` seconds in. */
-export function richFlicker(p: RichPreset, t: number, seed: number): number {
-  return 0.5 + 0.3 * Math.sin(t * p.hz * 2.1 + seed) + 0.2 * Math.sin(t * p.hz * 5.3 + seed * 2);
+export function richFlicker(glow: DieGlow, t: number, seed: number): number {
+  return (
+    0.5 + 0.3 * Math.sin(t * glow.hz * 2.1 + seed) + 0.2 * Math.sin(t * glow.hz * 5.3 + seed * 2)
+  );
 }

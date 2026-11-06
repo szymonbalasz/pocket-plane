@@ -1,6 +1,8 @@
-// FR-DICEX-106: fire and cold dice's full effect, the particle simulation: pure.
+// FR-DICEX-106: the full effect's particle simulation (pure), run on fire's and cold's presets.
+// Each kind's own tests: fx-kinds/<kind>.test.ts; the registry's: fx-kinds/index.test.ts.
 import { describe, expect, test } from "bun:test";
-import { dieFxOf } from "../die-fx";
+import { fire } from "./fx-kinds/fire";
+import { frost } from "./fx-kinds/frost";
 import {
   budgetScale,
   LAND_GLOW_S,
@@ -8,14 +10,13 @@ import {
   landFade,
   landGlow,
   MAX_PARTICLES,
-  RICH,
-  type RichKind,
   rampAt,
+  richAmp,
   richSim,
   type SimDie,
 } from "./fx-sim";
 
-const KINDS: RichKind[] = ["fire", "frost"];
+const KINDS = [fire.preset, frost.preset];
 const DT = 1 / 60;
 
 /** Dice flying along +x for `s` seconds; returns the last positions. */
@@ -29,13 +30,6 @@ function fly(sim: ReturnType<typeof richSim>, n: number, s: number): SimDie[] {
 }
 
 describe("FR-DICEX-106 fire and cold dice", () => {
-  test("FR-DICEX-106 fire and cold dice have the full effect, other types the subtle one", () => {
-    expect(dieFxOf("fire")?.rich).toBe("fire");
-    expect(dieFxOf("cold")?.rich).toBe("frost");
-    expect(dieFxOf("lightning")?.rich).toBeUndefined();
-    expect(dieFxOf("necrotic")?.rich).toBeUndefined();
-  });
-
   test("FR-DICEX-106 particles move with their die, no trail behind it", () => {
     for (const kind of KINDS) {
       const sim = richSim(kind, 2, 7);
@@ -90,17 +84,17 @@ describe("FR-DICEX-106 fire and cold dice", () => {
   });
 
   test("FR-DICEX-106 every client sheds the same particles", () => {
-    const a = richSim("fire", 2, 11);
-    const b = richSim("fire", 2, 11);
+    const a = richSim(fire.preset, 2, 11);
+    const b = richSim(fire.preset, 2, 11);
     fly(a, 2, 0.3);
     fly(b, 2, 0.3);
     expect(a.count).toBe(b.count);
     expect(a.drawn(5, 1)).toEqual(b.drawn(5, 1));
   });
 
-  test("FR-DICEX-106 colours stay in range; fire is hot, frost is cold", () => {
+  test("FR-DICEX-106 colours stay in range", () => {
     for (const kind of KINDS) {
-      for (const s of RICH[kind].species) {
+      for (const s of kind.species) {
         for (let t = 0; t <= 1; t += 0.05) {
           for (const c of rampAt(s.ramp, t)) {
             expect(c).toBeGreaterThanOrEqual(0);
@@ -109,9 +103,12 @@ describe("FR-DICEX-106 fire and cold dice", () => {
         }
       }
     }
-    const [fr, , fb] = rampAt((RICH.fire.species[0] as (typeof RICH.fire.species)[0]).ramp, 0.4);
-    expect(fr).toBeGreaterThan(fb);
-    const [cr, , cb] = rampAt((RICH.frost.species[1] as (typeof RICH.frost.species)[1]).ramp, 0.4);
-    expect(cb).toBeGreaterThan(cr);
+  });
+
+  test("FR-DICEX-106 the glow fades in, flares at the landing and is gone by LAND_GLOW_S", () => {
+    expect(richAmp(true, 0, null)).toBe(0);
+    expect(richAmp(true, 0.5, null)).toBe(1);
+    expect(richAmp(true, 1, 0)).toBeGreaterThan(1);
+    expect(richAmp(true, 1, LAND_GLOW_S)).toBe(0);
   });
 });

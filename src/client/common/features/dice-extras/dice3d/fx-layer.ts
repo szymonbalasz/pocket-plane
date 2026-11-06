@@ -1,8 +1,9 @@
 // FR-DICEX-106: a throw's damage effects on the shared canvas, in the lazy chunk only: each die's
 // own glow (a clone of its material), a soft halo under it and a few motes around it, as one Points
 // draw each for the whole throw. Built only when a die has an effect; no extra frames (it runs in
-// the throw's loop) and gone at rest, so the stills and hand-off copies stay clean. Fire and cold
-// dice get the full effect instead (fx-rich.ts), which ends in a short landing burst after rest.
+// the throw's loop) and gone at rest, so the stills and hand-off copies stay clean. A die whose
+// kind is built (fx-kinds/) gets the full effect instead (fx-rich.ts), which ends in a short
+// landing burst after rest; the others keep the subtle one (physical types: nothing).
 import {
   BufferGeometry,
   CanvasTexture,
@@ -15,8 +16,10 @@ import {
   PointsMaterial,
   SRGBColorSpace,
 } from "three";
-import { type DieFx, fxEnvelope, fxGlow, fxMote } from "../die-fx";
-import { richLayer } from "./fx-rich";
+import { type DieFx, fxEnvelope, fxGlow, fxMote, type RichKind } from "../die-fx";
+import { RICH_DEFS } from "./fx-kinds";
+import type { RichKindDef } from "./fx-kinds/kind";
+import { type RichDie, richLayer } from "./fx-rich";
 
 const MOTES = 6;
 /** The halo's height: above the shadow floor, below any die. */
@@ -28,9 +31,36 @@ const MOTE_SIZE = 0.34;
 
 export interface FxDie {
   mesh: Mesh;
-  fx: DieFx;
+  /** The subtle effect (die-fx.ts), if the type has one. */
+  fx: DieFx | null;
+  /** The full effect's kind (`richKindOf`), if the type has one. */
+  rich: RichKind | null;
   /** The die's radius (world units). */
   radius: number;
+}
+
+interface PlainDie {
+  mesh: Mesh;
+  fx: DieFx;
+  radius: number;
+}
+
+/**
+ * Which dice get the full effect (their kind is built) and which the subtle one (the rest that
+ * have one); a die with neither gets nothing.
+ */
+export function splitFx(
+  dice: readonly FxDie[],
+  defs: Readonly<Record<RichKind, RichKindDef | null>> = RICH_DEFS,
+): { rich: RichDie[]; plain: PlainDie[] } {
+  const rich: RichDie[] = [];
+  const plain: PlainDie[] = [];
+  for (const { mesh, fx, rich: kind, radius } of dice) {
+    const def = kind ? defs[kind] : null;
+    if (kind && def) rich.push({ mesh, kind, def, radius });
+    else if (fx) plain.push({ mesh, fx, radius });
+  }
+  return { rich, plain };
 }
 
 export interface FxLayer {
@@ -38,7 +68,7 @@ export interface FxLayer {
   own: { dispose(): void }[];
   /** `t` seconds in, at `progress` (0–1) of the throw, `unit` px per world unit. */
   update(t: number, progress: number, unit: number): void;
-  /** At rest: the landing (fire and cold burst once), while `active()`; the rest is gone. */
+  /** At rest: the landing (full effects burst once), while `active()`; the rest is gone. */
   land(): void;
   /** Still landing: the throw's loop keeps drawing. */
   active(): boolean;
@@ -84,11 +114,9 @@ function pointsOf(n: number, map: CanvasTexture) {
 
 /** The layer for these dice, or null when none has an effect. */
 export function fxLayer(dice: readonly FxDie[], seed = 0): FxLayer | null {
-  const rich = richLayer(
-    dice.flatMap(({ mesh, fx, radius }) => (fx.rich ? [{ mesh, kind: fx.rich, radius }] : [])),
-    seed,
-  );
-  const plain = plainLayer(dice.filter((d) => !d.fx.rich));
+  const split = splitFx(dice);
+  const rich = richLayer(split.rich, seed);
+  const plain = plainLayer(split.plain);
   if (!rich) return plain;
   if (!plain) return rich;
   const object = new Group();
@@ -112,8 +140,8 @@ export function fxLayer(dice: readonly FxDie[], seed = 0): FxLayer | null {
   };
 }
 
-/** The subtle glow and motes (every type but fire and cold). */
-function plainLayer(dice: readonly FxDie[]): FxLayer | null {
+/** The subtle glow and motes (magical types whose kind isn't built yet). */
+function plainLayer(dice: readonly PlainDie[]): FxLayer | null {
   if (dice.length === 0) return null;
   const map = new CanvasTexture(dotCanvas());
   map.colorSpace = SRGBColorSpace;
