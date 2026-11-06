@@ -91,12 +91,32 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      # The browser's system packages (fonts) as .debs: an Ubuntu mirror sometimes serves them at
+      # ~25 kB/s, which held a shard or three per run in this step for ~10 minutes.
+      - name: runner image
+        id: image
+        run: echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: pw-debs
+        with:
+          path: ~/.cache/pw-debs
+          key: pw-debs-${{ steps.image.outputs.os }}-${{ hashFiles('bun.lock') }}
       - name: playwright browser
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: bun x playwright install --with-deps chromium
+        run: bun x playwright install chromium
+      # Cached .debs first (no download); install-deps then only fetches what they don't cover,
+      # so a stale or empty cache is still correct, just slower. A miss keeps what apt fetched.
       - name: playwright system deps
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: bun x playwright install-deps chromium
+        run: |
+          if compgen -G "$HOME/.cache/pw-debs/*.deb" > /dev/null; then
+            sudo apt-get install -y --no-install-recommends "$HOME"/.cache/pw-debs/*.deb || true
+          fi
+          echo 'APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/99pp-keep-debs > /dev/null
+          bun x playwright install-deps chromium
+          if [ "${{ steps.pw-debs.outputs.cache-hit }}" != "true" ] && compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then
+            mkdir -p "$HOME/.cache/pw-debs"
+            cp /var/cache/apt/archives/*.deb "$HOME/.cache/pw-debs/"
+          fi
       # One retry: a test that passes on it is reported flaky (warning), not failed.
       - name: e2e (part ${{ matrix.part }})
         run: bun scripts/e2e.ts --shard=${{ matrix.part }}/12 --retries=1
