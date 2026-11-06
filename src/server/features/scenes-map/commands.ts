@@ -741,17 +741,20 @@ export function teleportTokenCommand(hooks: TokenHooks) {
       if (before.col === input.col && before.row === input.row) {
         throw invalid("Pick another cell", [{ path: ["col"], message: "Same cell" }]);
       }
-      applyMove(input, env, hooks, env.ctx.ids.next());
+      applyMove(input, env, hooks, { teleportCue: env.ctx.ids.next() });
     },
   });
 }
 
-/** A token move, in the FR-MAP-21 / -38 order above. `teleportCue`: FR-MAP-122 only. */
-function applyMove(
+/**
+ * A token move, in the FR-MAP-21 / -38 order above. `teleportCue`: FR-MAP-122 only. `undoStep`:
+ * combat's `cbt.undoMove` (FR-CBT-180), the DM's move back, passed to the hooks. Exported for it.
+ */
+export function applyMove(
   { tokenId, col, row }: MoveTokenInput,
   env: CommandEnv,
   hooks: TokenHooks,
-  teleportCue?: string,
+  { teleportCue, undoStep }: { teleportCue?: string; undoStep?: string } = {},
 ): void {
   const { tx, ctx, actor, emit } = env;
   const cid = campaignOf(actor);
@@ -772,7 +775,13 @@ function applyMove(
     .run();
   const after = readToken(tx, tokenId);
   const dependants = rederiveDependants({ tx, ctx, actor }, tokenChange(before, after));
-  const hookEnv = { tx, ctx, actor, ...(teleportCue ? { teleport: true } : {}) };
+  const hookEnv = {
+    tx,
+    ctx,
+    actor,
+    ...(teleportCue ? { teleport: true } : {}),
+    ...(undoStep ? { undoStep } : {}),
+  };
   const hookChanges = hooks.run(hookEnv, before, after);
   emit({
     type: TokenMoved.type,

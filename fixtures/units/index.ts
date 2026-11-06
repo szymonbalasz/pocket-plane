@@ -59,6 +59,7 @@ import cmpSrdMini from "./compendium/cmp-srd-mini";
 import cmpSrdMiniS3 from "./compendium/cmp-srd-mini-s3";
 import cmpxArtBatch from "./compendium/cmpx-art";
 import cmpxBooks from "./compendium/cmpx-books";
+import entryPresent1 from "./compendium/entry-present-1";
 import sheetLinksRows from "./compendium/sheet-links-rows";
 import dicexLooks from "./dice-extras/dicex-looks";
 import dicexMacros from "./dice-extras/dicex-macros";
@@ -366,4 +367,6 @@ export const units: readonly Fixture[] = [
   charVex,
   // Spell FX template anchor: Black Tentacles (build/vfx-tentacles)
   tentaclesRow,
+  // Compendium entry on players' screens (build/item-present, #458)
+  entryPresent1,
 ];

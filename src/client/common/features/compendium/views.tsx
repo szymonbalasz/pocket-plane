@@ -456,10 +456,13 @@ export function EntryView({
   data,
   viewer,
   actions,
+  bare = false,
 }: {
   data: EntryResponse;
   viewer: Role;
   actions?: ReactNode;
+  /** *(#458)* No actions row (the player's entry popup, FR-CMP-80: its menus would open under it). */
+  bare?: boolean;
 }) {
   const e = data.entry;
   let view: ReactNode;
@@ -496,7 +499,7 @@ export function EntryView({
       data-value={e.kind}
       className="space-y-2"
     >
-      {(drag || sheetable || rule || shareable || actions) && (
+      {!bare && (drag || sheetable || rule || shareable || actions) && (
         <div
           className="flex flex-wrap items-center justify-end gap-1"
           data-testid="cmp-entry-actions"

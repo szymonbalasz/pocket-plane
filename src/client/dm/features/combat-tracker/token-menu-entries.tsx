@@ -1,11 +1,12 @@
-// Combat's token menu entries (FR-CBT-30, FR-MAP-29): "Damage / heal…", "Set as ally / enemy"
-// (FR-CBT-104, #252), "Companion ▸" (FR-CBT-118, sprint 6: monsters) and "Remove from combat" on
-// a token bound to an active, non-removed combatant. Items render nothing otherwise.
-import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
+// Combat's token menu entries (FR-CBT-30, FR-MAP-29): "Damage / heal…", "Undo move" (FR-CBT-181,
+// #457: only while it has a step), "Set as ally / enemy" (FR-CBT-104, #252), "Companion ▸"
+// (FR-CBT-118, sprint 6: monsters) and "Remove from combat" on a token bound to an active,
+// non-removed combatant. Items render nothing otherwise.
+import { CBT_INTENTS, COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@ui/components/ui/menus";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import { useRecords } from "@ui/sync/store";
-import { HeartPulseIcon, UserMinusIcon } from "lucide-react";
+import { HeartPulseIcon, Undo2Icon, UserMinusIcon } from "lucide-react";
 import type { TokenMenuEntry, TokenMenuItemProps } from "../scenes-map/token-menu";
 import { CompanionMenu } from "./companion-menu";
 import { useCombatDialogs } from "./popup-store";
@@ -31,6 +32,28 @@ export const combatTokenMenu: readonly TokenMenuEntry[] = [
             <HeartPulseIcon /> Damage / heal…
           </DropdownMenuItem>
         </>
+      );
+    },
+  },
+  {
+    id: "cbt.undo-move",
+    order: 70.2,
+    Item: function UndoMoveItem({ token }: TokenMenuItemProps) {
+      const c = useBound(token.id);
+      const { send, disabled } = useCbtIntent();
+      const step = c?.moveSteps?.at(-1);
+      if (!c || !step || step.tokenId !== token.id) return null;
+      return (
+        <DropdownMenuItem
+          data-testid="cbt-token-menu-undo-move"
+          data-record-id={c.id}
+          disabled={disabled}
+          onSelect={() =>
+            void send(CBT_INTENTS.undoMove, { combatantId: c.id, expectedStepId: step.id })
+          }
+        >
+          <Undo2Icon /> {undoMoveLabel(step.ft)}
+        </DropdownMenuItem>
       );
     },
   },
@@ -71,3 +94,8 @@ export const combatTokenMenu: readonly TokenMenuEntry[] = [
     },
   },
 ];
+
+/** FR-CBT-181: the item's copy, e.g. "Undo move (10 ft)". */
+export function undoMoveLabel(ft: number): string {
+  return `Undo move (${ft} ft)`;
+}

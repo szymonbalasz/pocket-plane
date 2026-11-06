@@ -4,7 +4,7 @@
 // per FR-ASSET-16 via `AssetImg`. Viewers get exactly the IDs the entry read delivered (FR-CMP-48).
 
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../../components/ui/overlays";
 import { Tip } from "../../components/ui/tip";
@@ -68,11 +68,18 @@ export function LightboxView({
   );
 }
 
+/**
+ * *(#458)* Off inside the player's entry popup (FR-CMP-80), which shows the images large itself
+ * (a lightbox would open under the popup's layer).
+ */
+export const EntryGalleryOff = createContext(false);
+
 /** The entry's images; nothing when there are none (the view is unchanged). */
 export function EntryGallery({ ids, name }: { ids: readonly string[]; name: string }) {
   const [open, setOpen] = useState<number | null>(null);
+  const off = useContext(EntryGalleryOff);
   const [main, ...rest] = ids;
-  if (main === undefined) return null;
+  if (main === undefined || off) return null;
   return (
     <div data-testid="cmp-entry-images" data-value={ids.length} className="space-y-1.5">
       <Tip content={`${name}: open image 1`}>

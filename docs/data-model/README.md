@@ -630,6 +630,7 @@ erDiagram
     int hpCurrent "monsters only"
     int hpMax "monsters only"
     int movedFt "default 0"
+    json moveSteps "DM only, null = none"
   }
   HP_CHANGE {
     ID id PK
@@ -780,6 +781,7 @@ An instance ([ADR-0009](../architecture/adr/0009-entity-content-model.md)); crea
 | hpCurrent, hpMax | int \| null ×2 | **Monsters only**: `effectiveStats.hpMax` at start; clamped 0…hpMax; definition edit: new max, current follows if it equalled the old max, else clamped. PC HP lives on the character | FR-CBT-08, FR-CBT-06, [FR-CBT-22](../specs/combat-tracker.md#6-functional-requirements), #92, gate I10 |
 | tempHp *(sprint 1, built, fix/cbtx-core)* | int 0–999 | Column `temp_hp` int not null default 0. Monsters only (PCs' lives on the character, §11); never in a player redaction ([FR-CBTX-14/32](../specs/combat-extras.md#6-functional-requirements)). Absorbs damage first via `hpRules` (built, build/combat-extras) | [CBTX §8](../specs/combat-extras.md#8-data-model) |
 | movedFt *(feedback pass, built)* | int 0–9,999 | Column `moved_ft` int not null default 0. Movement used this turn: + each move's 5/10/5 distance via the token-changed hook on `map.moveToken` ([ADR-0031](../architecture/adr/0031-token-move-hooks.md)), any mover, active non-removed only; 0 on `cbt.nextTurn` for the new turn combatant, and for every combatant on Start round 1 (round-0 movement never counts; BL-03, built in fix/combat-glitches); `prevTurn` keeps it | [FR-CBT-39](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-40](../specs/combat-tracker.md#6-functional-requirements), #154 |
+| moveSteps *(#457, built)* | JSON leaf \| null | Column `move_steps` text (JSON) null, no default (push-safe). The undoable counted moves, oldest first, ≤ 20: `{id, tokenId, sceneId, from {col, row}, to {col, row}, ft}` (`ft` = feet added after the cap). Pushed by the token-changed hook with each counted move; popped by `cbt.undoMove`; null on every `movedFt` reset and on a teleport. Record field absent when null. DM only: no player redaction carries it | [FR-CBT-179](../specs/combat-tracker.md#69-undo-move-457) |
 
 ### Combat log entry (`hp_change`, record type `hp-change`) — owner combat-tracker
 
@@ -2961,3 +2963,17 @@ From [class-resources](../specs/class-resources.md) FR-CRES-01–15. **Two new c
 - **Upgrade:** both columns are added by push with their defaults; existing sheets read 0 / `{}`. No boot copy.
 - **Visibility:** as the sheet (DM + owner) and the stat block.
 - **Fixtures:** `char-vex` (Sorcerer 5 / Warlock 2, pact `{1, 2}`, "Font of Magic" sorcery points 5, "Quickened Spell" / "Twinned Spell" / "Eldritch Smite" spend links, "Pact blade" pact weapon, "Smite" trigger; links set by the fixtures-only command `char.linkSpendByName`); bundle `class-resources`.
+
+## 156. Entry present (build/item-present, DM #458)
+
+### Entry present (`entry_present`, record type `entry-present`, **in the snapshot**) — owner [compendium](../specs/compendium.md#62-entry-present-an-awarded-item-pops-up-dm-458-2026-11-06)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id | ID | `env.ctx.ids`, new per present | FR-CMP-79 |
+| campaignId | ID → Campaign | the presenting DM's campaign | FR-CMP-78 |
+| entryId | ID → Compendium entry, **cascade delete** | an entry the player may read (FR-CMP-14; kept by the commands, FR-CMP-82; cascade = backstop) | FR-CMP-82 |
+| playerId | ID → Player | **unique `(campaignId, playerId)`**: one open entry present per player | FR-CMP-78 |
+| presentedAt | timestamp | `env.ctx.clock` | FR-CMP-79 |
+
+Indexes unique `entry_present_campaign_player` (`campaign_id`, `player_id`), `entry_present_entry` (`entry_id`). Record = every column. Visibility: DM every row; a player only their own, else hidden. New table only (additive); no existing column changes. Fixtures: `entry-present-1` (Moonlit Lantern for every player); bundle `item-present`.

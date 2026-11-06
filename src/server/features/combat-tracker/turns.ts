@@ -68,9 +68,14 @@ export function turnCommand(direction: "next" | "prev", hooks: CombatRuleHooks) 
           : before.round === 0
             ? ranked
             : ranked.filter((r) => turnIds.has(r.id));
+      // FR-CBT-179 (#457): its undoable moves go with the count.
       for (const r of reset) {
-        if (r.movedFt === 0) continue;
-        env.tx.update(combatant).set({ movedFt: 0 }).where(eq(combatant.id, r.id)).run();
+        if (r.movedFt === 0 && !r.moveSteps) continue;
+        env.tx
+          .update(combatant)
+          .set({ movedFt: 0, moveSteps: null })
+          .where(eq(combatant.id, r.id))
+          .run();
       }
       changes.push(...combatantDiff(env.tx, rows0));
       // FR-CBT-97 (sprint 5): every turn change (Next, Prev, Start round 1) clears the trails.

@@ -19,6 +19,7 @@ import { requireAsset } from "../assets-pipeline/commands";
 import { activeCampaign } from "../campaign-management/commands";
 import { dataHash } from "../fixtures-adapters/import-pipeline";
 import { derivedColumns, EntryId, getEntry } from "./entries";
+import { closeEntryPresents } from "./present";
 
 export const PUT_ENTRY = "cmp.putEntry";
 export const DELETE_ENTRY = "cmp.deleteEntry";
@@ -142,7 +143,8 @@ export const putEntry = defineCommand({
       type: CompendiumEntrySaved.type,
       campaignId: cid,
       payload: { entryId, kind: d.kind, shared },
-      changes: [],
+      // FR-CMP-82: unshared → players can't read it, so its open popups close.
+      changes: shared ? [] : closeEntryPresents(env, entryId),
     });
     return { entryId };
   },
@@ -157,12 +159,14 @@ export const deleteEntry = defineCommand({
     const before = getEntry(env.tx, id);
     if (before && isReadOnlyEntry(before)) throw forbidden(READ_ONLY_ENTRY);
     if (!before || before.campaignId !== cid) throw notFound("Entry not found");
+    // FR-CMP-82: its open popups close first (the cascade is only the backstop).
+    const closed = closeEntryPresents(env, id);
     env.tx.delete(compendiumEntry).where(eq(compendiumEntry.id, id)).run();
     env.emit({
       type: CompendiumEntryDeleted.type,
       campaignId: cid,
       payload: { entryId: id },
-      changes: [],
+      changes: closed,
     });
     return {};
   },
