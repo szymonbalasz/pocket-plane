@@ -412,6 +412,7 @@ describe("FR-AGENT-01 list-tools", () => {
         "definitionId",
         "kind",
         "level",
+        "optionType",
         "q",
         "rarity",
         "sameAs",
