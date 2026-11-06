@@ -39,7 +39,7 @@ const book = (abbr: string, name: string, extra: Partial<BookStatus> = {}): Book
   key: `5et-${abbr.toLowerCase()}`,
   name,
   abbr,
-  counts: { monster: 450, spell: 0, item: 1 },
+  counts: { monster: 450, spell: 0, item: 1, feat: 0, race: 0, background: 0, option: 0 },
   ...extra,
 });
 
@@ -209,6 +209,10 @@ const COUNTS = (created: number, existing: number): ImportResponse["counts"] => 
   condition: { created: 0, updated: 0, existing: 0 },
   feature: { created: 0, updated: 0, existing: 0 },
   rule: { created: 0, updated: 0, existing: 0 },
+  feat: { created: 0, updated: 0, existing: 0 },
+  race: { created: 0, updated: 0, existing: 0 },
+  background: { created: 0, updated: 0, existing: 0 },
+  option: { created: 0, updated: 0, existing: 0 },
 });
 const answer = (source: string, created: number, existing = 0, warnings = 0): ImportResponse => ({
   source,

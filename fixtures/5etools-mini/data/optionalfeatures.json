@@ -1,0 +1,27 @@
+{
+  "optionalfeature": [
+    {
+      "name": "Bolt of Ruin",
+      "source": "TB1",
+      "page": 7,
+      "featureType": ["EI"],
+      "prerequisite": [{ "spell": ["fire bolt#c"] }],
+      "entries": ["When you cast {@spell fire bolt|TB1}, add your Charisma modifier to its damage."]
+    },
+    {
+      "name": "Steady Stance",
+      "source": "TB1",
+      "page": 8,
+      "featureType": ["FS:F", "FS:R"],
+      "entries": ["You gain a +1 bonus to AC while you aren't moving."]
+    },
+    {
+      "name": "Odd Trick",
+      "source": "TB1",
+      "page": 9,
+      "featureType": ["ZZ"],
+      "prerequisite": [{ "level": { "level": 5, "class": { "name": "Warlock" } }, "pact": "Tome" }],
+      "entries": ["A trick the filter doesn't know."]
+    }
+  ]
+}

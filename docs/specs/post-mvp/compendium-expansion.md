@@ -12,7 +12,7 @@ phase: post-mvp
 
 ## 1. Summary
 
-- The DM points the server at their own extracted 5etools folder (`PP_5ETOOLS_DIR`) and imports the **books** they choose into the compendium: **monsters, spells, items**.
+- The DM points the server at their own extracted 5etools folder (`PP_5ETOOLS_DIR`) and imports the **books** they choose into the compendium: **monsters, spells, items**, and (X5) the character options **feats, races, backgrounds, class options** as reference cards.
 - Each book becomes one more global, read-only **source**, next to `srd-5.1` ([ADR-0018](../../architecture/adr/0018-global-imported-content.md), [ADR-0046](../../architecture/adr/0046-compendium-scope.md)). Search, entry views, Derive, Add to sheet, players' reads: unchanged paths.
 - An imported entry that *is* an SRD entry (or a reprint of an older book's) **hides the other from search**; old references keep working.
 - Nothing from 5etools is bundled, committed or sent in a snapshot.
@@ -21,6 +21,7 @@ phase: post-mvp
 
 - **X1 core:** config, folder reader, 5etools adapter (monsters, spells, items), per-book sources, import / update, replace rule, fixtures.
 - **X2 panel:** the DM import panel lists the folder's books; import / update per book; About credits.
+- **X5 character options** *(DM, 2026-11-06, [#459](../../decisions-log.md))*: feats, races (subraces merged), backgrounds and class options (5etools `optionalfeatures`: invocations, fighting styles, maneuvers, metamagic, infusions…) as four new compendium kinds, text first: searchable, readable by players; feats and class options **Add to sheet** as feature rows. Nothing about them is automated on a sheet.
 - **X3 token art:** a 5etools monster's token image is copied into the campaign's assets the first time it is placed, then reused ([OQ-CMPX-01](#15-open-questions) A).
 - A local probe script `bun scripts/cmpx-probe.ts` reporting mapping counts and warnings over the real folder (dev aid, never in CI, prints no entry text).
 
@@ -35,7 +36,8 @@ phase: post-mvp
 
 ## 4. Non-goals
 
-- **Classes, subclasses, races, backgrounds, feats, optional features**: wait for character-sheet work and [levelling](levelling.md) (DM, 2026-10-30).
+- **Classes and subclasses**: wait for character-sheet work and [levelling](levelling.md) (DM, 2026-10-30). Feats, races, backgrounds and class options came in with X5 as reference cards (DM, 2026-11-06); their automation (ASIs, traits, proficiencies on a sheet) waits for levelling.
+- Race `_versions` (e.g. a dragonborn per colour), a subrace defined by `_copy`, a homebrew **form** for the X5 kinds (MCP `homebrew_create` only), lore (fluff) of any X5 kind.
 - Conditions and diseases (the 2014 conditions = SRD text, already imported); variant rules and actions as `rule` cards; adventure and book text; monster lore (fluff, [OQ-CMPX-05](#15-open-questions)).
 - 2024 rules (the `5etools-2.x` builds), reading the `.tar.xz` directly, downloading 5etools.
 - Running ttrpg-convert-cli or any Java; its code is a reading reference only (tag rendering, `_copy` handling).
@@ -94,6 +96,13 @@ All writes as compendium (one transaction, event-log entry, domain event; ids / 
 | FR-CMPX-27 | **Visibility unchanged:** the art is an ordinary campaign asset on a token field; players get it only with tokens they may see (FR-ENT-30, [ADR-0023](../../architecture/adr/0023-asset-access-by-capability-id.md)). | |
 | FR-CMPX-28 | **Derive:** Derive… on a 5etools monster prefills the custom's portrait with the campaign's imported art when it exists; otherwise none. | FR-CMP-27 |
 | FR-CMPX-29 | **Credits:** About (FR-CMPX-18) adds "Token art: © Wizards of the Coast, from your own 5etools files" once any book is imported. | |
+| | **X5 character options** *(DM, 2026-11-06)* | |
+| FR-CMPX-30 | **Kinds.** Four compendium kinds: `feat`, `race`, `background`, `option` (**Class option**). Read from `feats.json`, `races.json` (`race` + `subrace`), `backgrounds.json`, `optionalfeatures.json`; each file optional (missing → none). Keys `<kind>/<slug(name)>` (FR-CMPX-11). The book list counts them; a book row adds "· 42 feats · 9 races · …", non-zero ones only. `ADAPTER_VERSION_5ET` 4: imported books show **Update**. | 108 feats, 134 races + 98 subraces, 101 backgrounds, 151 options |
+| FR-CMPX-31 | **Feat** → `feat`: body `prerequisite?` (words: "Dexterity 13 or higher", "Halfling; or 4th level"; an unknown prerequisite part is left out with a warning) and `text`; an `ability` increase leads the text ("**Ability Score Increase.** +1 to Str or Dex (to a maximum of 20)."). No facets. Line "Feat · ‹prerequisite›". | |
+| FR-CMPX-32 | **Race** → `race`: body `abilities?` ("Dex +2, Int +1"; a VRGR `lineage` → "+2 to one score and +1 to another, or +1 to three scores"), `size?`, `speed?`, `text` (traits). `_copy` resolved. A **nameless subrace** folds into its race; a **named** one is its own entry "‹Race› (‹Subrace›)" in the subrace's book, merged with its race as 5etools does: race traits first, a trait tagged `overwrite` replaced in place, fixed scores added, the subrace's speed / size winning; facets `{parent}`, line "Subrace of ‹Race›". Its race missing, or a `_copy` subrace → skipped with a warning. | 1 `_copy` subrace in 1.217.1 |
+| FR-CMPX-33 | **Background** → `background`: `text` only (5etools' own proficiency / equipment list, feature, tables), `_copy` resolved. **Class option** → `option`: facets `types` from `featureType` (EI Eldritch Invocation, FS:* Fighting Style, MV* Maneuver, MM Metamagic, AI Artificer Infusion, AS Arcane Shot, ED Elemental Discipline, RN Rune, PB Pact Boon, else Other; one per type), body `prerequisite?`, `text`. Replace (FR-CMPX-13): `reprintedAs` only; `srd` on these kinds looks for no SRD entry (the SRD has none). | |
+| FR-CMPX-34 | **Compendium window:** Tabs Feats, Races, Backgrounds, Class options after Features (DM and player); Class options' Filters: **Type** (the list above), REST filter `optionType` (`kind=option` only, FR-CMP-11). Entry view: facts (Prerequisite, Ability Scores, Size, Speed; those present), rule, text. Players read all four (FR-CMP-14: only monsters are DM-only). Share (FR-SHARE-04) sends the same facts + text. No **Clone** / **Edit** form for these kinds (Delete stays on homebrew ones). | |
+| FR-CMPX-35 | **Add to sheet** (FR-CMP-28): a feat or class option → a **features** row (name, source abbreviation, text clipped as a feature's). Races and backgrounds: no Add to sheet. | |
 
 ## 7. UI/UX notes
 
@@ -179,9 +188,10 @@ Isolated per worktree ([ADR-0008](../../architecture/adr/0008-parallel-dev-isola
 | Unit | `_copy` / `_mod` modes; tag rendering table; entries → markdown-lite; monster / spell / item mapping incl. FR-CMPX-08; key slugs and duplicates; `replaces` from `srd` and `reprintedAs`; book list labels | `fixtures/5etools-mini/` |
 | Integration | Import two books: counts, warnings, idempotent re-import (0 writes); Update after a fake version bump; hidden set for DM and player (search, lookups, Creatures, `sameAs`) while `GET` still works; preset inheritance + Add to sheet; per-book transaction on `PP_TEST_CRASH=cmp.import:before-commit`; config states; path never from client; CON-44 0 B; search bench | `5etools-mini` + `cmp-srd-mini-s3` |
 | Integration (X3) | art path rule incl. override and missing file; path validation (`..`, absolute, backslash) at write and read; first placement ingests once, second reuses; concurrent placements → one asset; DM image never replaced; unset folder → glyph + log warning; crash `assets.ingest:after-files`; player sees art only on visible tokens; Derive portrait | `5etools-mini` (own-made token images) |
+| Unit + integration (X5) | prerequisite / ability / speed words; feat, race (folded nameless subrace, merged named subrace with overwrite, cross-book subrace, `_copy` race, lineage), background (`_copy`), class option types; missing race / `_copy` subrace skipped; reprint replace; `srd` without warning; import counts; search per kind + `optionType`; player read; Add to sheet rows | `5etools-mini` (feats, races, backgrounds, optionalfeatures) |
 | E2E (thin) | DM imports both fixture books, "goblin" → one row badged TB1, drag to map, token shows its art; player sees the TB1 spell, no monsters | bundle `cmpx-5etools` |
 
-- **Fixture folder** `fixtures/5etools-mini/` (invented content, 5etools layout): books `TB1`, `TB2` in `books.json`; `changelog.json` `ver` `0.0.1`; bestiary: a "Goblin" with `srd: true` (own stats and words), a `_copy` variant, a "Gnasher" in TB1 `reprintedAs` TB2, a special-HP monster, a spellcaster, a legendary creature with a group; one spell with `srd: "Hunter's Mark"`; a weapon, a magic item, a generic variant; `img/bestiary/tokens/TB1/*.webp` own-made images (tiny, generated from a committed SVG or drawn for the repo), one monster without its file.
+- **Fixture folder** `fixtures/5etools-mini/` (invented content, 5etools layout): books `TB1`, `TB2` in `books.json`; `changelog.json` `ver` `0.0.1`; bestiary: a "Goblin" with `srd: true` (own stats and words), a `_copy` variant, a "Gnasher" in TB1 `reprintedAs` TB2, a special-HP monster, a spellcaster, a legendary creature with a group; one spell with `srd: "Hunter's Mark"`; a weapon, a magic item, a generic variant; `img/bestiary/tokens/TB1/*.webp` own-made images (tiny, generated from a committed SVG or drawn for the repo), one monster without its file. X5: feats (an ability increase, a race prerequisite, a TB2 → TB1 reprint), a race with a nameless and a named subrace (`overwrite`), a TB2 `_copy` race with a lineage and a TB2 subrace of the TB1 race, a background and its TB2 `_copy`, three class options (invocation, fighting style on two codes, an unknown type).
 - **Bundle `cmpx-5etools`** = `base` + `cmp-srd-mini-s3`; the walkthrough sets `PP_5ETOOLS_DIR=fixtures/5etools-mini`.
 
 **Browser walkthrough:** bundle `cmpx-5etools` → DM: Compendium → panel `ready`, two books → import both → "goblin" gives one TB1 Goblin → stat block attack rolls → drag to map; "gnasher" gives TB2 only; Derive… on the special-HP monster opens the form with HP empty; the placed Goblin shows its token art, a second Goblin reuses it (Assets window: one Goblin image); re-import → "0 changed" → player: the Goblin token's art visible when not hidden; TB1 spell found, Add to sheet adds the Hunter's Mark trigger; Monsters tab absent; search "goblin" empty.
@@ -215,6 +225,6 @@ All decided by the DM, 2026-10-30 ([#395](../../decisions-log.md)): the **bold**
 
 ## 16. Out of scope
 
-- Classes and character options → [levelling](levelling.md); 2024 rules; lore, conditions, rules text (§4).
+- Classes → [levelling](levelling.md); automation of the X5 options on a sheet; 2024 rules; lore, conditions, rules text (§4).
 - Removing a book (OQ-CMPX-04), monster lore (OQ-CMPX-05), extra damage parts (OQ-CMPX-03), Artificer spell lists (OQ-CMPX-06): later.
 - Other third-party formats (Griffon's Saddlebag, homebrew files) → their own adapters ([ADR-0015](../../architecture/adr/0015-source-adapters-fixtures.md)).

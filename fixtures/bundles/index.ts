@@ -75,6 +75,7 @@ import imageManageE2e from "./image-manage-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
+import itemPresent from "./item-present";
 import kitInitiative from "./kit-initiative";
 import kitLibrary from "./kit-library";
 import kitLog from "./kit-log";
@@ -161,6 +162,7 @@ import tokenArtUpdate from "./token-art-update";
 import tokenMirrors from "./token-mirrors";
 import tplMenu from "./tpl-menu";
 import trayAttacks from "./tray-attacks";
+import undoMoveE2e from "./undo-move-e2e";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
@@ -423,6 +425,10 @@ export const bundles: readonly Bundle[] = [
   sessionSim18,
   // Class resources (build/cres-pact): pact slots, pact weapon
   classResources,
+  // Undo a counted move (build/undo-move): late-damage's moves in their own server
+  undoMoveE2e,
+  // Compendium entry on players' screens (build/item-present, #458)
+  itemPresent,
   // Linked notes N9 token notes (build/notes-token)
   notesToken,
 ];

@@ -35,6 +35,7 @@ describe("rest rules", () => {
         slotsUsed: { "1": 2 },
         hitDiceUsed: { d8: 1 },
         pactUsed: 0,
+        slotsCreated: {},
         features: [
           { id: "a", name: "A", source: "", text: "", usesMax: 1, used: 3, reset: "short" },
           { id: "b", name: "B", source: "", text: "", usesMax: 2, used: 2, reset: "long" },

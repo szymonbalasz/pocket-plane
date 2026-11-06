@@ -12,7 +12,7 @@ export interface RestState {
   tempHp: number;
   deathSuccesses: number;
   deathFailures: number;
-  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features" | "pactUsed">;
+  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features" | "pactUsed" | "slotsCreated">;
 }
 
 export interface RestStats {
@@ -60,7 +60,7 @@ const resetsOn = (f: FeatureRow, kind: RestKind): boolean =>
  * FR-CHARX-121: the state after the rest. **Short**: feature rows with `reset: short` → `used 0`
  * (also below zero, FR-CHARX-58). **Long**: HP → `hpMax`, temp HP 0, death saves 0 / 0, every
  * slot `used 0`, rows with `reset` short or long → `used 0`, hit dice per `regainHitDice`.
- * Both: pact slots `used 0` (FR-CRES-03).
+ * Both: pact slots `used 0` (FR-CRES-03). Long: created slots gone (FR-CRES-08).
  */
 export function restOutcome(kind: RestKind, s: RestState, stats: RestStats): RestState {
   const features = s.sheet.features.map(
@@ -78,6 +78,7 @@ export function restOutcome(kind: RestKind, s: RestState, stats: RestStats): Res
       slotsUsed,
       hitDiceUsed: regainHitDice(s.sheet.hitDiceUsed, stats),
       pactUsed: 0,
+      slotsCreated: {},
     },
   };
 }

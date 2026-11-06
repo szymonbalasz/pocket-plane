@@ -5,6 +5,8 @@ declare module "three" {
   export const REVISION: string;
   export const SRGBColorSpace: string;
   export const PCFShadowMap: number;
+  export const AdditiveBlending: number;
+  export const NormalBlending: number;
 
   export class Vector3 {
     constructor(x?: number, y?: number, z?: number);
@@ -27,7 +29,10 @@ declare module "three" {
   export class Object3D {
     position: Vector3;
     quaternion: Quaternion;
+    scale: Vector3;
     up: Vector3;
+    renderOrder: number;
+    frustumCulled: boolean;
     castShadow: boolean;
     receiveShadow: boolean;
     visible: boolean;
@@ -62,6 +67,9 @@ declare module "three" {
     g: number;
     b: number;
     setHex(hex: number): this;
+    clone(): Color;
+    copy(color: Color): this;
+    lerp(color: Color, alpha: number): this;
   }
 
   export class BufferAttribute {
@@ -75,6 +83,7 @@ declare module "three" {
   export class BufferGeometry {
     setAttribute(name: string, attribute: BufferAttribute): this;
     rotateX(angle: number): this;
+    setDrawRange(start: number, count: number): void;
     dispose(): void;
   }
   export class PlaneGeometry extends BufferGeometry {
@@ -112,6 +121,7 @@ declare module "three" {
   }
   export class MeshStandardMaterial extends Material {
     constructor(parameters?: MeshStandardMaterialParameters);
+    color: Color;
     emissive: Color;
     emissiveIntensity: number;
   }
@@ -129,6 +139,16 @@ declare module "three" {
     clearcoat?: number;
     clearcoatRoughness?: number;
   }
+  export interface ShaderMaterialParameters extends MaterialParameters {
+    uniforms?: Record<string, { value: unknown }>;
+    vertexShader?: string;
+    fragmentShader?: string;
+    blending?: number;
+  }
+  export class ShaderMaterial extends Material {
+    constructor(parameters?: ShaderMaterialParameters);
+    uniforms: Record<string, { value: unknown }>;
+  }
   export class MeshPhysicalMaterial extends MeshStandardMaterial {
     constructor(parameters?: MeshPhysicalMaterialParameters);
   }
@@ -144,7 +164,6 @@ declare module "three" {
 
   export class Points extends Object3D {
     constructor(geometry?: BufferGeometry, material?: Material);
-    frustumCulled: boolean;
   }
 
   export class Light extends Object3D {}

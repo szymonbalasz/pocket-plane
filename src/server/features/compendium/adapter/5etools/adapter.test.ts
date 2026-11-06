@@ -67,6 +67,11 @@ const emptyData = (over: Partial<FolderData>): FolderData => ({
   baseItems: [],
   itemEntries: [],
   variants: [],
+  feats: [],
+  races: [],
+  subraces: [],
+  backgrounds: [],
+  optionalFeatures: [],
   unreadable: [],
   ...over,
 });
@@ -80,13 +85,13 @@ describe("FR-CMPX-02 books", () => {
         key: "5et-tb1",
         abbr: "TB1",
         name: "Test Book One",
-        counts: { monster: 7, spell: 3, item: 10 },
+        counts: { monster: 7, spell: 3, item: 10, feat: 3, race: 2, background: 1, option: 3 },
       },
       {
         key: "5et-tb2",
         abbr: "TB2",
         name: "Test Book Two",
-        counts: { monster: 3, spell: 1, item: 2 },
+        counts: { monster: 3, spell: 1, item: 2, feat: 1, race: 2, background: 1, option: 0 },
       },
     ]);
   });
@@ -170,6 +175,10 @@ describe("FR-CMPX-04 reads only what's needed", () => {
         "data/items.json",
         "data/items-base.json",
         "data/magicvariants.json",
+        "data/feats.json",
+        "data/races.json",
+        "data/backgrounds.json",
+        "data/optionalfeatures.json",
       ].sort(),
     );
   });
@@ -612,6 +621,10 @@ describe("FR-CMPX-07 monster → entry + definition", () => {
       condition: 0,
       feature: 0,
       rule: 0,
+      feat: 3,
+      race: 2,
+      background: 1,
+      option: 3,
     });
     expect(tb2.counts).toEqual({
       monster: 3,
@@ -620,6 +633,10 @@ describe("FR-CMPX-07 monster → entry + definition", () => {
       condition: 0,
       feature: 0,
       rule: 0,
+      feat: 1,
+      race: 2,
+      background: 1,
+      option: 0,
     });
     expect(tb1.skipped).toBe(0);
     expect(tb2.skipped).toBe(0);

@@ -1,0 +1,41 @@
+{
+  "feat": [
+    {
+      "name": "Bolt Adept",
+      "source": "TB1",
+      "page": 1,
+      "prerequisite": [{ "ability": [{ "dex": 13 }] }],
+      "ability": [{ "choose": { "from": ["str", "dex"], "amount": 1 } }],
+      "entries": [
+        "You have drilled with the {@item test bow|TB1} until it is second nature:",
+        {
+          "type": "list",
+          "items": [
+            "You ignore the loading property of bows you are proficient with.",
+            "Once on each of your turns, you can reroll a {@damage 1d4} of bow damage."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lucky Hand",
+      "source": "TB1",
+      "page": 2,
+      "prerequisite": [{ "race": [{ "name": "glimmerkin" }] }, { "level": 4 }],
+      "entries": ["Once per long rest, you can turn a 1 on a {@dice d20} into a 2."]
+    },
+    {
+      "name": "Quick Draw",
+      "source": "TB1",
+      "page": 3,
+      "entries": ["You draw two weapons at once."]
+    },
+    {
+      "name": "Quick Draw",
+      "source": "TB2",
+      "page": 1,
+      "reprintedAs": ["Quick Draw|TB1"],
+      "entries": ["You draw a weapon faster than anyone."]
+    }
+  ]
+}

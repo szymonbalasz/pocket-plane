@@ -19,12 +19,15 @@ export const PRESENT_TICK = "Also open it on the screens of players who newly ge
 
 // ---- Player popup (FR-PARTY-36, -37) ----
 
+/** A present row of either kind: `handout-present` or *(#458)* compendium `entry-present`. */
+type PresentRow = Pick<HandoutPresentRecord, "id" | "playerId" | "presentedAt">;
+
 /** The viewer's own row; the store holds at most one (one per player), newest wins anyway. */
-export function ownPresent(
-  rows: readonly HandoutPresentRecord[],
+export function ownPresent<R extends PresentRow>(
+  rows: readonly R[],
   playerId: string | null | undefined,
-): HandoutPresentRecord | null {
-  let best: HandoutPresentRecord | null = null;
+): R | null {
+  let best: R | null = null;
   for (const r of rows) {
     if (!playerId || r.playerId !== playerId) continue;
     if (
@@ -62,12 +65,12 @@ export function hidePresent(presentId: string, generation: number) {
 }
 
 /** FR-PARTY-36: the row the popup shows, or null (no own row, or closed on this page). */
-export function shownPresent(
-  rows: readonly HandoutPresentRecord[],
+export function shownPresent<R extends PresentRow>(
+  rows: readonly R[],
   playerId: string | null | undefined,
   hides: LocalHides,
   generation: number,
-): HandoutPresentRecord | null {
+): R | null {
   const present = ownPresent(rows, playerId);
   return present && !hiddenLocally(hides, present.id, generation) ? present : null;
 }

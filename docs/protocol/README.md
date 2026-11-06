@@ -643,6 +643,7 @@ All scope `campaign` (no scene gate: combat runs whatever the active scene). DM 
 | `cbt.applyCard` | CBT | DM | `{cardId, toHitTotal (−20…99), damageTotal (0–999), targets [{targetId, hit, multiplier}] (1–20, unique; else `invalid`), public?}` (`ApplyCardTargetsInput`; feedback pass, built; the single-target shape is gone). *(sprint 2, built, fix/combat2-split-attack)* both totals optional on the wire | Each target active, non-removed (`not_found`); encounter started, card pending (`conflict`). Rolled values from roll rows. All or nothing. *(sprint 2)* `toHitTotal` iff the card has `toHit` (else `invalid`); no `damageTotal` only when the card has no damage roll and every target is `hit: false` (else `invalid` "Damage needed"); a typed total on a card without a damage roll = DM set (`damageRolled` null); damage-only rows have null to-hit fields ([FR-CBT-72](../specs/combat-tracker.md#6-functional-requirements)) | `{hpChangeIds}` (apply order, `HpChangesResult`) | [FR-CBT-34](../specs/combat-tracker.md#6-functional-requirements) (was FR-CBT-20), #134, #136 |
 | `cbt.applyHp` | CBT | DM | `{combatantId, kind: damage \| heal, amount 1–999, public?}` | | `{hpChangeId}` | FR-CBT-21 |
 | `cbt.undo` | CBT | DM | `{expectedHpChangeId}` | Latest non-undone row of the started encounter; none / mismatch → `conflict`. Undoes that row + every non-undone row of the same card (one apply, #154; feedback pass, built) | `{hpChangeIds}` (latest first) | [FR-CBT-25](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-35](../specs/combat-tracker.md#6-functional-requirements) |
+| `cbt.undoMove` *(#457, built)* | CBT | DM | `{combatantId, expectedStepId}` | The combatant's last move step; none → `conflict` "No move to undo"; mismatch → `conflict`; token not bound / not at the step's `to` → `conflict` "The token has moved since". Moves the token back via the map's move path (`applyMove`, hooks get `undoStep`): one unlogged `TokenMoved` with the `token` upsert (trail shortened) and the `combatant` (`movedFt` − ft, step popped). No result | [FR-CBT-180](../specs/combat-tracker.md#69-undo-move-457) |
 | `cbt.rollAbility` *(feedback pass, built)* | CBT | DM | `{combatantId, kind: check \| save, ability, mode?, manual?, public?}` | Active combatant of the started encounter (removed too); no scores → `conflict`; hidden combatant → never public; player → `forbidden` | `{rollIds, entryId}` | [FR-CBT-44](../specs/combat-tracker.md#6-functional-requirements), #149, #154 |
 
 - **Sheet routing** (#135): in a started encounter the sheet's Attack / Initiative send `cbt.attack` / `cbt.rollInitiative` (client roll-route registry), else `char.roll`; *(feedback pass, built)* checks / saves always `char.roll` (combat claims only `initiative`, `attack`, [FR-CBT-45](../specs/combat-tracker.md#6-functional-requirements)); *(sprint 1, built, fix/charx-combat-routes)* routes get the row `ref` (`{attackId}` \| `{spellId}`); combat claims every attack row's Attack and `spellAttack` only for a spell with damage, passing `ref` to `cbt.attack`; `damage`, `spellDamage`, `skill` never ([FR-CHARX-24](../specs/character-sheet-full.md#6-functional-requirements)) ([FR-CHAR-16](../specs/character-sheet.md#6-functional-requirements), [FR-CBT-30](../specs/combat-tracker.md#6-functional-requirements)). The server never routes: `char.roll` doesn't read combat state. *(built, build/combat-playtest)* A route may answer `hidden`; combat hides Initiative when `round ≥ 1` and the PC has initiative ([FR-CHAR-24](../specs/character-sheet.md#6-functional-requirements)).
@@ -705,7 +706,7 @@ All logged in the command's transaction; none transient. **Undoable: `AttackAppl
 | `HpApplied` | CBT | `cbt.applyHp` | `{hpChangeId, …facts}` | target; `hp-change`; `game-log-entry` | **yes** | FR-CBT-21 |
 | `CombatEntryUndone` (+ `NotificationReopened`) | CBT | `cbt.undo` | `{hpChangeId}` | target; `hp-change` (`undone`); `game-log-entry` (`undone`); card → pending. *(feedback pass, built)*: one per row of the apply (latest first), then one `NotificationReopened` | compensating | FR-CBT-25, FR-CBT-35, gate I28 |
 | `CombatantRolled` *(feedback pass, built)* | CBT | `cbt.rollAbility` | `{encounterId, combatantId, kind, ability, rollIds, entryId}` | `game-log-entry` (players iff public; hidden combatant never) | no | [FR-CBT-44](../specs/combat-tracker.md#6-functional-requirements) |
-| `TokenMoved` *(scenes-map)* *(feedback pass, built)* | MAP | `map.moveToken` | | + bound `combatant` (`movedFt`) from the token-changed hook; unlogged | no | [FR-CBT-39](../specs/combat-tracker.md#6-functional-requirements), [ADR-0031](../architecture/adr/0031-token-move-hooks.md) |
+| `TokenMoved` *(scenes-map)* *(feedback pass, built)* | MAP | `map.moveToken`; *(#457)* `cbt.undoMove` | | + bound `combatant` (`movedFt`; *#457* `moveSteps`, DM only) from the token-changed hook; unlogged | no (*#457:* a counted move is taken back by `cbt.undoMove`) | [FR-CBT-39](../specs/combat-tracker.md#6-functional-requirements), [ADR-0031](../architecture/adr/0031-token-move-hooks.md) |
 | `EntityUpdated` *(entities)* | ENT | `entities.update` | | + `combatant` rows from combat's definition-changed hook | no | [FR-CBT-06](../specs/combat-tracker.md#6-functional-requirements) |
 | `TokenUpdated` / `TokenHidden` / `TokenRevealed` / `TokenDeleted`, `SceneDeleted` *(scenes-map)* | MAP | token commands, scene delete | | + `combatant` / `encounter` rows from token-changed hooks ([§25](#25-combat-token-changed-hooks)) | no | [FR-CBT-09](../specs/combat-tracker.md#6-functional-requirements), [ADR-0028](../architecture/adr/0028-token-changed-hooks.md) |
 
@@ -4173,7 +4174,7 @@ From [spell-fx](../specs/spell-fx.md) (VFX, in-review, DM direction #372) and [A
 |---|---|---|---|---|---|
 | `EffectFxSet` | VFX | `{effectId}` | `effect` upsert (+ effect-hook rows) | yes | no |
 
-*(#456, build/vfx-tentacles, FR-VFX-41)* `vfx.cast` gains `place?: {sceneId, x, y, angle, hidden?}` (`CastPlace`): required for a template preset (else `conflict` "Place ‹spell› on the map"), refused for any other (`invalid`); player: active scene only, no `hidden` (`invalid`). Events: `TemplatePlaced` (the kept cube, FR-SCN-25 limits and fog copies; placer = the player, or for the DM the character's owner, a monster's none) then the effect's own; the effect's `fx.templateId` = the template. FR-VFX-43: an effect ending by any path removes its template in the causing event's changes (effect-changed hook `spell-fx.cast-template`; no event of its own); `vfx.setEffectFx` clearing / replacing such a map effect does too, and refuses a template preset (`conflict`; the same preset again → no-op).
+*(#457, build/vfx-tentacles, FR-VFX-41)* `vfx.cast` gains `place?: {sceneId, x, y, angle, hidden?}` (`CastPlace`): required for a template preset (else `conflict` "Place ‹spell› on the map"), refused for any other (`invalid`); player: active scene only, no `hidden` (`invalid`). Events: `TemplatePlaced` (the kept cube, FR-SCN-25 limits and fog copies; placer = the player, or for the DM the character's owner, a monster's none) then the effect's own; the effect's `fx.templateId` = the template. FR-VFX-43: an effect ending by any path removes its template in the causing event's changes (effect-changed hook `spell-fx.cast-template`; no event of its own); `vfx.setEffectFx` clearing / replacing such a map effect does too, and refuses a template preset (`conflict`; the same preset again → no-op).
 
 **Record change:** `effect` (DM) gains `fx: {preset, params, spellId?} | null` *(#456: `templateId?`)*; the player redaction (`redactEffect`, FR-CBTX-31) gains `fx` on every effect players receive (not secret, not hidden, not ended). The stored / wire shape accepts any kebab-case preset key (a newer server's preset parses on an older client, which draws nothing); writes accept catalogue presets only.
 
@@ -4591,16 +4592,56 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-11 and [ADR-0078](../arch
 - **Client:** a renamed note's old folded title resolves to it for 5 s, so chips stay solid until the rewrite lands.
 - **Search polish (r1, `GET /api/notes/search`):** body matching keeps the shared matcher's tiers but a note's own body rule: the **last** query word (being typed) matches body words as a prefix at any length; another word under 3 letters matches whole body words only; longer words match as prefixes (plural forms too), as before. Snippets drop markdown markers (`#`–`###`, list `-` / `*` / `1.`, `**`) in a window around the first hit. Bench at the caps (1,000 × 32 KiB, Windows, same machine): warm p95 21–33 ms ("the", "dragon", "gold coins", "captain of the guard", "lo"), was 2.8–25 ms; short and last-word queries cost more because they now match bodies.
 
-## 201. Class resources: pact slots and pact weapons (build/cres-pact)
+## 201. Class resources: pact slots, pact weapons, sorcery points, uses with a cost (build/cres-pact)
 
-From [class-resources](../specs/class-resources.md) FR-CRES-02, -03, -15. **No new intent, event or record type.**
+From [class-resources](../specs/class-resources.md) FR-CRES-02–15. **Four new intents, four events and log kind `char.resourceUse`; no new record type.**
+
+| Intent | Who | Validation | Result | Event |
+|---|---|---|---|---|
+| `char.convertSlot {characterId, from: {slot: 1–9} \| {pact: true}}` | DM; owner (locked ok); characters only | a sorcery-points row; a slot of that kind left (created ones first); points after ≤ the maximum, else `invalid` "Sorcery points are full" | `{points}` (left after) | `CharacterSlotConverted {characterId, from, points: {before, after}}`, `creature-sheet` upsert |
+| `char.useFeature {characterId, rowId, amount?, slotLevel?, overspend?, public?}` | as above | the row's `spend`: `amount` iff "ask", `slotLevel` iff any slot (created first); a feature source short of uses → `conflict` "Not enough … (n left)" unless `overspend` (floor −9); no pact slot → `conflict`; a row with its own uses spends 1 of them too | `{entryId}` | `CharacterFeatureUsed {characterId, rowId, entryId}`, `creature-sheet` + `game-log-entry` |
+| `char.undoResourceUse {entryId}` | DM; the line's sender | a `char.resourceUse` line, not undone, no long rest of the character after it, a created slot it made still unspent; gives the `ops` back (clamped) and marks the line undone | `{}` | `CharacterResourceUseUndone {characterId, entryId}` |
+| `char.createSlot {characterId, level: 1–5}` | as above | points left ≥ cost (2 / 3 / 5 / 6 / 7), else `invalid` "A 3rd-level slot costs 5 sorcery points (2 left)"; ≤ 9 created per level | `{points}` | `CharacterSlotCreated {characterId, level, points}`, `creature-sheet` upsert |
+
+- **`char.useResource {slot}`** with `delta > 0` on a level with created slots spends those first (`slotsCreated` drops, `used` only for the rest); the event's `before` / `after` are `used`, so they may be equal. A negative delta only lowers `used`.
+- **`char.rest` long** also writes `slotsCreated: {}`.
+- **Lines** (FR-CRES-12): `char.convertSlot`, `char.createSlot` and `char.useFeature` each append one `char.resourceUse` line in their transaction ("Vex · Quickened Spell · −2 sorcery points (3 left)"); their results and events carry its `entryId`. `public?: false` (the sheet's per-browser switch) → not public, `audiencePlayerId` = the owner; otherwise public for everyone. Game-log action `cres.undo` (sender or DM) sends `char.undoResourceUse`.
+- **`char.putRow` features**: `pool: "sorcery-points"` needs `usesMax`; a second pool row on the sheet → `invalid` "Only one sorcery points row".
 
 - **`char.useResource`**: `resource` also takes `{pact: true}` (the pact slots): `used = clamp(used + delta, 0, spellcasting.pact.slots)`, `reset` → 0; no pact slots → max 0, no change, no event. Same roles as slots (DM; owner, locked ok). `CharacterResourceUsed` carries the same resource.
 - **`char.rest`**: short and long both write `pactUsed: 0` (in the `creature-sheet` change, only when it was above 0). The short-rest confirm reads "Resets short-rest feature uses and pact slots. Spend hit dice on the sheet."
 - **`char.edit`** `set.spellcasting` and **`char.putRow`** attacks accept `pact` / `pactWeapon` (the stat-block zod); the content tools (`character_edit`, `character_put_row`) take them through the same schemas.
 - **`mod.putTrigger`** filters: + `{if: "pactWeapon"}` on `hit` / `roll` (`turnStart` → `invalid`). The roll hook and the tray preview set the fire fact from the owner's stat block: a weapon roll whose `row` name matches a `pactWeapon` attack row. Words: "with a pact weapon".
 
-## 202. Linked notes categories (build/notes-categories)
+## 202. Entry present (build/item-present, DM #458)
+
+From [compendium §6.2](../specs/compendium.md#62-entry-present-an-awarded-item-pops-up-dm-458-2026-11-06) FR-CMP-78–83. A compendium entry open on players' screens, as `handout-present` (§86–87).
+
+| Item | Shape / rule |
+|---|---|
+| Record type `entry-present` (`src/server/features/compendium/present.ts`) | `{id, campaignId, entryId, playerId, presentedAt}`; campaign scope, **not lazy**; DM every row, a player only their own (`entryPresentVisibility`, `@shared/compendium/present`) |
+| `cmp.presentEntry {entryId}` (DM) | Every player of the campaign; `not_found` (not visible to the DM), `invalid` (monster), `conflict` "Share it to show it on players' screens" (unshared homebrew) or "No players to show it to". Result `{presentIds}` |
+| `cmp.closeEntryPresent {presentId}` (DM any; player own) | Another player's row → `not_found`; gone → `ack`, no event |
+| `EntryPresented {entryId, playerIds}` | Logged. Changes per target: old row delete, new row upsert. A target receives only their own rows |
+| `EntryPresentClosed {entryId, playerIds, by: dm \| player}` | Logged. Changes: the row → null |
+| `cmp.putEntry` (`shared: false`), `cmp.deleteEntry` | Delete the entry's `entry-present` rows; the changes ride on `CompendiumEntrySaved` / `CompendiumEntryDeleted` |
+| `cmp.presentEntryByName {kind, name}` | Fixtures only (not an intent): the campaign's homebrew entry by name, then as `cmp.presentEntry` |
+| Client | DM: Add to party's tick "Show it on players' screens" sends `cmp.presentEntry` after the `party.addItem` ack. Player: `player/features/compendium/entry-present-popup.tsx`, mounted next to the handout popup in `PlayerPlayPage.tsx`, same layer (`PRESENT_POPUP_Z`); a shown handout present goes first. Entry body over REST (`GET /api/compendium/entries/:id`) |
+| Snapshot | ≤ 1 row (~250 B) per player; DM ≤ players rows |
+## 203. Compendium character options (build/cmpx-options)
+
+[compendium-expansion](../specs/post-mvp/compendium-expansion.md#6-functional-requirements) X5 (FR-CMPX-30–35). No new event, intent or route; shapes in `@shared/compendium`.
+
+| Surface | Change |
+|---|---|
+| `CompendiumKind` | + `feat`, `race`, `background`, `option`: every REST shape with a kind takes them (`EntrySummary`, `CompendiumEntry`, homebrew `PUT` via MCP); `ImportCounts` (event `CompendiumImported`) has a row per kind |
+| `GET /api/compendium/search` | `kind=feat \| race \| background` take no filter; `kind=option` takes `optionType` (one of `OPTION_TYPES`), matched against `facets.types`; on any other kind → `400 invalid` |
+| Visibility (FR-CMP-14) | unchanged: players read all four kinds, imported or shared homebrew |
+| `cmp.addToSheet` | `feat` and `option` → a `features` row; `race`, `background` → `400 invalid` |
+| `GET /api/compendium/sources` | `fiveEtools.books[].counts` + `feat`, `race`, `background`, `option` |
+| Share (FR-SHARE-04) | feat / option: Prerequisite fact + text; race: Ability Scores, Size, Speed facts + text; background: text |
+
+## 204. Linked notes categories (build/notes-categories)
 
 From [linked-notes](../specs/linked-notes.md) FR-NOTES-25 – -28, -30 (#454). **Built by `build/notes-categories` (slice N8).** One new intent, one column (`note.category`, [data model §154](../data-model/README.md#154-linked-notes-records-buildnotes-core)), the `note` record and `notes.create` gain `category`; no new event, signal or table. The token menu (FR-NOTES-29) is N9's.
 

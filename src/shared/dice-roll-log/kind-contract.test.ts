@@ -102,6 +102,18 @@ const SAMPLES: Record<string, { payload: unknown; dmPayload: unknown | null }> =
   },
   // FR-CHARX-124: the rest line names the kind only.
   "char.rest": { payload: { characterId: "c1", kind: "long" }, dmPayload: null },
+  // FR-CRES-12: a resource-use line; no DM-only part.
+  "char.resourceUse": {
+    payload: {
+      characterId: "c1",
+      action: "use",
+      name: "Quickened Spell",
+      detail: "−2 sorcery points",
+      left: "3 left",
+      ops: [{ on: "feature", id: "f1", n: 2 }],
+    },
+    dmPayload: null,
+  },
 };
 
 describe("FR-DICE-28 kind contract", () => {

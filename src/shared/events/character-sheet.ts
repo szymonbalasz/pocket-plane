@@ -205,6 +205,63 @@ export const CharacterResourceUsed = defineEvent({
   undoable: false,
 });
 
+/** Sorcery points before → after a Flexible Casting step (FR-CRES-06, -07). */
+const PointsChange = z.strictObject({ before: z.number().int(), after: z.number().int() });
+
+/**
+ * `char.convertSlot` (FR-CRES-06): a slot (or a pact slot) spent for sorcery points; changes =
+ * `creature-sheet` upsert.
+ */
+export const CharacterSlotConverted = defineEvent({
+  type: "CharacterSlotConverted",
+  payload: z.strictObject({
+    characterId: Id,
+    from: z.union([
+      z.strictObject({ slot: z.number().int().min(1).max(9) }),
+      z.strictObject({ pact: z.literal(true) }),
+    ]),
+    points: PointsChange,
+    entryId: Id,
+  }),
+  logged: true,
+  undoable: false,
+});
+
+/** `char.createSlot` (FR-CRES-07): sorcery points spent on a created slot; `creature-sheet`. */
+export const CharacterSlotCreated = defineEvent({
+  type: "CharacterSlotCreated",
+  payload: z.strictObject({
+    characterId: Id,
+    level: z.number().int().min(1).max(5),
+    points: PointsChange,
+    entryId: Id,
+  }),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `char.useFeature` (FR-CRES-11): a feature row's Use spent its link's cost; changes =
+ * `creature-sheet` upsert + the `char.resourceUse` `game-log-entry` (`entryId`).
+ */
+export const CharacterFeatureUsed = defineEvent({
+  type: "CharacterFeatureUsed",
+  payload: z.strictObject({ characterId: Id, rowId: Id, entryId: Id }),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `char.undoResourceUse` (FR-CRES-12): a resource-use line given back; changes =
+ * `creature-sheet` upsert + the entry marked undone.
+ */
+export const CharacterResourceUseUndone = defineEvent({
+  type: "CharacterResourceUseUndone",
+  payload: z.strictObject({ characterId: Id, entryId: Id }),
+  logged: true,
+  undoable: false,
+});
+
 /**
  * `char.rest` (FR-CHARX-121), one per character something changed for: changes = its
  * `creature-sheet` and / or `entity` upserts + its `char.rest` `game-log-entry` (`entryId`).

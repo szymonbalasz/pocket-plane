@@ -11,6 +11,7 @@ import {
   ItemCategory,
   LINE_MAX,
   NAME_MAX,
+  OptionType,
   RULE_CHAPTER_MAX,
   RULE_SECTION_MAX,
   SpellSchool,
@@ -33,6 +34,11 @@ export const FILTER_KEYS = {
   feature: ["className", "subclass"],
   // Sprint 9 (FR-CMP-62, amends FR-CMP-11).
   rule: ["chapter", "section"],
+  // Compendium-expansion X5 (FR-CMPX-34).
+  feat: [],
+  race: [],
+  background: [],
+  option: ["optionType"],
 } as const satisfies Record<CompendiumKind, readonly string[]>;
 export const ALL_FILTER_KEYS = [
   "crMin",
@@ -46,6 +52,7 @@ export const ALL_FILTER_KEYS = [
   "subclass",
   "chapter",
   "section",
+  "optionType",
 ] as const;
 export type FilterKey = (typeof ALL_FILTER_KEYS)[number];
 
@@ -76,6 +83,7 @@ export const SearchQuery = z
     subclass: z.string().min(1).max(NAME_MAX).optional(),
     chapter: z.string().min(1).max(RULE_CHAPTER_MAX).optional(),
     section: z.string().min(1).max(RULE_SECTION_MAX).optional(),
+    optionType: OptionType.optional(),
   })
   .superRefine((q, c) => {
     if (q.sameAs !== undefined) {

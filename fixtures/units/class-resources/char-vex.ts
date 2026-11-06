@@ -1,7 +1,9 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is the rule's effect field (MOD §8.4); rules are data, never awaited.
+
+import type { LinkSpendByNameInput } from "@server/features/character-sheet/fixture-commands";
 import { charCreate } from "@server/features/character-sheet/lifecycle";
 import { putTrigger } from "@server/features/effect-modifiers/trigger-commands";
-import { defineFixture, step } from "@server/features/fixtures-adapters/fixture-types";
+import { defineFixture, type Refs, step } from "@server/features/fixtures-adapters/fixture-types";
 import type { CharCreateIntent } from "@shared/character-sheet/sheet";
 import type { PutTriggerInput } from "@shared/effect-modifiers/trigger-intents";
 import { editStep, entityOf, putRowStep } from "../character-sheet-full/steps";
@@ -11,8 +13,9 @@ const vex = (r: Parameters<typeof entityOf>[0]) => entityOf(r, "char-vex");
 /**
  * class-resources §13 `char-vex`: "Vex", owner `player-1`, Sorcerer 5 / Warlock 2, CHA 18;
  * slots 1st ×4, 2nd ×3, 3rd ×2 and 2 pact slots of 1st level (FR-CRES-01); attacks "Pact blade"
- * (pact weapon, FR-CRES-14) and "Dagger"; feature "Font of Magic" (5 uses, long); trigger "Smite"
- * (hit with a pact weapon, the DM checks, once per turn, 2d8 force; FR-CRES-15).
+ * (pact weapon, FR-CRES-14) and "Dagger"; feature "Font of Magic" (the sorcery points, 5, long; FR-CRES-05); trigger "Smite"
+ * (hit with a pact weapon, the DM checks, once per turn, 2d8 force; FR-CRES-15). Spend links
+ * (FR-CRES-09): "Quickened Spell" 2 sorcery points, "Twinned Spell" asks, "Eldritch Smite" a pact slot.
  */
 export default defineFixture({
   key: "char-vex",
@@ -63,8 +66,56 @@ export default defineFixture({
     putRowStep((r) => ({
       creatureId: vex(r),
       list: "features",
-      row: { name: "Font of Magic", source: "Sorcerer 2", usesMax: 5, reset: "long" },
+      row: {
+        name: "Font of Magic",
+        source: "Sorcerer 2",
+        usesMax: 5,
+        reset: "long",
+        pool: "sorcery-points",
+      },
     })),
+    putRowStep((r) => ({
+      creatureId: vex(r),
+      list: "features",
+      row: { name: "Quickened Spell", source: "Metamagic" },
+    })),
+    putRowStep((r) => ({
+      creatureId: vex(r),
+      list: "features",
+      row: { name: "Twinned Spell", source: "Metamagic" },
+    })),
+    putRowStep((r) => ({
+      creatureId: vex(r),
+      list: "features",
+      row: { name: "Eldritch Smite", source: "Invocation" },
+    })),
+    {
+      command: "char.linkSpendByName",
+      input: (r: Refs): LinkSpendByNameInput => ({
+        creatureId: vex(r),
+        row: "Quickened Spell",
+        from: { feature: "Font of Magic" },
+        amount: 2,
+      }),
+    },
+    {
+      command: "char.linkSpendByName",
+      input: (r: Refs): LinkSpendByNameInput => ({
+        creatureId: vex(r),
+        row: "Twinned Spell",
+        from: { feature: "Font of Magic" },
+        amount: "ask",
+      }),
+    },
+    {
+      command: "char.linkSpendByName",
+      input: (r: Refs): LinkSpendByNameInput => ({
+        creatureId: vex(r),
+        row: "Eldritch Smite",
+        from: { pact: true },
+        amount: 1,
+      }),
+    },
     step(
       putTrigger,
       (r): PutTriggerInput => ({

@@ -53,6 +53,11 @@ export const BookStatus = z.strictObject({
     monster: z.number().int().min(0),
     spell: z.number().int().min(0),
     item: z.number().int().min(0),
+    // FR-CMPX-30: character options.
+    feat: z.number().int().min(0),
+    race: z.number().int().min(0),
+    background: z.number().int().min(0),
+    option: z.number().int().min(0),
   }),
   importedVersion: z.string().min(1).optional(),
   importedAt: z.string().min(1).optional(),

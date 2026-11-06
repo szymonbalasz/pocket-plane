@@ -5,6 +5,7 @@ import { FILTER_KEYS, type FilterKey } from "@shared/compendium/rest";
 import {
   type CompendiumKind,
   ITEM_CATEGORIES,
+  OPTION_TYPES,
   SPELL_SCHOOLS,
   SRD_CLASSES,
 } from "@shared/compendium/schemas";
@@ -20,8 +21,22 @@ export const WINDOW_DEBOUNCE_MS = 200;
 export type CmpTab = "all" | CompendiumKind;
 export type Role = "dm" | "player";
 
-const TABS: readonly CmpTab[] = ["all", "monster", "spell", "item", "condition", "feature"];
-/** FR-CMP-18: DM All, Monsters, Spells, Items, Conditions, Features; players no Monsters. */
+const TABS: readonly CmpTab[] = [
+  "all",
+  "monster",
+  "spell",
+  "item",
+  "condition",
+  "feature",
+  "feat",
+  "race",
+  "background",
+  "option",
+];
+/**
+ * FR-CMP-18: DM All, Monsters, Spells, Items, Conditions, Features, then the character options
+ * (FR-CMPX-34: Feats, Races, Backgrounds, Class options); players no Monsters.
+ */
 export const tabsFor = (role: Role): CmpTab[] =>
   TABS.filter((t) => role === "dm" || t !== "monster");
 
@@ -34,6 +49,10 @@ export const TAB_LABEL: Record<CmpTab, string> = {
   feature: "Features",
   // FR-CMP-62: no Rules tab (the Rules window is the place); the label serves the kind line.
   rule: "Rules",
+  feat: "Feats",
+  race: "Races",
+  background: "Backgrounds",
+  option: "Class options",
 };
 
 export interface FilterField {
@@ -74,6 +93,10 @@ export const FILTER_FIELDS: Record<CompendiumKind, readonly FilterField[]> = {
     { key: "chapter", label: "Chapter" },
     { key: "section", label: "Section" },
   ],
+  feat: [],
+  race: [],
+  background: [],
+  option: [{ key: "optionType", label: "Type", options: opts(OPTION_TYPES) }],
 };
 
 export type Filters = Partial<Record<FilterKey, string>>;

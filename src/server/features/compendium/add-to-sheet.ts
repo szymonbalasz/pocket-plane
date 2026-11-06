@@ -55,19 +55,21 @@ export function sheetRowOf(env: Pick<CommandEnv, "tx">, e: EntryRow): NewSheetRo
     case "item":
       return { list: "items", rows: [{ name, qty: 1 }] };
     case "feature":
+    case "feat":
+    case "option":
       return {
         list: "features",
         rows: [
           {
             name,
             source: sourceLabelOf(env.tx, e.source),
-            text: clip((e.body as BodyOf<"feature">).text, ROW_TEXT_MAX),
+            text: clip((e.body as BodyOf<"feature" | "feat">).text, ROW_TEXT_MAX),
           },
         ],
       };
     default:
-      throw invalid("Only spells, items and features go on a sheet", [
-        { path: ["entryId"], message: "Not a spell, item or feature" },
+      throw invalid("Only spells, items, features, feats and class options go on a sheet", [
+        { path: ["entryId"], message: "Not a spell, item, feature, feat or class option" },
       ]);
   }
 }

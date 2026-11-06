@@ -203,8 +203,20 @@ export function PresentContent({
   );
 }
 
-/** Images one at a time, fit inside 90 vw × 75 vh; > 1 → Prev / Next + "‹n› / ‹N›". */
-function Images({ ids, title }: { ids: readonly string[]; title: string }) {
+/**
+ * Images one at a time, fit inside 90 vw × 75 vh; > 1 → Prev / Next + "‹n› / ‹N›". *(#458)* Also
+ * the entry popup's (FR-CMP-80).
+ */
+export function Images({
+  ids,
+  title,
+  prefix = "party-present",
+}: {
+  ids: readonly string[];
+  title: string;
+  /** Test ID prefix: `party-present` (handouts) or `cmp-present` (entries). */
+  prefix?: string;
+}) {
   const [i, setI] = useState(0);
   const n = ids.length;
   const at = Math.min(i, n - 1);
@@ -212,7 +224,7 @@ function Images({ ids, title }: { ids: readonly string[]; title: string }) {
   if (!id) return null;
   return (
     <div className="flex flex-col items-center gap-2">
-      <div data-testid="party-present-image" data-record-id={id} className="flex justify-center">
+      <div data-testid={`${prefix}-image`} data-record-id={id} className="flex justify-center">
         <AssetImg
           id={id}
           file="display"
@@ -228,14 +240,14 @@ function Images({ ids, title }: { ids: readonly string[]; title: string }) {
               variant="outline"
               className="size-8"
               aria-label="Previous image"
-              data-testid="party-present-prev"
+              data-testid={`${prefix}-prev`}
               disabled={at === 0}
               onClick={() => setI(stepPage(at, -1, n))}
             >
               <ChevronLeftIcon className="size-4" />
             </Button>
           </Tip>
-          <span data-testid="party-present-page" className="tabular-nums text-muted-foreground">
+          <span data-testid={`${prefix}-page`} className="tabular-nums text-muted-foreground">
             {pageText(at, n)}
           </span>
           <Tip content="Next image" off={at === n - 1}>
@@ -244,7 +256,7 @@ function Images({ ids, title }: { ids: readonly string[]; title: string }) {
               variant="outline"
               className="size-8"
               aria-label="Next image"
-              data-testid="party-present-next"
+              data-testid={`${prefix}-next`}
               disabled={at === n - 1}
               onClick={() => setI(stepPage(at, 1, n))}
             >

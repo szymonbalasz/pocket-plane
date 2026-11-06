@@ -40,9 +40,24 @@ export function entryShareText(e: { kind: CompendiumKind; body: unknown }): stri
       ].filter((f) => f !== null);
       return paragraphs([facts.join("\n"), b.text]);
     }
+    case "feat":
+    case "option": {
+      const b = e.body as BodyOf<"feat">;
+      return paragraphs([fact("Prerequisite", b.prerequisite), b.text]);
+    }
+    case "race": {
+      const b = e.body as BodyOf<"race">;
+      const facts = [
+        fact("Ability Scores", b.abilities),
+        fact("Size", b.size),
+        fact("Speed", b.speed),
+      ].filter((f) => f !== null);
+      return paragraphs([facts.join("\n"), b.text]);
+    }
     case "condition":
     case "feature":
     case "rule":
+    case "background":
       return (e.body as { text: string }).text.trim();
     case "monster":
       throw new Error("Monsters are not shared");

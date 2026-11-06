@@ -376,6 +376,34 @@ function ItemView({ e }: { e: CompendiumEntry }) {
   );
 }
 
+/** FR-CMPX-34: feats, races and class options: their facts, then the text. */
+function OptionView({ e }: { e: CompendiumEntry }) {
+  const b = e.body as { text: string; prerequisite?: string } & Partial<BodyOf<"race">>;
+  const facts: [string, string | undefined][] = [
+    ["Prerequisite", b.prerequisite],
+    ["Ability Scores", b.abilities],
+    ["Size", b.size],
+    ["Speed", b.speed],
+  ];
+  const shown = facts.filter(([, v]) => v);
+  return (
+    <div className="space-y-2 text-sm">
+      <Heading e={e} line={e.line} />
+      {shown.length > 0 && (
+        <div className="space-y-0.5">
+          {shown.map(([label, v]) => (
+            <Fact key={label} label={label}>
+              {v}
+            </Fact>
+          ))}
+        </div>
+      )}
+      <Rule />
+      <MarkdownLite text={b.text} context={{ kind: "plain", label: e.name }} />
+    </div>
+  );
+}
+
 function TextView({ e }: { e: CompendiumEntry }) {
   const b = e.body as { text: string };
   const f = e.kind === "feature" ? (e.facets as FacetsOf<"feature">) : null;
@@ -456,10 +484,13 @@ export function EntryView({
   data,
   viewer,
   actions,
+  bare = false,
 }: {
   data: EntryResponse;
   viewer: Role;
   actions?: ReactNode;
+  /** *(#458)* No actions row (the player's entry popup, FR-CMP-80: its menus would open under it). */
+  bare?: boolean;
 }) {
   const e = data.entry;
   let view: ReactNode;
@@ -482,7 +513,9 @@ export function EntryView({
     );
   } else if (e.kind === "spell") view = <SpellView e={e} />;
   else if (e.kind === "item") view = <ItemView e={e} />;
-  else view = <TextView e={e} />;
+  else if (e.kind === "feat" || e.kind === "race" || e.kind === "option") {
+    view = <OptionView e={e} />;
+  } else view = <TextView e={e} />;
   const drag = viewer === "dm" && e.kind === "monster" && data.definition;
   const sheetable = isSheetable(e.kind);
   const rule = e.kind === "rule";
@@ -496,7 +529,7 @@ export function EntryView({
       data-value={e.kind}
       className="space-y-2"
     >
-      {(drag || sheetable || rule || shareable || actions) && (
+      {!bare && (drag || sheetable || rule || shareable || actions) && (
         <div
           className="flex flex-wrap items-center justify-end gap-1"
           data-testid="cmp-entry-actions"

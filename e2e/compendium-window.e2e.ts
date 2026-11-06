@@ -25,7 +25,7 @@ test("FR-CMP-18 FR-CMP-19 FR-CMP-20 DM opens Goblin's stat block; player-1 opens
     /^SRD 5\.1 · 55 entries · imported/,
   );
   await expect(win.getByTestId("cmp-update")).toBeVisible();
-  await expect(win.getByTestId("cmp-tab")).toHaveCount(6);
+  await expect(win.getByTestId("cmp-tab")).toHaveCount(10); // + Feats, Races, Backgrounds, Class options (FR-CMPX-34)
 
   await win.getByTestId("cmp-search").fill("goblin");
   const first = win.getByTestId("cmp-result").first();
@@ -60,7 +60,7 @@ test("FR-CMP-18 FR-CMP-19 FR-CMP-20 DM opens Goblin's stat block; player-1 opens
   await p1.goto(link("Player 1"));
   await live(p1);
   const pw = await openWindow(p1, "cmp.compendium");
-  await expect(pw.getByTestId("cmp-tab")).toHaveCount(5);
+  await expect(pw.getByTestId("cmp-tab")).toHaveCount(9);
   await expect(pw.locator('[data-testid="cmp-tab"][data-value="monster"]')).toHaveCount(0);
   await expect(pw.getByTestId("cmp-import-panel")).toHaveCount(0);
   await pw.getByTestId("cmp-search").fill("fire");

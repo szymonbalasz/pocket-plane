@@ -14,6 +14,7 @@ import {
   HP_MODES,
   type HpDamagePart,
   type HpTriggerPart,
+  type MoveStep,
   SIDES,
 } from "@shared/combat-tracker/schemas";
 import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
@@ -309,6 +310,8 @@ export const creatureSheet = sqliteTable(
     hitDiceUsed: text("hit_dice_used", { mode: "json" }).notNull(),
     /** FR-CRES-02 (class-resources): pact slots used. Added column, default 0. */
     pactUsed: integer("pact_used").notNull().default(0),
+    /** FR-CRES-08 (class-resources): created slots per level `{"1"…"5": int}`. Added column. */
+    slotsCreated: text("slots_created", { mode: "json" }).notNull().default({}),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -800,6 +803,11 @@ export const combatant = sqliteTable(
      * Nullable, no default: push-safe on old dev DBs.
      */
     tieOrder: integer("tie_order"),
+    /**
+     * FR-CBT-179 (#457): JSON leaf, the undoable counted moves, oldest first (≤ 20); null = none.
+     * Cleared with `movedFt`'s reset and by a teleport. DM only. Nullable, no default: push-safe.
+     */
+    moveSteps: text("move_steps", { mode: "json" }).$type<MoveStep[]>(),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );
@@ -1696,6 +1704,33 @@ export const compendiumEntry = sqliteTable(
 );
 
 /**
+ * Entry present (compendium, `entry-present`, FR-CMP-78; DM #458): a compendium entry open on one
+ * player's screen until closed, like `handout_present`. At most one row per player (unique
+ * `(campaignId, playerId)`); a row exists only while its player may read the entry (FR-CMP-82,
+ * kept by the commands; the cascade is the backstop for a homebrew delete).
+ */
+export const entryPresent = sqliteTable(
+  "entry_present",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    entryId: text("entry_id")
+      .notNull()
+      .references((): AnySQLiteColumn => compendiumEntry.id, { onDelete: "cascade" }),
+    playerId: text("player_id")
+      .notNull()
+      .references((): AnySQLiteColumn => player.id),
+    presentedAt: text("presented_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("entry_present_campaign_player").on(t.campaignId, t.playerId),
+    index("entry_present_entry").on(t.entryId),
+  ],
+);
+
+/**
  * Imported art (compendium-expansion §8, FR-CMPX-24; per campaign, server-only, not a record
  * type): the asset holding a monster's token file in this campaign. A deleted asset takes its
  * row with it, so the next placement ingests again.
@@ -2008,6 +2043,7 @@ export const schema = {
   mapSettings,
   compendiumSource,
   compendiumEntry,
+  entryPresent,
   importedArt,
   diceLook,
   characterGems,

@@ -25,6 +25,10 @@ const counts = {
   condition: zero,
   feature: zero,
   rule: zero,
+  feat: zero,
+  race: zero,
+  background: zero,
+  option: zero,
 };
 
 describe("CMP domain events (§9)", () => {
@@ -40,7 +44,7 @@ describe("CMP domain events (§9)", () => {
     const p = { source: "srd-5.1", version: "mini", counts };
     expect(CompendiumImported.payload.parse(p)).toEqual(p);
     expect(CompendiumImported.payload.safeParse({ ...p, extra: 1 }).success).toBe(false);
-    expect(ImportCounts.safeParse({ ...counts, race: zero }).success).toBe(false);
+    expect(ImportCounts.safeParse({ ...counts, spellbook: zero }).success).toBe(false);
     expect(ImportCounts.safeParse({ ...counts, spell: { ...zero, skipped: 1 } }).success).toBe(
       false,
     );

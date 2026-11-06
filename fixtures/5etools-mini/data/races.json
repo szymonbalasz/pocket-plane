@@ -1,0 +1,121 @@
+{
+  "race": [
+    {
+      "name": "Glimmerkin",
+      "source": "TB1",
+      "page": 4,
+      "size": ["S"],
+      "speed": {
+        "walk": 25,
+        "climb": true
+      },
+      "ability": [
+        {
+          "dex": 2
+        }
+      ],
+      "entries": [
+        {
+          "name": "Age",
+          "type": "entries",
+          "entries": ["Glimmerkin live about sixty years."]
+        },
+        {
+          "name": "Glow",
+          "type": "entries",
+          "entries": ["You shed dim light in a 5-foot radius."]
+        },
+        {
+          "name": "Languages",
+          "type": "entries",
+          "entries": ["You speak Common and Glim."]
+        }
+      ]
+    },
+    {
+      "name": "Stonekin",
+      "source": "TB2",
+      "page": 2,
+      "lineage": "VRGR",
+      "_copy": {
+        "name": "Glimmerkin",
+        "source": "TB1",
+        "_mod": {
+          "entries": {
+            "mode": "replaceArr",
+            "replace": "Age",
+            "items": {
+              "name": "Age",
+              "type": "entries",
+              "entries": ["Stonekin live for centuries."]
+            }
+          }
+        }
+      },
+      "size": ["S", "M"],
+      "speed": 30,
+      "ability": []
+    }
+  ],
+  "subrace": [
+    {
+      "source": "TB1",
+      "raceName": "Glimmerkin",
+      "raceSource": "TB1",
+      "entries": [
+        {
+          "name": "Bright Eyes",
+          "type": "entries",
+          "entries": ["You see well in dim light."]
+        }
+      ]
+    },
+    {
+      "name": "Deep",
+      "source": "TB1",
+      "raceName": "Glimmerkin",
+      "raceSource": "TB1",
+      "page": 5,
+      "ability": [
+        {
+          "wis": 1
+        }
+      ],
+      "entries": [
+        {
+          "name": "Glow",
+          "type": "entries",
+          "entries": ["Your glow is blue and only you can see it."],
+          "data": {
+            "overwrite": "Glow"
+          }
+        },
+        {
+          "name": "Stone Sense",
+          "type": "entries",
+          "entries": ["You know which way is down."]
+        }
+      ]
+    },
+    {
+      "name": "Ash",
+      "source": "TB2",
+      "raceName": "Glimmerkin",
+      "raceSource": "TB1",
+      "page": 3,
+      "speed": 30,
+      "ability": [
+        {
+          "con": 1
+        }
+      ],
+      "entries": [
+        {
+          "name": "Ashen",
+          "type": "entries",
+          "entries": ["Smoke doesn't bother you."]
+        }
+      ]
+    }
+  ]
+}
