@@ -1,6 +1,7 @@
 // Start / End (FR-CBT-07, FR-CBT-08, FR-CBT-10; End dismisses pending cards, FR-CBT-59/61;
 // sprint 2: Start options, created tokens, HP modes, monster initiative, FR-CBT-64–66; sprint 7:
-// kept HP on rebind FR-CBT-141, every summon's token goes at End FR-CBT-145).
+// kept HP on rebind FR-CBT-141, every summon's token goes at End FR-CBT-145; a monster's token at
+// 0 HP stays marked dead, FR-MAP-151).
 // `started` / `ended` rule hooks run after the event (FR-CBTX-01, ADR-0035).
 import { type BindSlot, planBindings } from "@shared/combat-tracker/rules";
 import {
@@ -26,6 +27,7 @@ import { resolveDefinition } from "../entities/commands";
 import { syncPetPresence } from "../entities/pet-presence";
 import { getRow, toEntityRecord } from "../entities/rows";
 import { dismissForEncounter } from "../notifications";
+import { markDead } from "../scenes-map/dead";
 import { getScene, sceneTokens } from "../scenes-map/rows";
 import { clearTrails } from "../scenes-map/trail";
 import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
@@ -337,6 +339,16 @@ export const endCommandWith = (hooks: CombatRuleHooks) =>
         ...(before.sceneId ? clearTrails(env, before.sceneId) : []),
         // FR-CBT-113 (sprint 6): pets' HP written back, summons' tokens deleted (1b).
         ...companionsAtEnd(env, rows),
+        // FR-MAP-151: a monster left at 0 HP keeps its X; after the summons' deletes, so a
+        // deleted token is skipped.
+        ...markDead(
+          env,
+          rows.flatMap((r) =>
+            r.kind === "monster" && r.tokenId && r.hpCurrent !== null && r.hpCurrent <= 0
+              ? [r.tokenId]
+              : [],
+          ),
+        ),
       ];
       env.emit({ type: EncounterEnded.type, campaignId: cid, payload: { encounterId }, changes });
       changes.push(...hooks.run("ended", env, after, { combatantIds: rows.map((r) => r.id) }));

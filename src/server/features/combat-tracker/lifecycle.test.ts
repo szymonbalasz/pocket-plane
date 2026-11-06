@@ -6,11 +6,12 @@ import {
   ENCOUNTER_TYPE,
   type EncounterRecord,
 } from "@shared/combat-tracker/schemas";
-import { MAP_INTENTS } from "@shared/scenes-map/schemas";
+import { MAP_INTENTS, TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { UPDATE } from "../entities/commands";
 import { MAP_REST } from "../scenes-map/commands";
 import { createEncounter } from "./encounters";
 import { TOKEN_IN_ENCOUNTER } from "./hooks";
+import { applyHp } from "./hp";
 import { endCommand, startCommand } from "./lifecycle";
 import { combatSetup, eliteBlock } from "./testing";
 
@@ -175,6 +176,22 @@ describe("FR-CBT-07 FR-CBT-08 FR-CBT-10 start / end", () => {
       expect(t.s.records.filterChange(c, v)?.op ?? "none").toMatch(/delete|none/);
     }
     expect(t.err(() => t.run(endCommand.name, { encounterId: t.enc.id })).code).toBe("conflict");
+  });
+
+  test("FR-MAP-151 end: a monster's token at 0 HP stays marked dead; others don't", () => {
+    const t = started();
+    const by = t.byName(t.enc.id);
+    t.run(applyHp.name, { combatantId: by.Goblin?.id, kind: "damage", amount: 99 });
+    t.run(applyHp.name, { combatantId: by.Wolf?.id, kind: "damage", amount: 3 });
+    t.run(endCommand.name, { encounterId: t.enc.id });
+    const dead = (id: string) =>
+      t.s.db.$client.query("select dead from token where id = ?").get(id) as { dead: number };
+    expect(dead(t.tokens.goblin).dead).toBe(1);
+    expect(dead(t.tokens.goblin2).dead).toBe(0);
+    expect(dead(by.Wolf?.tokenId as string).dead).toBe(0);
+    const ev = t.events.map((e) => e.event).findLast((e) => e.type === "EncounterEnded");
+    const tok = ev?.changes.filter((c) => c.type === TOKEN_TYPE && c.id === t.tokens.goblin);
+    expect(tok?.map((c) => (c.after as { dead?: boolean }).dead)).toEqual([true]);
   });
 
   test("FR-CBT-27 visibility matrix: started encounter redacted; combatants per rule", () => {

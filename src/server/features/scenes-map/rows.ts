@@ -37,7 +37,7 @@ export const folderChange = (
 
 export const toSceneRecord = (r: SceneRow): SceneRecord => ({ ...r });
 /**
- * `fogged` and `invisible` ride the DM wire only when true (FOG §9, #210); `seenBy` and
+ * `fogged`, `invisible` and `dead` ride the wire only when true (FOG §9, #210, FR-MAP-151); `seenBy` and
  * `sizeOverridden` are server state no wire carries (`dmTokenRecord` / `redactToken` strip them).
  */
 export const toTokenRecord = ({
@@ -45,10 +45,12 @@ export const toTokenRecord = ({
   invisible,
   seenBy,
   sizeOverridden,
+  dead,
   ...r
 }: TokenRow): TokenRecord => ({
   ...r,
   ...(fogged ? { fogged: true as const } : {}),
+  ...(dead ? { dead: true as const } : {}),
   ...(invisible ? { invisible: true as const } : {}),
   ...(sizeOverridden ? { sizeOverridden: true as const } : {}),
   seenBy,

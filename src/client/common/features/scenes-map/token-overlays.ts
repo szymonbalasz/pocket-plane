@@ -11,6 +11,7 @@ import { cbtTokenOverlay, companionTokenOverlay } from "../combat-tracker/token-
 import { modTriggersOverlay } from "../effect-modifiers/trigger-badges";
 import { fogTokenOverlay } from "../fog-of-war/token-overlay";
 import { noteCueOverlay } from "../notifications/token-cue";
+import { deadTokenOverlay } from "./dead-overlay";
 
 export interface TokenOverlayView {
   client: "dm" | "player";
@@ -146,6 +147,7 @@ export const tokenOverlays: readonly TokenOverlay[] = [
   cbtTokenOverlay, // combat-tracker (FR-CBT-38/39)
   cbtxTokenOverlay, // combat-extras: HP bar, effect icons, death badge (FR-CBTX-28/29/30)
   noteCueOverlay, // notifications: the DM's 4 s action cue (FR-NOTE-30)
+  deadTokenOverlay, // scenes-map: a token marked dead keeps the red X (FR-MAP-151)
   fogTokenOverlay, // fog-of-war: DM "Fog" / "Invisible" badges, View-as dimming (FR-FOG-20, -47)
   // combat-tracker: companion marker, a paw badge in the owner's colour (FR-MAP-76); above MOD's
   // line, which stays last (its icon ends the icon row)
