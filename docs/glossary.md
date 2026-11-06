@@ -215,7 +215,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Fight summary** | The Stats window opened on a fight at End, with its leaderboard and **Highlights** (MVP, biggest hit, kills, downs…). | Session awards |
 | **Luck tracker** | The Stats Luck tab: rolls, d20s, average d20, nat 20s / 1s per character, per session or campaign, from public rolls. | — |
 | **Trophy case** | A character's campaign-wide totals and records, on the sheet's Trophies tab (owner + DM). | Session awards |
-| **Health band** | healthy / bloodied / down: what players see of a monster's HP instead of numbers. | — |
+| **Health band** | healthy / bloodied / critical (under 15 %) / down: what players see of a monster's HP instead of numbers. | — |
 | **Log entry** | One game-log line; may join several rolls (e.g. an attack's to-hit and damage). | Roll; event log entry |
 | **Roll mode** | normal / advantage / disadvantage, applied to the d20. | — |
 | **Roll purpose** | Plain, attack or damage, set in the Dice tray before rolling (saved weapons and spells preset it): an attack's d20 decides the crit; a damage roll has a damage type per part. In combat a combatant's attack / damage roll feeds the damage card; the DM can **Use as attack / damage** a logged roll ([ADR-0073](architecture/adr/0073-tray-attacks.md)). | Dice tray, Damage card |

@@ -3,13 +3,17 @@
 // active effect on the creature carries `fx.spellId` = the row, else **End** (`cbtx.endEffect`)
 // beside CBTX's chip for that effect. Cast sends `vfx.cast` (DM any sheet; the owner on theirs,
 // locked or not, like counters). Disabled while not live; a reject toasts. Test ID `vfx-cast`
-// (`data-record-id` = spell id, `data-state` = `cast` | `end`).
+// (`data-record-id` = spell id, `data-state` = `cast` | `end` | `placing`). FR-VFX-40: a
+// template-anchored preset's Cast asks the map's AoE tool for one placement (its shape and size);
+// the release sends `vfx.cast` with `place`; pressing it again while placing cancels.
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import type { EffectView } from "@shared/combat-extras/schemas";
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { VFX_INTENTS } from "@shared/spell-fx/intents";
-import { SparklesIcon, SquareIcon } from "lucide-react";
+import { presetOf } from "@shared/spell-fx/presets";
+import { MousePointerClickIcon, SparklesIcon, SquareIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { useSync } from "../../sync/store";
 import { useSheet, useSheetScope } from "../character-sheet/sheet-context";
@@ -17,6 +21,7 @@ import type { SpellRowAction, SpellRowActionProps } from "../character-sheet/spe
 import { activeEffects } from "../combat-extras/logic";
 import { EffectChips } from "../combat-extras/parts";
 import { useCbtIntent, useStartedEncounter } from "../combat-tracker/store";
+import { endRequest, requestPlacement, useAoe } from "../scene-tools/aoe-store";
 
 /**
  * FR-VFX-06: the active effect cast from this row on the creature (a character: its own effects;
@@ -40,15 +45,42 @@ export function castEffectOf(
   );
 }
 
-function CastButton({ creatureId, row }: SpellRowActionProps) {
+function CastButton({ creatureId, row, client }: SpellRowActionProps) {
   const ctx = useSheet();
   const kit = useSheetScope() === "main";
   const active = useSync((s) => castEffectOf(s.store, creatureId, row.id));
+  const connection = useSync((s) => s.connection);
   const enc = useStartedEncounter();
   const { send, disabled } = useCbtIntent();
+  const requestKey = `${VFX_INTENTS.cast}:${row.id}`;
+  const placing = useAoe((s) => s.request?.key === requestKey);
   // OQ-VFX-01 A: the DM and the owner (who may count on the sheet, locked or not).
   if (!ctx.canCount) return null;
-  const state = active ? "end" : "cast";
+  const tpl = row.fx ? presetOf(row.fx.preset)?.template : undefined;
+  const state = active ? "end" : placing ? "placing" : "cast";
+  // FR-VFX-40: one placement on the map, then `vfx.cast` with it.
+  const place = () => {
+    if (!tpl) return;
+    requestPlacement({
+      key: requestKey,
+      title: row.name,
+      shape: tpl.shape,
+      size: tpl.sizeFt,
+      place: (sceneId, t, dmOnly) =>
+        connection.sendIntent(VFX_INTENTS.cast, {
+          creatureId,
+          spellId: row.id,
+          place: {
+            sceneId,
+            x: t.x,
+            y: t.y,
+            angle: t.angle,
+            ...(client === "dm" && dmOnly ? { hidden: true } : {}),
+          },
+        }),
+    });
+    toast.info(`Place ${row.name} on the map`, { id: "vfx-place" });
+  };
   return (
     <span className="inline-flex items-center gap-1">
       {active && active.kind === "concentration" && (
@@ -62,14 +94,21 @@ function CastButton({ creatureId, row }: SpellRowActionProps) {
         data-record-id={row.id}
         data-state={state}
         disabled={disabled}
-        onClick={() =>
-          void (active
-            ? send(CBTX_INTENTS.endEffect, { effectId: active.id })
-            : send(VFX_INTENTS.cast, { creatureId, spellId: row.id }))
-        }
+        onClick={() => {
+          if (active) void send(CBTX_INTENTS.endEffect, { effectId: active.id });
+          else if (placing) endRequest(true);
+          else if (tpl) place();
+          else void send(VFX_INTENTS.cast, { creatureId, spellId: row.id });
+        }}
       >
-        {active ? <SquareIcon className="size-3" /> : <SparklesIcon className="size-3" />}
-        {active ? "End" : "Cast"}
+        {active ? (
+          <SquareIcon className="size-3" />
+        ) : placing ? (
+          <MousePointerClickIcon className="size-3" />
+        ) : (
+          <SparklesIcon className="size-3" />
+        )}
+        {active ? "End" : placing ? "Placing…" : "Cast"}
       </Button>
     </span>
   );

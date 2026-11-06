@@ -10,12 +10,15 @@ import {
   DAMAGE_RE,
   DAMAGE_TYPES,
   type ExtraDamage,
+  PACT_LEVEL_MAX,
+  PACT_SLOTS_MAX,
   SPELL_LEVELS,
   spellAttackBonus,
   spellSaveDc,
 } from "@shared/entities/schemas";
 import { type ReactNode, useState } from "react";
 import { Button } from "../../components/ui/button";
+import { Checkbox } from "../../components/ui/controls";
 import { Badge, Input } from "../../components/ui/primitives";
 import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
@@ -55,6 +58,7 @@ import {
   extraPart,
   levelOrdinal,
   MAGIC_OPTIONS,
+  pactPips,
   pipDelta,
   type RowRollButton,
   slotPips,
@@ -342,6 +346,15 @@ function ExtraParts({ a, put }: { a: Attack; put: PutAttack }) {
 }
 
 /** FR-CHARX-56: view mode: name + "+1" Badge, then "+8 · 2d6+5 slashing + 2d6 fire". */
+/** FR-CRES-14: the view-mode "Pact" chip of a pact-weapon row. */
+function PactChip({ a, variant }: { a: Attack; variant: "outline" | "secondary" }) {
+  return (
+    <Badge data-testid="cres-pact-weapon" data-record-id={a.id} variant={variant}>
+      Pact
+    </Badge>
+  );
+}
+
 function AttackLine({ a }: { a: Attack }) {
   const v = attackRowView(a);
   const parts = v.parts.map((p, i) => (
@@ -360,11 +373,14 @@ function AttackLine({ a }: { a: Attack }) {
           <span className="min-w-0 [overflow-wrap:anywhere] text-[15px] font-bold">
             <CompendiumName list="attacks" name={v.name} rowId={a.id} />
           </span>
-          {v.badge && (
-            <Badge data-testid="charx-attack-bonus" data-value={a.bonus} variant="outline">
-              {v.badge}
-            </Badge>
-          )}
+          <span className="flex gap-1">
+            {a.pactWeapon && <PactChip a={a} variant="outline" />}
+            {v.badge && (
+              <Badge data-testid="charx-attack-bonus" data-value={a.bonus} variant="outline">
+                {v.badge}
+              </Badge>
+            )}
+          </span>
         </span>
         <span data-testid="charx-attack-numbers" className="text-sm text-muted-foreground">
           {parts}
@@ -381,6 +397,7 @@ function AttackLine({ a }: { a: Attack }) {
             {v.badge}
           </Badge>
         )}
+        {a.pactWeapon && <PactChip a={a} variant="secondary" />}
       </span>
       <span data-testid="charx-attack-numbers" className="text-muted-foreground">
         {parts}
@@ -432,11 +449,33 @@ export function AttackEditFields({ a, tools }: { a: Attack; tools: ReactNode }) 
         commit={(t) => put({ damageType: t ?? undefined })}
       />
       <MagicSelect a={a} put={put} />
+      <PactWeaponBox a={a} put={put} />
       {tools}
       <div className="basis-full">
         <ExtraParts a={a} put={put} />
       </div>
     </div>
+  );
+}
+
+/** FR-CRES-14: the attack row is the warlock's pact weapon (rule triggers match it). */
+function PactWeaponBox({ a, put }: { a: Attack; put: PutAttack }) {
+  const live = useSync((s) => s.state === "live");
+  const busy = useBusy();
+  return (
+    <span className="flex h-8 items-center gap-1.5 text-xs text-muted-foreground">
+      <Checkbox
+        data-testid="cres-pact-weapon"
+        data-record-id={a.id}
+        aria-label="Pact weapon"
+        checked={a.pactWeapon === true}
+        disabled={!live || busy.busy}
+        onCheckedChange={(on) =>
+          busy.run(() => put({ pactWeapon: on === true ? true : undefined }))
+        }
+      />
+      Pact weapon
+    </span>
   );
 }
 
@@ -511,62 +550,115 @@ function AttacksBlock({ overrides }: { overrides: PublicOverrides }) {
   );
 }
 
+/**
+ * One pip row: a spell level's slots, or the pact slots (FR-CRES-04). `key` = the level or
+ * `pact`; the pact row keeps its own test IDs (`cres-pact-pip`, `cres-pact-count`).
+ */
+interface PipRow {
+  key: string;
+  label: string;
+  kitLabel: string;
+  tip: string;
+  resource: { slot: number } | { pact: true };
+  pipId: string;
+  countId: string;
+  max: number;
+  used: number;
+}
+
+function pipRows(ctx: ReturnType<typeof useSheet>): PipRow[] {
+  const rows: PipRow[] = slotPips(ctx.stats, ctx.sheet).map((p) => ({
+    key: p.level,
+    label: `Level ${p.level}`,
+    kitLabel: levelOrdinal(p.level),
+    tip: `Level ${p.level} slots: ${p.used} of ${p.max} used`,
+    resource: { slot: Number(p.level) },
+    pipId: "charx-slot",
+    countId: "charx-slot-count",
+    max: p.max,
+    used: p.used,
+  }));
+  const pact = pactPips(ctx.stats, ctx.sheet);
+  if (pact) {
+    const lvl = levelOrdinal(pact.level);
+    rows.push({
+      key: "pact",
+      label: `Pact ${lvl}`,
+      kitLabel: `Pact · ${lvl}`,
+      tip: `Pact slots (${lvl} level, back on a short rest): ${pact.used} of ${pact.max} used`,
+      resource: { pact: true },
+      pipId: "cres-pact-pip",
+      countId: "cres-pact-count",
+      max: pact.max,
+      used: pact.used,
+    });
+  }
+  return rows;
+}
+
+/** The Reset link's `data-value`: `slot.<level>` or `pact`. */
+const resetValue = (r: PipRow) => ("slot" in r.resource ? `slot.${r.key}` : "pact");
+
 function SlotPips() {
   const ctx = useSheet();
   const live = useSync((s) => s.state === "live");
   const intents = useSheetIntents();
   const busy = useBusy();
   const scope = useSheetScope();
-  const pips = slotPips(ctx.stats, ctx.sheet);
+  const rows = pipRows(ctx);
   const counters = ctx.creature.kind === "character" && ctx.canCount;
-  const use = (level: string, op: object) =>
+  const use = (r: PipRow, op: object) =>
     busy.run(() =>
       intents.send(CHARX_INTENTS.useResource, {
         characterId: ctx.creature.id,
-        resource: { slot: Number(level) },
+        resource: r.resource,
         ...op,
       }),
     );
-  if (pips.length === 0) return null;
+  if (rows.length === 0) return null;
   if (scope === "main")
-    return <KitSlots pips={pips} counters={counters} busy={busy.busy} use={use} />;
+    return <KitSlots rows={rows} counters={counters} busy={busy.busy} use={use} />;
   return (
     <div className="flex flex-col gap-0.5">
-      {pips.map((p) => (
-        <div key={p.level} className="flex items-center gap-1.5 text-xs">
-          <span className="w-12 text-muted-foreground">Level {p.level}</span>
+      {rows.map((r) => (
+        <div
+          key={r.key}
+          className="flex items-center gap-1.5 text-xs"
+          {...(r.key === "pact" ? { "data-testid": "cres-pact-pips", "data-scope": scope } : {})}
+        >
+          <span className="w-12 text-muted-foreground">{r.label}</span>
           <span className="flex gap-0.5">
-            {Array.from({ length: p.max }, (_, i) => (
+            {Array.from({ length: r.max }, (_, i) => (
               <Tip
                 // biome-ignore lint/suspicious/noArrayIndexKey: pips are positional.
                 key={i}
-                content={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
+                content={r.tip}
                 off={!live || busy.busy || !counters}
               >
                 <button
                   type="button"
-                  data-testid="charx-slot"
+                  data-testid={r.pipId}
                   data-scope={scope}
-                  data-value={p.level}
-                  data-used={p.used}
-                  aria-label={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
+                  data-value={r.key}
+                  data-used={r.used}
+                  aria-label={r.tip}
                   disabled={!live || busy.busy || !counters}
                   data-slot="sheet-pip"
-                  className={`size-3 rounded-full border border-foreground/60 ${i < p.used ? "bg-foreground" : ""}`}
-                  onClick={(e) => use(p.level, { delta: pipDelta(e.shiftKey) })}
+                  className={`size-3 rounded-full border border-foreground/60 ${i < r.used ? "bg-foreground" : ""}`}
+                  onClick={(e) => use(r, { delta: pipDelta(e.shiftKey) })}
                 />
               </Tip>
             ))}
           </span>
-          {counters && p.used > 0 && (
+          {counters && r.used > 0 && (
             <button
               type="button"
               data-testid="charx-resource-reset"
               data-scope={scope}
-              data-value={`slot.${p.level}`}
+              data-value={resetValue(r)}
               disabled={!live || busy.busy}
               className="text-[10px] text-muted-foreground underline"
-              onClick={() => use(p.level, { reset: true })}
+              onClick={() => use(r, { reset: true })}
             >
               Reset
             </button>
@@ -580,63 +672,67 @@ function SlotPips() {
 /**
  * K13 (kit `.slots`): the wide Main's slots on one wrapping line: "1st" in label size, the slots
  * as diamonds (filled = used, as the Actions tab's pips; same IDs, clicks and Reset), then
- * "used / max".
+ * "used / max". The pact slots last, "Pact · 1st" (FR-CRES-04).
  */
 function KitSlots({
-  pips,
+  rows,
   counters,
   busy,
   use,
 }: {
-  pips: ReturnType<typeof slotPips>;
+  rows: PipRow[];
   counters: boolean;
   busy: boolean;
-  use(level: string, op: object): void;
+  use(r: PipRow, op: object): void;
 }) {
   const live = useSync((s) => s.state === "live");
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-      {pips.map((p) => (
-        <span key={p.level} className="flex items-center gap-1.5">
-          <span className={cn(BOX_LABEL, "normal-case")}>{levelOrdinal(p.level)}</span>
+      {rows.map((r) => (
+        <span
+          key={r.key}
+          className="flex items-center gap-1.5"
+          {...(r.key === "pact" ? { "data-testid": "cres-pact-pips", "data-scope": "main" } : {})}
+        >
+          <span className={cn(BOX_LABEL, "normal-case")}>{r.kitLabel}</span>
           <span className="flex gap-1.5 px-0.5">
-            {Array.from({ length: p.max }, (_, i) => (
+            {Array.from({ length: r.max }, (_, i) => (
               <Tip
                 // biome-ignore lint/suspicious/noArrayIndexKey: pips are positional.
                 key={i}
-                content={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
+                content={r.tip}
                 off={!live || busy || !counters}
               >
                 <button
                   type="button"
-                  data-testid="charx-slot"
+                  data-testid={r.pipId}
                   data-scope="main"
-                  data-value={p.level}
-                  data-used={p.used}
-                  aria-label={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
+                  data-value={r.key}
+                  data-used={r.used}
+                  aria-label={r.tip}
                   disabled={!live || busy || !counters}
                   data-slot="sheet-pip"
                   className={cn(
                     "size-3 rounded-[1px] border border-foreground/60 [transform:rotate(45deg)]",
-                    i < p.used && "bg-foreground",
+                    i < r.used && "bg-foreground",
                   )}
-                  onClick={(e) => use(p.level, { delta: pipDelta(e.shiftKey) })}
+                  onClick={(e) => use(r, { delta: pipDelta(e.shiftKey) })}
                 />
               </Tip>
             ))}
           </span>
-          <span data-testid="charx-slot-count" data-value={p.level} className="tabular-nums">
-            {p.used} / {p.max}
+          <span data-testid={r.countId} data-value={r.key} className="tabular-nums">
+            {r.used} / {r.max}
           </span>
-          {counters && p.used > 0 && (
+          {counters && r.used > 0 && (
             <button
               type="button"
               data-testid="charx-resource-reset"
               data-scope="main"
-              data-value={`slot.${p.level}`}
+              data-value={resetValue(r)}
               disabled={!live || busy}
               className="text-[10px] text-muted-foreground underline"
-              onClick={() => use(p.level, { reset: true })}
+              onClick={() => use(r, { reset: true })}
             >
               Reset
             </button>
@@ -663,7 +759,7 @@ function SpellcastingEditor() {
           { value: "" as const, label: "No spellcasting" },
           ...ABILITIES.map((a) => ({ value: a, label: ABILITY_NAMES[a] })),
         ]}
-        commit={(ability) => edit(ability ? { ability, slots: sc?.slots ?? {} } : null)}
+        commit={(ability) => edit(ability ? { ...sc, ability, slots: sc?.slots ?? {} } : null)}
       />
       {sc && (
         <div className="grid grid-cols-5 gap-1">
@@ -685,6 +781,47 @@ function SpellcastingEditor() {
             />
           ))}
         </div>
+      )}
+      {sc && <PactEditor />}
+    </div>
+  );
+}
+
+/**
+ * FR-CRES-01: the pact slots, edited beside the slot maxima. Level 0 = no pact slots; a new
+ * level starts with 1 slot.
+ */
+function PactEditor() {
+  const ctx = useSheet();
+  const intents = useSheetIntents();
+  const sc = ctx.stats.spellcasting;
+  if (!sc) return null;
+  const pact = sc.pact;
+  const edit = (next: typeof pact) => {
+    const { pact: _old, ...rest } = sc;
+    return intents.edit(ctx.creature.id, { spellcasting: next ? { ...rest, pact: next } : rest });
+  };
+  return (
+    <div className="grid grid-cols-2 gap-1" data-testid="cres-pact-editor">
+      <IntField
+        path="spellcasting.pact.level"
+        label="Pact slot level (0 = none)"
+        value={pact?.level ?? 0}
+        min={0}
+        max={PACT_LEVEL_MAX}
+        inputClassName="w-full"
+        commit={(n) => edit(n ? { level: n, slots: pact?.slots ?? 1 } : undefined)}
+      />
+      {pact && (
+        <IntField
+          path="spellcasting.pact.slots"
+          label="Pact slots"
+          value={pact.slots}
+          min={1}
+          max={PACT_SLOTS_MAX}
+          inputClassName="w-full"
+          commit={(n) => edit({ level: pact.level, slots: Math.max(1, n ?? 1) })}
+        />
       )}
     </div>
   );

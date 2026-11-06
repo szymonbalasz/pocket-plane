@@ -67,7 +67,7 @@ function refuseDmFields(actor: Actor, input: object, fields: readonly string[]):
 }
 
 /** FR-SCN-25: a player places on the active scene only (as the signal, FR-SCN-24). */
-function assertActiveForPlayer(tx: Tx, actor: Actor, sceneId: string): void {
+export function assertActiveForPlayer(tx: Tx, actor: Actor, sceneId: string): void {
   if (actor.role !== "player") return;
   if (activeSceneOf(tx, campaignOf(actor))?.id !== sceneId) {
     throw invalid("Not the scene players see", [{ path: ["sceneId"], message: "Not active" }]);
@@ -125,61 +125,103 @@ export const placeTemplate = defineCommand({
     assertActiveForPlayer(tx, actor, input.sceneId);
   },
   execute(input, env: CommandEnv): { templateId: string } {
-    const { tx, ctx, actor, emit } = env;
-    const cid = campaignOf(actor);
-    const s = getScene(tx, cid, input.sceneId);
     const placedBy =
-      actor.role === "player" ? (actor.playerId ?? null) : (input.placedByPlayerId ?? null);
-    if (actor.role !== "player" && placedBy !== null) assertPlayerOf(tx, cid, placedBy);
-    if (countOn(tx, s.id) >= TEMPLATES_PER_SCENE_MAX) {
-      throw conflict(`A scene holds at most ${TEMPLATES_PER_SCENE_MAX} kept templates`);
-    }
-    if (placedBy !== null && countOn(tx, s.id, placedBy) >= TEMPLATES_PER_PLAYER_MAX) {
-      throw conflict(`At most ${TEMPLATES_PER_PLAYER_MAX} kept templates per player on a scene`);
-    }
-    const geometry: TemplateGeometry = {
-      shape: input.shape,
-      x: input.x,
-      y: input.y,
-      size: input.size,
-      width: widthFor(input.shape, input.width),
-      angle: input.angle,
-      footprint: input.footprint ?? null,
-    };
-    const copies = templateCopies(tx, s, geometry, placedBy);
-    const id = ctx.ids.next();
-    const now = ctx.clock.iso();
-    tx.insert(aoeTemplate)
-      .values({
-        id,
-        campaignId: cid,
-        sceneId: s.id,
-        seq: aoeTemplateSeqNext,
-        shape: geometry.shape,
-        x: geometry.x,
-        y: geometry.y,
-        size: geometry.size,
-        width: geometry.width ?? null,
-        angle: geometry.angle,
-        footprint: geometry.footprint ?? null,
-        label: input.label ?? "",
-        placedByPlayerId: placedBy,
-        hidden: actor.role === "player" ? false : (input.hidden ?? false),
-        ...copies,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-    const after = readTemplate(tx, id) as AoeTemplateRecord;
-    emit({
-      type: TemplatePlaced.type,
-      campaignId: cid,
-      payload: { templateId: id },
-      changes: [change(null, after)],
+      env.actor.role === "player" ? (env.actor.playerId ?? null) : (input.placedByPlayerId ?? null);
+    const templateId = insertKeptTemplate(env, {
+      sceneId: input.sceneId,
+      geometry: {
+        shape: input.shape,
+        x: input.x,
+        y: input.y,
+        size: input.size,
+        width: widthFor(input.shape, input.width),
+        angle: input.angle,
+        footprint: input.footprint ?? null,
+      },
+      label: input.label ?? "",
+      placedBy,
+      hidden: env.actor.role === "player" ? false : (input.hidden ?? false),
     });
-    return { templateId: id };
+    return { templateId };
   },
 });
+
+/** A kept template to insert (FR-SCN-25; FR-VFX-40 casts one through `vfx.cast`). */
+export interface KeptPlacement {
+  sceneId: string;
+  geometry: TemplateGeometry;
+  label: string;
+  /** Null = DM-placed (a fog subject). */
+  placedBy: string | null;
+  hidden: boolean;
+}
+
+/**
+ * FR-SCN-25: inserts a kept template (scene of the campaign; ≤ 20 per scene, ≤ 3 per player per
+ * scene; a DM-set placer must be a player of the campaign), derives its fog copies (FR-SCN-35)
+ * and emits `TemplatePlaced`. The caller checks a player's active scene. Returns its id.
+ */
+export function insertKeptTemplate(env: CommandEnv, p: KeptPlacement): string {
+  const { tx, ctx, actor, emit } = env;
+  const cid = campaignOf(actor);
+  const s = getScene(tx, cid, p.sceneId);
+  const placedBy = p.placedBy;
+  if (actor.role !== "player" && placedBy !== null) assertPlayerOf(tx, cid, placedBy);
+  if (countOn(tx, s.id) >= TEMPLATES_PER_SCENE_MAX) {
+    throw conflict(`A scene holds at most ${TEMPLATES_PER_SCENE_MAX} kept templates`);
+  }
+  if (placedBy !== null && countOn(tx, s.id, placedBy) >= TEMPLATES_PER_PLAYER_MAX) {
+    throw conflict(`At most ${TEMPLATES_PER_PLAYER_MAX} kept templates per player on a scene`);
+  }
+  const geometry = p.geometry;
+  const copies = templateCopies(tx, s, geometry, placedBy);
+  const id = ctx.ids.next();
+  const now = ctx.clock.iso();
+  tx.insert(aoeTemplate)
+    .values({
+      id,
+      campaignId: cid,
+      sceneId: s.id,
+      seq: aoeTemplateSeqNext,
+      shape: geometry.shape,
+      x: geometry.x,
+      y: geometry.y,
+      size: geometry.size,
+      width: geometry.width ?? null,
+      angle: geometry.angle,
+      footprint: geometry.footprint ?? null,
+      label: p.label,
+      placedByPlayerId: placedBy,
+      hidden: p.hidden,
+      ...copies,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+  const after = readTemplate(tx, id) as AoeTemplateRecord;
+  emit({
+    type: TemplatePlaced.type,
+    campaignId: cid,
+    payload: { templateId: id },
+    changes: [change(null, after)],
+  });
+  return id;
+}
+
+/**
+ * FR-VFX-40: deletes the kept templates still there among `ids` (an ended cast's template) and
+ * returns their record changes for the caller's event; no event of its own.
+ */
+export function removeKeptTemplates(tx: Tx, ids: readonly string[]): RecordChange[] {
+  const out: RecordChange[] = [];
+  for (const id of new Set(ids)) {
+    const before = readTemplate(tx, id);
+    if (!before) continue;
+    tx.delete(aoeTemplate).where(eq(aoeTemplate.id, id)).run();
+    out.push(change(before, null));
+  }
+  return out;
+}
 
 /** FR-SCN-26: move / rotate / resize / relabel (placer or DM); `hidden` DM only. */
 export const updateTemplate = defineCommand({

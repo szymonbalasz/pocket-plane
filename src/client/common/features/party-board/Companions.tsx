@@ -27,7 +27,12 @@ export interface CompanionsDmParts {
   menu: ComponentType<{ row: CompanionRow; disabled: boolean }>;
 }
 
-const HP_BAR = { healthy: "bg-hp-full", bloodied: "bg-hp-bloodied", down: "bg-hp-down" } as const;
+const HP_BAR = {
+  healthy: "bg-hp-full",
+  bloodied: "bg-hp-bloodied",
+  critical: "bg-hp-down",
+  down: "bg-hp-down",
+} as const;
 
 /** FR-PARTY-42 / FR-CHARX-59: Card, while the companion card window is registered. */
 function CardButton({ row }: { row: CompanionRow }) {

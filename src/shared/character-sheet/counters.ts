@@ -25,6 +25,9 @@ type CounterStats = { spellcasting?: Spellcasting; classes?: readonly ClassRow[]
 export const slotMax = (stats: CounterStats, level: SpellLevelKey): number =>
   stats.spellcasting?.slots[level] ?? 0;
 
+/** FR-CRES-01: pact slots (0 = none). */
+export const pactMax = (stats: CounterStats): number => stats.spellcasting?.pact?.slots ?? 0;
+
 /** Hit dice of a size = Σ class levels with it (FR-CHARX-05). */
 export const hitDieMax = (stats: CounterStats, die: HitDie): number => hitDice(stats)[die] ?? 0;
 
@@ -44,12 +47,13 @@ function clampLeaf<K extends string>(
 
 /** FR-CHARX-17: lowering a maximum clamps `used` (stat block side: slots, hit dice). */
 export function clampCounters(
-  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed">,
+  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "pactUsed">,
   stats: CounterStats,
-): { slotsUsed: SlotsUsed; hitDiceUsed: HitDiceUsed } {
+): { slotsUsed: SlotsUsed; hitDiceUsed: HitDiceUsed; pactUsed: number } {
   return {
     slotsUsed: clampLeaf(sheet.slotsUsed, SPELL_LEVELS, (l) => slotMax(stats, l)),
     hitDiceUsed: clampLeaf(sheet.hitDiceUsed, HIT_DICE, (d) => hitDieMax(stats, d)),
+    pactUsed: Math.min(sheet.pactUsed, pactMax(stats)),
   };
 }
 
@@ -69,7 +73,7 @@ export const leftText = (left: number): string => (left < 0 ? `−${-left}` : St
  * rows: `usesMax + 9`, FR-CHARX-58); `null` = unknown feature row.
  */
 export function counterOf(
-  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features">,
+  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features" | "pactUsed">,
   stats: CounterStats,
   resource: SheetResource,
 ): { used: number; max: number; cap: number } | null {
@@ -77,6 +81,10 @@ export function counterOf(
     const l = String(resource.slot) as SpellLevelKey;
     const max = slotMax(stats, l);
     return { used: sheet.slotsUsed[l] ?? 0, max, cap: max };
+  }
+  if ("pact" in resource) {
+    const max = pactMax(stats);
+    return { used: sheet.pactUsed, max, cap: max };
   }
   if ("hitDie" in resource) {
     const max = hitDieMax(stats, resource.hitDie);
@@ -92,10 +100,10 @@ export const nextUsed = (used: number, cap: number, op: { delta?: number; reset?
 
 /** The counter written back into the sheet's leaves / feature row. */
 export function withUsed(
-  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features">,
+  sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features" | "pactUsed">,
   resource: SheetResource,
   used: number,
-): Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features"> {
+): Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features" | "pactUsed"> {
   const leaf = <K extends string>(m: Partial<Record<K, number>>, k: K) => {
     const out = { ...m };
     if (used > 0) out[k] = used;
@@ -106,6 +114,7 @@ export function withUsed(
     const l = String(resource.slot) as SpellLevelKey;
     return { ...sheet, slotsUsed: leaf(sheet.slotsUsed, l) };
   }
+  if ("pact" in resource) return { ...sheet, pactUsed: used };
   if ("hitDie" in resource) {
     return { ...sheet, hitDiceUsed: leaf(sheet.hitDiceUsed, resource.hitDie) };
   }
