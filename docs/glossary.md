@@ -239,6 +239,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Handout** | DM-authored title + text + up to 10 images, shared with everyone or chosen players. | Note |
 | **Share / Unshare** | Making a handout visible to players or withdrawing it; "reveal" stays fog's word. Images a player already saw stay valid capabilities ([ADR-0023](architecture/adr/0023-asset-access-by-capability-id.md)). | Reveal (fog) |
 | **Note** | A shared page of text in the Notes window, written and co-edited live by everyone at the table, the DM included; nothing in notes is private ([linked-notes](specs/linked-notes.md)). Not a handout, and not session-recap's "share note". | Handout |
+| **Note category** | One of Session, NPC, Quest, Location, Item, Faction, Player, Other; every note has one, and the Notes list groups by it ([linked-notes](specs/linked-notes.md) FR-NOTES-25). Not a roll category. | Tag, folder |
 | **Note link** | A link to a note by title, stored as `[[Title]]` and shown as a chip; inserted from the `@` picker or typed by hand; follows a rename. | Notation link |
 | **Backlink** | A note listed under "Linked from" because it links to the open note. | — |
 | **Recycle bin** | Where a deleted note waits, with no expiry, until anyone restores it. | — |

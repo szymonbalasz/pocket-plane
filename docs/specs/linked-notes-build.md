@@ -85,6 +85,8 @@ The slices are thin, one commit each. `fixtures:reset-load notes` works from N1 
 | N4 | `build/notes-search` | REST search with its isolation tests and bench, and the search box | N3 | N5, N6 | `src/server/app.ts` route mount (append) |
 | N5 | `build/notes-links` | `parseLinks` and `note_link` rows, backlinks, chips (atomic, click vs Alt+click), the `@` / `[[` picker with Create note, create on click | N3 | N4 | `docs/protocol/` (`notes.backlinks`) |
 | N6 | `build/notes-rename` | The rename rewrite as server changes, binned notes included | N5 | N4 | none |
+| N8 | `build/notes-categories` | (#454) The `category` column and `notes.setCategory`; `category` on `notes.create`; + New's form, the picker's and missing chip's category step; category fold-outs, the Recent toggle, the taller Linked from box; fixtures get categories | — | N9 | `src/server/db/schema.ts` (add the column), `docs/protocol/`, `docs/data-model/` |
+| N9 | `build/notes-token` | (#454) The player token menu (new append-only registry, like the DM's) and the Open / Create note entry in both clients | N8 for `category` on create (merge `main` when N8 lands) | N8 | `src/client/common/features/scenes-map/MapCanvas.tsx` (player right-click / long-press), new `src/client/player/features/scenes-map/token-menu.ts`, `src/client/dm/features/scenes-map/token-menu.ts` (append) |
 | N7 | `fix/notes-sim` | `session-sim-18` and its scan additions | N4, N6 | — | `fixtures/bundles/` |
 
 ```mermaid

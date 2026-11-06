@@ -8,6 +8,8 @@ phase: post-mvp
 
 # Linked notes
 
+> **Amended 2026-11-06 ([#454](../decisions-log.md)):** categories, a Recent sort, a taller Linked from box and token notes (FR-NOTES-25 to -30); build slices N8, N9.
+
 > No open questions for the gate: the DM decided everything ([#444](../decisions-log.md), [#445](../decisions-log.md), #446 this round; §15). Test plan and build split: [linked-notes-build](linked-notes-build.md). How co-writing works: [proposed ADR](../architecture/adr/0078-note-co-writing.md).
 
 ## 1. Summary
@@ -91,6 +93,17 @@ A note can have the same name as a token or creature; nothing ties them together
 | FR-NOTES-23 | **A roll from a note is labelled "Note", never the note's title,** and follows normal roll visibility. |
 | FR-NOTES-24 | Notes add nothing to the event log, game log, session recap, stats, notifications or snapshots. Server log lines name notes by ID only. No MCP tool reads notes (OQ-07). New tables only (#416): a DB without them boots, and they start empty. |
 
+**Categories, Recent and token notes** (#454)
+
+| ID | Requirement |
+|---|---|
+| FR-NOTES-25 | Every note has one **category**: Session, NPC, Quest, Location, Item, Faction, Player, Other (this order everywhere). Creating a note needs one: **+ New** asks for the title and a category, none picked in advance; the `@` picker's Create note and a click on a missing chip show the eight categories in the same popup (Enter takes the highlighted one, first Session). Anyone can change a note's category from the editor's header. Notes from before this change are Other; Restore keeps the category. |
+| FR-NOTES-26 | **Category view (the default):** the list groups live notes in fold-outs like the Recycle bin, in the order above, each with its count; empty groups don't show. Session starts open; the others open or close as each person last left them (per browser). Inside a group: A–Z by title, each row with who last edited it and when. |
+| FR-NOTES-27 | **Recent:** a sort toggle above the list switches to one flat list, last edited first, each row with title, category, who last edited it and when. The choice is remembered per browser. Search results don't change. |
+| FR-NOTES-28 | **Linked from** is a box under the editor at least four link rows tall, with a scroll past that, its title and a count; it keeps that height when empty ("No links here yet"). |
+| FR-NOTES-29 | **Token notes:** right-clicking a token (long-press on touch) shows **Open note** when a live note's title matches the token's name (folded), else **Create note**: a note titled with the token's name, category Player for a character token (`characterId` set) and NPC for any other, which then opens. Players get a token menu for this (they had none); the DM gets the entry in theirs, and on a hidden token Create first says "Players will see this note's title". Tokens with the same name share one note. A token whose name has no valid title once `[[`, `]]` and `\|` are removed shows no entry. Nothing ties the note to the token: renaming either one ends the match. |
+| FR-NOTES-30 | A category change reaches everyone ≤ 1 s, like a rename, and adds nothing to the event log. |
+
 ## 7. UI/UX notes
 
 Gilt & Stone kit and [visual-direction](../design/visual-direction.md) only.
@@ -101,19 +114,25 @@ Gilt & Stone kit and [visual-direction](../design/visual-direction.md) only.
 ```text
 ┌ Notes ───────────────────────────────────────────────────────┐
 │ [Search notes…] [+ New] │ Burnt Ledger    (M)(DM)  Saved     │
-│  Burnt Ledger  Mira·2m  │ [Rename] [Delete]                  │
-│  Quest log     DM·1h    │ Found in (Duke Varen)'s office.|M  │
-│                         │ Roll 2d6 [die].  See (Quest log)   │
-│ Recycle bin (1)         │ ── Linked from: Quest log ──────── │
+│ [Recent]                │ [Item ▾] [Rename] [Delete]         │
+│ ▾ Session (1)           │ Found in (Duke Varen)'s office.|M  │
+│    Session 4   DM·1h    │ Roll 2d6 [die].  See (Quest log)   │
+│ ▸ NPC (3)               │                                    │
+│ ▾ Item (1)              │ ┌ Linked from (2) ─────────────┐   │
+│    Burnt Ledger Mira·2m │ │ Quest log                    │   │
+│                         │ │ Session 4                    │   │
+│ Recycle bin (1)         │ └──────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 - **Editor:** CodeMirror; link chips, the title picker, die buttons, carets with name tags, who-is-here chips, status at the right.
+- **List:** category fold-outs by default, or one Recent list (FR-NOTES-26, -27). **+ New** opens a small form: title and the eight categories.
+- **Token menu:** one entry, Open note / Create note (FR-NOTES-29); the player client's menu looks like the DM's.
 - **Recycle bin:** a fold-out at the list's foot, newest first: title, who deleted it, when, **Restore**.
 - **States:** empty ("No notes yet"), loading, error with Retry, disconnected (FR-SYNC-24 banner; typing carries on).
 - **Narrow (< 520 px):** the list becomes a dropdown.
 - **DM view = player view.**
-- **Test IDs:** `notes-new`, `notes-search`, `notes-list-item` (+ `data-record-id`), `notes-editor`, `notes-rename`, `notes-delete`, `notes-link` (+ `data-title`), `notes-picker`, `notes-picker-item`, `notes-picker-create`, `notes-die`, `notes-backlinks`, `notes-cursor` (+ `data-player-id`), `notes-here` (+ `data-player-id`), `notes-status`, `notes-bin`, `notes-restore`, `notes-banner`, `notes-copy-text`.
+- **Test IDs:** `notes-new`, `notes-search`, `notes-list-item` (+ `data-record-id`), `notes-editor`, `notes-rename`, `notes-delete`, `notes-link` (+ `data-title`), `notes-picker`, `notes-picker-item`, `notes-picker-create`, `notes-die`, `notes-backlinks`, `notes-cursor` (+ `data-player-id`), `notes-here` (+ `data-player-id`), `notes-status`, `notes-bin`, `notes-restore`, `notes-banner`, `notes-copy-text`; #454: `notes-sort`, `notes-group` (+ `data-category`), `notes-new-title`, `notes-category-pick` (+ `data-category`), `notes-category` (editor header), `notes-token-note` (token menu entry, + `data-record-id` of the token).
 
 ## 8. Data model
 
@@ -121,14 +140,14 @@ Gilt & Stone kit and [visual-direction](../design/visual-direction.md) only.
 
 | Table | Fields | Notes |
 |---|---|---|
-| `note` | `id`, `campaignId`, `title`, `titleFold`, `createdBy{Role,PlayerId}`, `createdAt`, `updatedAt`, `updatedBy{Role,PlayerId}`, `deletedAt`, `deletedBy{Role,PlayerId}` | IDs from `ctx.ids`, times from `ctx.clock`. `deletedAt` set = in the bin. Index (`campaignId`, `titleFold`); live-title uniqueness is checked by the commands |
+| `note` | `id`, `campaignId`, `title`, `titleFold`, `category` (added #454: `session` / `npc` / `quest` / `location` / `item` / `faction` / `player` / `other`, not null, default `other`), `createdBy{Role,PlayerId}`, `createdAt`, `updatedAt`, `updatedBy{Role,PlayerId}`, `deletedAt`, `deletedBy{Role,PlayerId}` | IDs from `ctx.ids`, times from `ctx.clock`. `deletedAt` set = in the bin. Index (`campaignId`, `titleFold`); live-title uniqueness is checked by the commands |
 | | `body`, `bodyFold`, `bodyVersion`, `version` | `body` holds the changes up to `bodyVersion`; `version` is the latest accepted change |
 | `note_change` | `noteId`, `version`, `clientId`, `changes` (JSON), `at` | One row per accepted push; the last 1,000 rows or 1 MiB per note are kept |
 | `note_link` | `noteId`, `targetFold` | One row per distinct link target, rewritten when the links change |
 
 ### 8.2 Record, relations, derived values
 
-- **Record type `note`:** campaign scope, `lazy: "all"`, seen by the campaign's DM and players. Fields `{id, title, createdBy, updatedAt, updatedBy, deletedAt, deletedBy}`; no body. Bodies travel only in co-writing results and signals, and never for a binned note.
+- **Record type `note`:** campaign scope, `lazy: "all"`, seen by the campaign's DM and players. Fields `{id, title, category, createdBy, updatedAt, updatedBy, deletedAt, deletedBy}`; no body. Bodies travel only in co-writing results and signals, and never for a binned note.
 - **Relations:** `note_change` and `note_link` rows belong to a `note`; a `note` belongs to a campaign. Link targets are titles, not keys.
 - **Derived:** link resolution and the picker on the client, from live `note` rows; backlinks on the server from `note_link`, live notes only.
 - **Runtime state:** subscriptions, who is here and cursors, in memory only.
@@ -144,7 +163,8 @@ Everything about a note goes to the campaign's DM and players. Cursors and who-i
 
 | Intent | Rule |
 |---|---|
-| `notes.create {title, ifMissing?}` / `notes.rename {noteId, title}` | FR-NOTES-02, -03, -10, -11 |
+| `notes.create {title, category, ifMissing?}` / `notes.rename {noteId, title}` | FR-NOTES-02, -03, -10, -11, -25 |
+| `notes.setCategory {noteId, category}` | FR-NOTES-25, -30; a binned note gets `not_found` |
 | `notes.delete {noteId}` / `notes.restore {noteId}` | FR-NOTES-04 to -06 |
 | `notes.open {noteId, clientId, version?}` / `notes.close {noteId}` | FR-NOTES-13, -16, -18 |
 | `notes.push {noteId, version, updates}` | From the bound `clientId`; FR-NOTES-14, -21 |
@@ -211,4 +231,4 @@ See [linked-notes-build §1](linked-notes-build.md#1-test-plan): fixtures, the `
 
 ## 16. Out of scope
 
-Each with the room left for it: permanent delete (`notes.purge`, §8.2); version history (`note_change` rows already hold recent changes); images (an image run on asset IDs, [ADR-0023](../architecture/adr/0023-asset-access-by-capability-id.md)); tags and folders; quest log, calendar, NPC directory (a note `kind`); Obsidian import (create notes from `[[Title]]` text); MCP (a read tool on `note`, OQ-07); pop-outs (FR-SHELL-201); links to tokens, creatures or compendium entries.
+Each with the room left for it: permanent delete (`notes.purge`, §8.2); version history (`note_change` rows already hold recent changes); images (an image run on asset IDs, [ADR-0023](../architecture/adr/0023-asset-access-by-capability-id.md)); tags and folders (categories came in #454); notes from a map right-click (dropped in #454: players don't see scene names); quest log, calendar, NPC directory (a note `kind`); Obsidian import (create notes from `[[Title]]` text); MCP (a read tool on `note`, OQ-07); pop-outs (FR-SHELL-201); links to tokens, creatures or compendium entries.
