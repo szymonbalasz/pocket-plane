@@ -699,9 +699,9 @@ test("N8 FR-NOTES-25 FR-NOTES-26 FR-NOTES-27 FR-NOTES-28 FR-NOTES-30 categories:
   await p2Win.getByTestId("notes-new").click();
   const dialog = p2.getByTestId("notes-new-dialog");
   await dialog.getByTestId("notes-new-title").fill("Harbour master");
-  await expect(dialog.locator('[data-testid="notes-category-pick"][aria-checked="true"]')).toHaveCount(
-    0,
-  );
+  await expect(
+    dialog.locator('[data-testid="notes-category-pick"][aria-checked="true"]'),
+  ).toHaveCount(0);
   await expect(dialog.getByTestId("notes-title-save")).toBeDisabled();
   await dialog.locator('[data-testid="notes-category-pick"][data-category="npc"]').click();
   await dialog.getByTestId("notes-title-save").click();
