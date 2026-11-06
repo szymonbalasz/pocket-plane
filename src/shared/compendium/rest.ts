@@ -184,10 +184,10 @@ export type EntryResponse = z.infer<typeof EntryResponse>;
 // ---------- names on a sheet (FR-CMP-77) ----------
 
 /** The kinds a sheet row's name may link to. */
-export const NameLookupKind = z.enum(["spell", "item", "feature"]);
+export const NameLookupKind = z.enum(["spell", "item", "feature", "feat", "option"]);
 export type NameLookupKind = z.infer<typeof NameLookupKind>;
 
-/** Every row a full sheet holds (170), plus an attack's second try as a spell (20). */
+/** Every row a full sheet holds (170), plus an attack's second try as a spell (20); more go in batches. */
 export const NAME_LOOKUP_MAX = 190;
 
 /** `POST /api/compendium/names`: the exact names to look up, in one request per sheet. */

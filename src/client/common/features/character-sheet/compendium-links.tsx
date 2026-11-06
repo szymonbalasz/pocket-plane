@@ -18,11 +18,12 @@ import {
 
 export type LinkedList = "attacks" | "spells" | "features" | "items";
 
-/** The kinds a list's names can be, first match wins: an attack is a weapon, else a spell. */
+/** The kinds a list's names can be, first match wins: an attack is a weapon, else a spell; a
+ * feature is a class feature, else a feat, else a class option (FR-CMPX-36). */
 const KINDS: Readonly<Record<LinkedList, readonly NameLookupKind[]>> = {
   attacks: ["item", "spell"],
   spells: ["spell"],
-  features: ["feature"],
+  features: ["feature", "feat", "option"],
   items: ["item"],
 };
 

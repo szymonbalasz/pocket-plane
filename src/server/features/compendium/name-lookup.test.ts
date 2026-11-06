@@ -118,6 +118,33 @@ describe("FR-CMP-77 sheet names → compendium entries", () => {
     ]);
   });
 
+  test("FR-CMPX-36 a feat and a class option are looked up as their own kinds", async () => {
+    const made = await fetch(`${h.http}/api/compendium/entries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...DM },
+      body: JSON.stringify({
+        entry: {
+          kind: "feat",
+          name: "Crossbow Expert",
+          facets: {},
+          body: { text: "Fast reloads." },
+        },
+      }),
+    });
+    expect(made.status).toBe(201);
+    const m = await look(
+      [
+        { kind: "feature", name: "Crossbow Expert" },
+        { kind: "feat", name: "crossbow expert" },
+        { kind: "option", name: "Crossbow Expert" },
+      ],
+      DM,
+    );
+    expect(m).toEqual([
+      { kind: "feat", name: "crossbow expert", entryId: idOf("Crossbow Expert") },
+    ]);
+  });
+
   test("FR-CMP-77 FR-CMP-13 credentials, validation and Cache-Control as every compendium route", async () => {
     const names = [{ kind: "spell", name: "Fireball" }];
     const anon = await post({ names }, {});
