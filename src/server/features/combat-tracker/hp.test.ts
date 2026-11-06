@@ -250,7 +250,7 @@ describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     expect(wire.map((w) => w?.type)).toEqual([COMBATANT_TYPE, GAME_LOG_ENTRY_TYPE]);
     expect(JSON.stringify(wire)).not.toContain("hpCurrent");
     expect(JSON.stringify(wire)).not.toContain("dmPayload");
-    expect(JSON.stringify(wire)).toContain('"band":"bloodied"');
+    expect(JSON.stringify(wire)).toContain('"band":"critical"');
   });
 
   test("FR-CBT-34 rolled values from the rows; overrides flagged; half rounds down; overkill", () => {
@@ -516,5 +516,21 @@ describe("FR-CBT-21 FR-CBT-25 direct HP and undo", () => {
     const v = t.h.viewer("player", t.h.p1.id);
     const wire = (t.events.at(-1)?.event.changes ?? []).map((c) => t.s.records.filterChange(c, v));
     expect(wire[0]).toMatchObject({ type: COMBATANT_TYPE, data: { band: "down" } });
+  });
+
+  test("FR-CBT-26 band critical under 15 %: player sees the band, never the numbers", () => {
+    const t = started();
+    const v = t.h.viewer("player", t.h.p1.id);
+    const band = () => {
+      const wire = (t.events.at(-1)?.event.changes ?? []).map((c) =>
+        t.s.records.filterChange(c, v),
+      );
+      return wire[0] as { data: Record<string, unknown> };
+    };
+    t.run(applyHp.name, { combatantId: t.id("Goblin"), kind: "damage", amount: 5 }); // 2 / 7
+    expect(band().data).toMatchObject({ band: "bloodied" });
+    t.run(applyHp.name, { combatantId: t.id("Goblin"), kind: "damage", amount: 1 }); // 1 / 7
+    expect(band().data).toMatchObject({ band: "critical" });
+    expect(band().data).not.toHaveProperty("hpCurrent");
   });
 });

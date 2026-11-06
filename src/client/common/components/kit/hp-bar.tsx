@@ -11,18 +11,21 @@ import { cn } from "../../lib/utils";
 export const BAND_WORD: Readonly<Record<HealthBand, string>> = {
   healthy: "Healthy",
   bloodied: "Bloodied",
+  critical: "Critical",
   down: "Down",
 };
 
 const FILL: Readonly<Record<HealthBand, string>> = {
   healthy: "bg-hp-full",
   bloodied: "bg-hp-bloodied",
+  critical: "bg-hp-down",
   down: "bg-hp-down",
 };
 
 const WORD: Readonly<Record<HealthBand, string>> = {
   healthy: "text-hp-full",
   bloodied: "text-hp-bloodied",
+  critical: "text-hp-down",
   down: "text-hp-down",
 };
 

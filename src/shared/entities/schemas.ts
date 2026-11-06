@@ -648,7 +648,8 @@ export const REDACTED_CHARACTER_KEYS = Object.keys(
 ) as readonly (keyof RedactedCharacter)[];
 
 /** FR-CBT-26's health band; a pet's for other players (FR-ENT-37), a monster combatant's. */
-export const HealthBand = z.enum(["healthy", "bloodied", "down"]);
+/** `critical` = above 0 but under 15 % of max (shown in `hp.down` red). */
+export const HealthBand = z.enum(["healthy", "bloodied", "critical", "down"]);
 export type HealthBand = z.infer<typeof HealthBand>;
 
 /**
