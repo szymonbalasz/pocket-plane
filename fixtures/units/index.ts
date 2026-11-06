@@ -146,6 +146,7 @@ import recapShareNote from "./session-recap/recap-share-note";
 import fireCard from "./spell-fx/fire-card";
 import moilRow from "./spell-fx/moil-row";
 import sgRow from "./spell-fx/sg-row";
+import tentaclesRow from "./spell-fx/tentacles-row";
 import vfxFight from "./spell-fx/vfx-fight";
 import vfxVisualAuras from "./spell-fx/vfx-visual-auras";
 import sbFightFacts from "./stats/sb-fight-facts";
@@ -360,4 +361,6 @@ export const units: readonly Fixture[] = [
   notesShared,
   notesBinned,
   notesSecondCampaign,
+  // Spell FX template anchor: Black Tentacles (build/vfx-tentacles)
+  tentaclesRow,
 ];

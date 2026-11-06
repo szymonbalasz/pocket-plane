@@ -53,6 +53,26 @@ describe("presets (FR-VFX-01, -02)", () => {
   });
 });
 
+describe("template presets (FR-VFX-40)", () => {
+  test("FR-VFX-40 Black Tentacles: a 20 ft cube template anchor, no radius, turnInside; names with either apostrophe", () => {
+    const bt = presetOf("black-tentacles");
+    expect(bt?.template).toEqual({ shape: "cube", sizeFt: 20 });
+    expect(bt?.radiusFt).toBeUndefined();
+    expect(bt?.reactions).toEqual(["turnInside"]);
+    expect(bt?.params.parse({})).toEqual({});
+    expect(suggestPreset("Black Tentacles")?.key).toBe("black-tentacles");
+    expect(suggestPreset("Evard's Black Tentacles")?.key).toBe("black-tentacles");
+    expect(suggestPreset("Evard’s Black Tentacles")?.key).toBe("black-tentacles");
+    expect(presetOf("spirit-guardians")?.template).toBeUndefined();
+  });
+
+  test("FR-VFX-40 stored fx carries the template id; the write shape does not take it", () => {
+    const fx = { preset: "black-tentacles", params: {}, spellId: "s1", templateId: "t1" };
+    expect(FxRecord.parse(fx)).toEqual(fx);
+    expect(Fx.safeParse(fx).success).toBe(false);
+  });
+});
+
 describe("map effect (FR-VFX-03, -05)", () => {
   test("FR-VFX-03 Fx: catalogue preset, params parsed with defaults; unknown / bad → invalid", () => {
     expect(Fx.parse({ preset: "spirit-guardians", params: {} })).toEqual({

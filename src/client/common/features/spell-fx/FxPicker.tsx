@@ -72,11 +72,14 @@ export function FxFields({
   recordId,
   value,
   disabled,
+  tokenOnly,
   onChange,
 }: {
   recordId: string | undefined;
   value: FxDraft | null;
   disabled?: boolean;
+  /** FR-VFX-40: an effect's picker: template presets are cast from a spell row, not set here. */
+  tokenOnly?: boolean;
   onChange(v: FxDraft | null): void;
 }) {
   const preset = value ? presetOf(value.preset) : null;
@@ -97,11 +100,13 @@ export function FxFields({
         }}
       >
         <option value={NONE}>Map effect: none</option>
-        {fxPresets.map((p) => (
-          <option key={p.key} value={p.key}>
-            {p.label}
-          </option>
-        ))}
+        {fxPresets
+          .filter((p) => !tokenOnly || !p.template || p.key === value?.preset)
+          .map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.label}
+            </option>
+          ))}
         {value && !preset && <option value={value.preset}>{value.preset}</option>}
       </select>
       {value &&

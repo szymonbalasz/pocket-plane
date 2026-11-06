@@ -10,6 +10,8 @@ phase: post-mvp
 
 > Five-minute read. See [AGENTS.md](../../AGENTS.md). Raised by the DM (2026-10-28): moving map graphics for the party's favourite spells, a subtle look for every hit by damage type, and a way to switch it all off. Cross-cutting choices: [ADR-0071](../architecture/adr/0071-spell-fx.md) (accepted, #373). Every term in *italics* below is a [glossary](../glossary.md#play) term (OQ-VFX-07 A, added at merge).
 
+> **Template anchor (DM, 2026-11-06, [#455](../decisions-log.md)).** Soel's **Evard's Black Tentacles** gets a map effect, placed where the player points: a third preset **Black Tentacles**, the first *template anchor* (lifts "point and template anchors" out of §16 for templates). Cast on its row borrows the map's AoE tool for one placement of a 20 ft cube; the release casts. The cast places a kept AoE template ([scene-tools](scene-tools.md) FR-SCN-25) in the same command; the aura fills that template and follows it when the placer or the DM moves it. New FR-VFX-40–44 (§6.6). No new record type or column: `fx.templateId` rides the JSON leaf. Built by `build/vfx-tentacles`.
+
 ## 1. Summary
 
 - A spell row on the sheet can carry a *map effect*. **Cast** starts the spell's effect (concentration or custom) and the map animates it around the caster's token for everyone who can see that token: an *aura*.
@@ -110,6 +112,16 @@ phase: post-mvp
 | FR-VFX-28 | DM Layers popover switch **Effects** (toggle key `vfx`, kind `hide`): off hides both passes and cues on the DM's screen only, like the other switches (FR-SCN-05). | |
 | FR-VFX-29 | Budget: ≤ 400 live particles per client across every aura and look; past it, the oldest looks end early. | §12 |
 
+### 6.6 Template anchors (Black Tentacles, #455)
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-VFX-40 | **Template presets.** `FxPreset.template?: {shape: "cube", sizeFt}` = drawn on a kept AoE template placed at cast, not on a token (no `radiusFt`, no affected-cells entry: the template shows its own squares). Built-in `black-tentacles`: params `{}`, names `["black tentacles", "evard's black tentacles"]` (a curly apostrophe reads as straight in `suggestPreset`), 20 ft cube, reactions `turnInside`. Stored `fx` gains `templateId?` (server-set). | Look §7.1 |
+| FR-VFX-41 | **Cast and place.** Cast on a row with a template preset asks the AoE tool for one placement (shape and size fixed, the spell name as label; the tool becomes active, the user's settings and tool come back after); the button reads **Placing…** (a press cancels, so do Esc and the panel's Cancel). The release sends `vfx.cast {creatureId, spellId, place: {sceneId, x, y, angle, hidden?}}`. Server, one transaction: FR-VFX-07's checks, then `place` required (else `conflict` "Place ‹spell› on the map"; `place` on a token preset → `invalid`), a player places on the active scene only and never sets `hidden`; the kept template (FR-SCN-25 limits) with placer = the casting player, or for the DM the character's owner (a monster's: none, DM-placed); then the effect with `fx.templateId`. | |
+| FR-VFX-42 | **Drawn on its template.** The aura draws where the viewer's canvas draws that template (shown scene; DM switches Templates and DM-only items; a blind player only their own; a fogged / hidden template reaches no player, so neither does its aura): filling the cube's square at its angle, following an edit (the editor's own drag previews locally). No template → nothing drawn; the effect runs on. | |
+| FR-VFX-43 | **Ends together.** The effect ending by any path (End, a concentration drop or replacement) deletes its template in the same command (an effect-changed hook, ADR-0049); `vfx.setEffectFx` clearing or replacing the map effect deletes it too. Deleting the template leaves the effect running. `vfx.setEffectFx` never sets a template preset (`conflict` "Cast ‹label› from its spell row"; the same preset again → no-op); the effect dialog's picker leaves them out. | |
+| FR-VFX-44 | **Grab** (`turnInside` on a template aura): the turn passing to a creature whose footprint overlaps the square (by more than a tenth of a cell), **either side** (the spell holds everyone), plays the grab. | |
+
 ## 7. UI/UX notes
 
 Reference [visual-direction](../design/visual-direction.md). FX colours are preset constants (like dice looks), not theme tokens; DOM controls use shadcn primitives and theme tokens. Prototype: the DM-reviewed page (2026-10-28) drew every look below.
@@ -120,6 +132,7 @@ Reference [visual-direction](../design/visual-direction.md). FX colours are pres
 |---|---|---|---|
 | Spirit Guardians | Faint radial wash rising to the radius edge; double ring at the edge with ~30 runes turning slowly; breathing alpha (≈ 4 s) | 6 spirits orbiting at 50–90 % of the radius on comet trails, each lagging the token a little; ~48 motes drifting inside. Radiant gold-white, necrotic green | Strike: the nearest free spirit darts to the creature and back (0.9 s), flash ring on it |
 | Shadow of Moil | Three stacked ragged pools of darkness to 10 ft (+ half a square), edges breathing; faint violet rim | Black flame particles with a violet fringe rising off the token (≈ 75/s at Full), trailing when it moves; the token covered (FR-VFX-17) with two violet eyes that blink every 2.5–5.5 s | Lash: three shadow tendrils whip to the attacker (0.9 s) with a dark puff there |
+| Black Tentacles *(#455)* | An inky pool filling the cube's square, edges breathing, a faint green-teal rim; oily bubbles rising and popping; black tentacles (about two per three squares) with a sheen and pale suckers, each rising out of the pool, writhing and sinking back on its own cycle | The tentacles' upper halves, translucent, lapping over the tokens in the area | Grab (`turnInside`, FR-VFX-44): three tentacles rise around the creature and coil it, a squeeze ring (1.2 s) |
 
 ### 7.2 Hit looks
 
@@ -285,7 +298,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 ## 16. Out of scope
 
 - Further presets (Bless, Spiritual Weapon, Darkness, Hunger of Hadar, Cloud of Daggers, Faerie Fire): one catalogue line + one renderer each, later.
-- Point and template anchors; tethers between two tokens (Hex, Witch Bolt); one-shot cast bursts (Fireball, Misty Step).
+- Point anchors and template shapes other than the cube (*#455: cube template anchors are in, §6.6*); tethers between two tokens (Hex, Witch Bolt); one-shot cast bursts (Fireball, Misty Step).
 - Hit looks for sheet HP changes outside combat (`char.adjustHp`): no combat log entry, no cue.
 - Spell slot use on Cast ([CHARX §2](character-sheet-full.md#2-scope) keeps it manual).
 - A table-wide DM switch (a campaign feature switch, [ADR-0058](../architecture/adr/0058-feature-switches.md)); per-preset mute; sound.
