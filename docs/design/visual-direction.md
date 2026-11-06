@@ -48,7 +48,7 @@ Delivered as the **Gilt & Stone** theme via the [theme system](../specs/post-mvp
 | Border | `border.subtle`, `border.frame` |
 | Typography | `font.display`, `font.body`, `font.mono` |
 | Texture | `texture.panel`, `texture.parchment` |
-| Game state | `hp.full`, `hp.bloodied`, `hp.down`, `visibility.hidden` |
+| Game state | `hp.full`, `hp.bloodied`, `hp.down` (also the `critical` band, under 15 %), `visibility.hidden` |
 | Creature type (canvas) | `creature.<type>`, 14 tokens, values below |
 | Palette colour | `player.<key>`, 8 tokens, values below (suggested player colours) |
 

@@ -271,8 +271,13 @@ export function planMove(
 
 // ---------- health band (FR-CBT-26) ----------
 
+/** Under 15 % of max (and above 0): `20 × hp < 3 × hpMax`, integer-safe. */
+export const isCritical = (hpCurrent: number, hpMax: number): boolean =>
+  hpCurrent > 0 && 20 * hpCurrent < 3 * hpMax;
+
 export function healthBand(hpCurrent: number, hpMax: number): HealthBand {
   if (hpCurrent <= 0) return "down";
+  if (isCritical(hpCurrent, hpMax)) return "critical";
   if (2 * hpCurrent <= hpMax) return "bloodied";
   return "healthy";
 }

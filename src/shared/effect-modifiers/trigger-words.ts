@@ -81,6 +81,7 @@ export function triggerSentence(rule: PlayerTriggerRule, cx: TriggerWordsContext
     else if (f.if === "crit") conds.push("on a crit");
     else if (f.if === "row") conds.push(`with ${f.names.join(" or ")}`);
     else if (f.if === "targetHurt") conds.push("against a hurt target");
+    else if (f.if === "pactWeapon") conds.push("with a pact weapon");
     else if (f.if === "targetMarked") {
       const name = "name" in f ? f.name : presetRefName({ preset: f.preset }, cx);
       conds.push(`against a target with your ${name}`);

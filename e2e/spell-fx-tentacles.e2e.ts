@@ -1,5 +1,5 @@
 // e2e-bundle: spell-fx
-// Spell FX template anchor (FR-VFX-40–43, #455): player-2 presses Cast on Thorn's Evard's Black
+// Spell FX template anchor (FR-VFX-40–43, #456): player-2 presses Cast on Thorn's Evard's Black
 // Tentacles → the AoE tool asks for one placement (Placing…); a press on a grid corner and a drag
 // cast it → a `vfx-aura` (preset black-tentacles, on its kept template) on the DM's and both
 // players' maps, and player-2's tool goes back; End → no aura and no template anywhere. DM,

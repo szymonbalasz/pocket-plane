@@ -22,6 +22,7 @@ import charSela from "./character-sheet-full/char-sela";
 import kitMiraSpells from "./character-sheet-full/kit-mira-spells";
 import npcEliteSheet from "./character-sheet-full/npc-elite-sheet";
 import restSpent from "./character-sheet-full/rest-spent";
+import charVex from "./class-resources/char-vex";
 import cbFogGoblin from "./combat-extras/cb-fog-goblin";
 import cbParty from "./combat-extras/cb-party";
 import cbPartySix from "./combat-extras/cb-party-six";
@@ -361,6 +362,8 @@ export const units: readonly Fixture[] = [
   notesShared,
   notesBinned,
   notesSecondCampaign,
+  // Class resources (build/cres-pact): pact slots, pact weapon
+  charVex,
   // Spell FX template anchor: Black Tentacles (build/vfx-tentacles)
   tentaclesRow,
 ];

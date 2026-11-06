@@ -58,6 +58,8 @@ const filterOptions = [
     soft: z.literal(true).optional(),
   }),
   z.strictObject({ if: z.literal("targetHurt") }),
+  /** FR-CRES-15: the roll's attack row is marked `pactWeapon` (never a spell row). */
+  z.strictObject({ if: z.literal("pactWeapon") }),
   z.strictObject({ if: z.literal("ask"), note: z.string().min(1).max(ASK_NOTE_MAX) }),
 ] as const;
 const TargetMarked = z.strictObject({ if: z.literal("targetMarked"), preset: Ref });
@@ -93,8 +95,8 @@ export type TriggerEffect = z.infer<typeof TriggerEffect>;
 
 /** MOD §8.4 table: filters and effects each event allows. */
 export const EVENT_FILTERS: Readonly<Record<TriggerEvent, readonly TriggerFilterKind[]>> = {
-  hit: ["via", "row", "ownTurn", "crit", "mode", "targetMarked", "targetHurt", "ask"],
-  roll: ["roll", "row", "ownTurn", "crit", "mode"],
+  hit: ["via", "row", "ownTurn", "crit", "mode", "targetMarked", "targetHurt", "ask", "pactWeapon"],
+  roll: ["roll", "row", "ownTurn", "crit", "mode", "pactWeapon"],
   // ownTurn is implied; writing it is allowed and changes nothing.
   turnStart: ["ownTurn"],
 };

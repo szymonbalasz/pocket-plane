@@ -68,7 +68,12 @@ import {
   withSkill,
 } from "./view-model";
 
-const HP_BAR = { full: "bg-hp-full", bloodied: "bg-hp-bloodied", down: "bg-hp-down" };
+const HP_BAR = {
+  full: "bg-hp-full",
+  bloodied: "bg-hp-bloodied",
+  critical: "bg-hp-down",
+  down: "bg-hp-down",
+};
 
 /**
  * FR-CHARX-112 / -118: the layout follows the sheet's own width (`@container/sheet` on the sheet
