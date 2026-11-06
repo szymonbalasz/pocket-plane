@@ -14,6 +14,11 @@ import {
 } from "@shared/compendium/schemas";
 import { dataPath, type ImageSize, type Item } from "./dataset";
 
+/**
+ * Bump when the mapping's output changes (text layout, facets, images): every imported item is
+ * then re-mapped as `changed` on the next run (DM-edited entries still stay `locallyEdited`).
+ */
+export const MAPPER_VERSION = 1;
 export const SOURCE_NAME = "The Griffon's Saddlebag";
 export const TRUNCATED = "… (see source)";
 /** Size picked per image: medium, else the largest present. */

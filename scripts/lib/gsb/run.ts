@@ -7,7 +7,7 @@ import type { Dataset, Item } from "./dataset";
 import { GsbError } from "./dataset";
 import { type Diff, diff, type Filters, isFiltered } from "./diff";
 import { type Ledger, type LedgerRow, ledgerPath, loadLedger, saveLedger } from "./ledger";
-import { entryHash, type ItemEntry, type Mapped, mapItem } from "./map";
+import { entryHash, type ItemEntry, MAPPER_VERSION, type Mapped, mapItem } from "./map";
 import { FATAL_CODES, type ToolCaller, ToolFailure } from "./tools";
 
 export const PLAN_CHUNK = 50;
@@ -44,6 +44,8 @@ export interface ImportOptions {
   progress?: (line: string) => void;
   progressEvery?: number;
   exists?: (p: string) => boolean;
+  /** Tests only: stands in for a bumped `MAPPER_VERSION`. */
+  mapperVersion?: number;
 }
 
 export interface ItemNote {
@@ -82,7 +84,7 @@ export interface Summary {
   counts: Record<Bucket, number>;
   /** First `NAMES_SHOWN` names per bucket (removed: uids; the ledger keeps no names). */
   names: Record<Bucket, { shown: string[]; more: number }>;
-  /** Items this run would write (or wrote), after `--limit`. */
+  /** Items this run would write (or wrote). */
   work: number;
   planIssues: ItemNote[];
   warnings: ItemNote[];
@@ -175,7 +177,7 @@ export async function runImport(o: ImportOptions): Promise<Summary> {
   const file = ledgerPath(o.ledgerDir, o.target, active.id);
   const ledger: Ledger = loadLedger(file);
   const filtered = isFiltered(o.filters);
-  const d: Diff = diff(dataset.items, ledger, o.filters);
+  const d: Diff = diff(dataset.items, ledger, o.filters, o.mapperVersion);
 
   const buckets: Record<Bucket, string[]> = Object.fromEntries(
     BUCKETS.map((b) => [b, [] as string[]]),
@@ -210,7 +212,6 @@ export async function runImport(o: ImportOptions): Promise<Summary> {
     }
   }
   work.sort((a, b) => (order.get(a.item.uid) ?? 0) - (order.get(b.item.uid) ?? 0));
-  const todo = o.filters.limit === undefined ? work : work.slice(0, o.filters.limit);
 
   const summary: Summary = {
     mode: o.apply ? "apply" : "dry-run",
@@ -224,7 +225,7 @@ export async function runImport(o: ImportOptions): Promise<Summary> {
     nothingChanged: d.new.length + d.changed.length + d.removed.length === 0,
     counts: emptyCounts(),
     names: {} as Summary["names"],
-    work: todo.length,
+    work: work.length,
     planIssues: [],
     warnings,
     failures: [],
@@ -238,10 +239,10 @@ export async function runImport(o: ImportOptions): Promise<Summary> {
   };
 
   if (!o.apply) {
-    await dryRun(caller, todo, buckets, summary.planIssues);
+    await dryRun(caller, work, buckets, summary.planIssues);
     return finish();
   }
-  await applyWork(o, todo, ledger, file, progress, summary);
+  await applyWork(o, work, ledger, file, progress, summary);
   if (summary.result && !o.overwrite) {
     summary.result.skipped += buckets.locallyEdited.length + buckets.deleted.length;
   }
@@ -403,6 +404,7 @@ async function applyWork(
         writtenHash: storedHash(back),
         imageAssetIds: back.imageAssetIds,
         imageSha256s: shas.filter((_, i) => back.imageAssetIds.includes(ids[i] as string)),
+        mapperVersion: o.mapperVersion ?? MAPPER_VERSION,
       };
       saveLedger(file, ledger);
     } catch (err) {

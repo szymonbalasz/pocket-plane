@@ -14,9 +14,13 @@ export const LedgerRow = z.object({
   writtenHash: z.string().min(1),
   imageAssetIds: z.array(z.string()),
   imageSha256s: z.array(z.string()),
+  /** `MAPPER_VERSION` the entry was written with; absent = 1 (before the field). */
+  mapperVersion: z.number().int().min(1).optional(),
   removedAt: z.string().optional(),
 });
 export type LedgerRow = z.infer<typeof LedgerRow>;
+
+export const rowMapperVersion = (r: LedgerRow) => r.mapperVersion ?? 1;
 
 export const Ledger = z.object({
   schemaVersion: z.literal(LEDGER_VERSION),

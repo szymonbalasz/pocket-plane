@@ -236,6 +236,24 @@ describe("GSB diff", () => {
     ]);
   });
 
+  test("GSB a row written by an older mapper version is changed; absent version = 1", () => {
+    const a = item("a");
+    const ledger = emptyLedger();
+    ledger.items[a.uid] = row(a.contentHash);
+    expect(diff([a], ledger, {}).unchanged).toHaveLength(1);
+    expect(diff([a], ledger, {}, 2).changed).toHaveLength(1);
+    ledger.items[a.uid] = row(a.contentHash, { mapperVersion: 2 });
+    expect(diff([a], ledger, {}, 2).unchanged).toHaveLength(1);
+    expect(diff([a], ledger, {}, 1).changed).toHaveLength(1);
+  });
+
+  test("GSB --limit keeps the first n filtered items, so a rerun picks the same ones", () => {
+    const all = ["a", "b", "c", "d"].map((k) => item(k, k === "b" ? { type: "Ring" } : {}));
+    const names = (f: object) => diff(all, emptyLedger(), f).new.map((i) => i.name.slice(5));
+    expect(names({ limit: 2 })).toEqual(["a", "b"]);
+    expect(names({ limit: 2, type: "wondrous item" })).toEqual(["a", "c"]);
+  });
+
   test("GSB filters: type, rarity, tag, theme, uid fold case", () => {
     const all = [
       item("a", { type: "Ring", tags: ["Druid"] }),

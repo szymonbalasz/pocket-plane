@@ -37,7 +37,7 @@ The DM's Griffon's Saddlebag exporter writes `data/manifest.json`, `data/items.j
 | `--rarity <r>` | items that come in that rarity |
 | `--tag <tag>` / `--theme <theme>` | one tag / treasure theme |
 | `--uid <a,b>` | those items |
-| `--limit <n>` | the first n items to write (after the others) |
+| `--limit <n>` | the first n items (after the other filters, dataset order; a rerun picks the same n) |
 
 A filtered run never reports removals and doesn't move the "last full import" mark.
 
@@ -46,7 +46,7 @@ JSON fields to read: `campaign`, `counts`, `names.<bucket>.shown` / `.more`, `wo
 | Bucket | Means | On `--apply` |
 |---|---|---|
 | `new` | not imported yet | created (unshared, with up to 4 images) |
-| `changed` | changed upstream, entry as last written | edited |
+| `changed` | changed upstream (or the importer's mapping changed), entry as last written | edited |
 | `unchanged` | same as last import | nothing |
 | `removed` | gone from the dataset (uids) | reported, marked; the entry stays |
 | `locallyEdited` | changed upstream, but the DM edited the entry in Pocket Plane | skipped; `--overwrite` replaces it |

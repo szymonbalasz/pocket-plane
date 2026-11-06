@@ -46,7 +46,13 @@ const homebrewItems = async () =>
   ).results.filter((r) => r.sourceLabel === "Homebrew");
 
 async function run(
-  opts: { apply?: boolean; overwrite?: boolean; filters?: Filters; dir?: string } = {},
+  opts: {
+    apply?: boolean;
+    overwrite?: boolean;
+    filters?: Filters;
+    dir?: string;
+    mapperVersion?: number;
+  } = {},
 ): Promise<Summary> {
   ex.write(items);
   return runImport({
@@ -58,6 +64,7 @@ async function run(
     apply: opts.apply ?? false,
     overwrite: opts.overwrite ?? false,
     now: () => "2026-11-06T00:00:00.000Z",
+    mapperVersion: opts.mapperVersion,
   });
 }
 const ledgerRow = (s: Summary, key: string) => loadLedger(s.ledger).items[uidOf(key)];
@@ -130,6 +137,7 @@ describe("GSB import over the MCP server", () => {
   test("GSB import: --limit narrows the work list", async () => {
     const s = await run({ filters: { limit: 1 } });
     expect(s.work).toBe(1);
+    expect(s.names.new.shown).toEqual(["Test alpha"]);
     expect(s.filtered).toBe(true);
   });
 
@@ -199,6 +207,30 @@ describe("GSB import over the MCP server", () => {
     const o = await run({ apply: true, overwrite: true });
     expect(o.result).toMatchObject({ updated: 1, skipped: 0 });
     expect((await get(id)).body.text).toContain("Upstream v2.");
+    expect((await run()).nothingChanged).toBe(true);
+  });
+
+  test("GSB import: a mapper version bump re-maps unchanged items; locally edited ones stay skipped", async () => {
+    const alphaId = ledgerRow(await run(), "alpha")?.entryId as string;
+    await caller.call("homebrew_edit", { id: alphaId, patch: { name: "Test alpha (DM)" } });
+    const dry = await run({ mapperVersion: 2 });
+    expect(dry.counts.unchanged).toBe(0);
+    expect(dry.counts.changed).toBe(3);
+    expect(dry.names.locallyEdited.shown).toEqual(["Test alpha"]);
+    expect(dry.work).toBe(2);
+    expect(dry.planIssues).toEqual([]);
+    const s = await run({ apply: true, mapperVersion: 2 });
+    expect(s.result).toMatchObject({ updated: 2, skipped: 1, failed: 0 });
+    expect(ledgerRow(s, "beta")?.mapperVersion).toBe(2);
+    expect(ledgerRow(s, "alpha")?.mapperVersion).toBe(1);
+    expect((await get(alphaId)).name).toBe("Test alpha (DM)");
+    const again = await run({ mapperVersion: 2 });
+    expect([again.counts.unchanged, again.counts.locallyEdited, again.work]).toEqual([2, 1, 0]);
+    // Back to version 1 (the rest of the file): beta / gamma re-map again; alpha's row is at 1,
+    // so it is unchanged and the DM's name stays until the DM undoes it.
+    expect((await run({ apply: true })).result).toMatchObject({ updated: 2, skipped: 0 });
+    expect((await get(alphaId)).name).toBe("Test alpha (DM)");
+    await caller.call("homebrew_edit", { id: alphaId, patch: { name: "Test alpha" } });
     expect((await run()).nothingChanged).toBe(true);
   });
 
