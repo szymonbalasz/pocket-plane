@@ -17,6 +17,7 @@ import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
 import { useSync } from "../../sync/store";
 import { useBusy } from "./fields";
+import { useResourcePublic } from "./resource-use";
 import { useSheet, useSheetIntents } from "./sheet-context";
 import { levelOrdinal } from "./view-model";
 
@@ -26,6 +27,7 @@ export function ConvertMenu({ f }: { f: FeatureRow }) {
   const intents = useSheetIntents();
   const busy = useBusy();
   const [open, setOpen] = useState(false);
+  const [pub] = useResourcePublic(ctx.creature.id);
   const stats = ctx.stats;
   const left = pointsLeft(f);
   const spent = f.used;
@@ -43,7 +45,13 @@ export function ConvertMenu({ f }: { f: FeatureRow }) {
   ];
   const run = (name: string, payload: object) =>
     busy.run(() =>
-      intents.send(name, { characterId: ctx.creature.id, ...payload }).then(() => setOpen(false)),
+      intents
+        .send(name, {
+          characterId: ctx.creature.id,
+          ...payload,
+          ...(pub ? {} : { public: false }),
+        })
+        .then(() => setOpen(false)),
     );
   const off = !live || busy.busy;
   return (

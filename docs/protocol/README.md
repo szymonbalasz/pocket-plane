@@ -4589,17 +4589,20 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-11 and [ADR-0078](../arch
 - **Client:** a renamed note's old folded title resolves to it for 5 s, so chips stay solid until the rewrite lands.
 - **Search polish (r1, `GET /api/notes/search`):** body matching keeps the shared matcher's tiers but a note's own body rule: the **last** query word (being typed) matches body words as a prefix at any length; another word under 3 letters matches whole body words only; longer words match as prefixes (plural forms too), as before. Snippets drop markdown markers (`#`–`###`, list `-` / `*` / `1.`, `**`) in a window around the first hit. Bench at the caps (1,000 × 32 KiB, Windows, same machine): warm p95 21–33 ms ("the", "dragon", "gold coins", "captain of the guard", "lo"), was 2.8–25 ms; short and last-word queries cost more because they now match bodies.
 
-## 201. Class resources: pact slots, pact weapons, sorcery points (build/cres-pact)
+## 201. Class resources: pact slots, pact weapons, sorcery points, uses with a cost (build/cres-pact)
 
-From [class-resources](../specs/class-resources.md) FR-CRES-02, -03, -05–08, -15. **Two new intents and two events; no new record type.**
+From [class-resources](../specs/class-resources.md) FR-CRES-02–15. **Four new intents, four events and log kind `char.resourceUse`; no new record type.**
 
 | Intent | Who | Validation | Result | Event |
 |---|---|---|---|---|
 | `char.convertSlot {characterId, from: {slot: 1–9} \| {pact: true}}` | DM; owner (locked ok); characters only | a sorcery-points row; a slot of that kind left (created ones first); points after ≤ the maximum, else `invalid` "Sorcery points are full" | `{points}` (left after) | `CharacterSlotConverted {characterId, from, points: {before, after}}`, `creature-sheet` upsert |
+| `char.useFeature {characterId, rowId, amount?, slotLevel?, overspend?, public?}` | as above | the row's `spend`: `amount` iff "ask", `slotLevel` iff any slot (created first); a feature source short of uses → `conflict` "Not enough … (n left)" unless `overspend` (floor −9); no pact slot → `conflict`; a row with its own uses spends 1 of them too | `{entryId}` | `CharacterFeatureUsed {characterId, rowId, entryId}`, `creature-sheet` + `game-log-entry` |
+| `char.undoResourceUse {entryId}` | DM; the line's sender | a `char.resourceUse` line, not undone, no long rest of the character after it, a created slot it made still unspent; gives the `ops` back (clamped) and marks the line undone | `{}` | `CharacterResourceUseUndone {characterId, entryId}` |
 | `char.createSlot {characterId, level: 1–5}` | as above | points left ≥ cost (2 / 3 / 5 / 6 / 7), else `invalid` "A 3rd-level slot costs 5 sorcery points (2 left)"; ≤ 9 created per level | `{points}` | `CharacterSlotCreated {characterId, level, points}`, `creature-sheet` upsert |
 
 - **`char.useResource {slot}`** with `delta > 0` on a level with created slots spends those first (`slotsCreated` drops, `used` only for the rest); the event's `before` / `after` are `used`, so they may be equal. A negative delta only lowers `used`.
 - **`char.rest` long** also writes `slotsCreated: {}`.
+- **Lines** (FR-CRES-12): `char.convertSlot`, `char.createSlot` and `char.useFeature` each append one `char.resourceUse` line in their transaction ("Vex · Quickened Spell · −2 sorcery points (3 left)"); their results and events carry its `entryId`. `public?: false` (the sheet's per-browser switch) → not public, `audiencePlayerId` = the owner; otherwise public for everyone. Game-log action `cres.undo` (sender or DM) sends `char.undoResourceUse`.
 - **`char.putRow` features**: `pool: "sorcery-points"` needs `usesMax`; a second pool row on the sheet → `invalid` "Only one sorcery points row".
 
 - **`char.useResource`**: `resource` also takes `{pact: true}` (the pact slots): `used = clamp(used + delta, 0, spellcasting.pact.slots)`, `reset` → 0; no pact slots → max 0, no change, no event. Same roles as slots (DM; owner, locked ok). `CharacterResourceUsed` carries the same resource.

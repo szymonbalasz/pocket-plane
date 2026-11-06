@@ -2,6 +2,7 @@
 // row, counter and rest intents; record type `creature-sheet` (FR-CHARX-36); internal API
 // `characters.adjustHp` (FR-CHAR-13) and `characters.sheetAttack` (FR-CHARX-24) for combat-tracker.
 // Rules numbers stay in `entity`.
+import type { CommandDef } from "../../commands/commands";
 import type { Feature } from "../../services";
 import { definitionHooksOf } from "../entities/definition-hooks";
 import { sheetAttack } from "./attack";
@@ -12,12 +13,13 @@ import {
   charMoveRowCommand,
   charPutRowCommand,
 } from "./edit";
+import { linkSpendByName } from "./fixture-commands";
 import { adjustHp } from "./hp";
 import { charApprove, charCreate, charSetLock } from "./lifecycle";
 import { creatureSheetRecordType } from "./records";
 import { charUseResource } from "./resources";
 import { charRest } from "./rest";
-import { charConvertSlot, charCreateSlot } from "./sorcery";
+import { charConvertSlot, charCreateSlot, charUndoResourceUse, charUseFeature } from "./sorcery";
 
 export type { AdjustHpResult } from "./hp";
 
@@ -45,6 +47,10 @@ export const characterSheet: Feature = {
     r.command(charRest, { intent: true });
     r.command(charConvertSlot, { intent: true });
     r.command(charCreateSlot, { intent: true });
+    r.command(charUseFeature, { intent: true });
+    r.command(charUndoResourceUse, { intent: true });
+    // Fixtures only (not an intent): a spend link by row names (class-resources §13).
+    r.command(linkSpendByName(hooks) as unknown as CommandDef);
     r.recordType(creatureSheetRecordType(r.services.log));
   },
 };

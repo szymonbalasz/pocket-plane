@@ -22,6 +22,7 @@ import { CompendiumName } from "./compendium-links";
 import { ConvertMenu } from "./convert-menu";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
 import { OverspendPopover, OverspentTip } from "./overspend";
+import { ResourcePublicSwitch, SpendFields, UseButton } from "./resource-use";
 import { AddRow, RowTools, useRowPut } from "./rows";
 import { notationContext, useSheet, useSheetIntents, useSheetScope } from "./sheet-context";
 import { pipDelta, usesLeftText, walletLine } from "./view-model";
@@ -206,6 +207,9 @@ function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count:
             />
             <PoolBox f={f} put={put} />
           </div>
+          <div className="flex flex-wrap items-start gap-1">
+            <SpendFields f={f} put={put} />
+          </div>
           <TextField
             path={`features.${f.id}.text`}
             label="Feature text"
@@ -234,6 +238,7 @@ function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count:
         </>
       )}
       <FeatureUses f={f} />
+      {!e && <UseButton f={f} />}
     </div>
   );
 }
@@ -244,6 +249,7 @@ export function FeaturesTab() {
   const e = ctx.editing && ctx.canEdit;
   return (
     <Box box="features" list label="Features">
+      {list.some((f) => f.spend || f.pool) && <ResourcePublicSwitch />}
       {list.length === 0 && !e && <p className="text-xs text-muted-foreground">No features</p>}
       {list.map((f, i) => (
         <FeatureView key={f.id} f={f} index={i} count={list.length} />
@@ -268,7 +274,8 @@ export function FeaturesTab() {
 export function LimitedUsesBox() {
   const ctx = useSheet();
   const scope = useSheetScope();
-  const list = ctx.sheet.features.filter((f) => f.usesMax);
+  // FR-CRES-10: rows with a cost (metamagic, Channel Divinity options) count here too.
+  const list = ctx.sheet.features.filter((f) => f.usesMax || f.spend);
   if (list.length === 0) return null;
   return (
     <Box box="uses" list label="Limited uses">
@@ -286,6 +293,7 @@ export function LimitedUsesBox() {
             </span>
             <span className="flex items-center gap-1">
               <FeatureUses f={f} />
+              <UseButton f={f} />
               <SheetShare list="features" rowId={f.id} />
             </span>
           </div>

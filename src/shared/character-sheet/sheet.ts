@@ -102,6 +102,18 @@ const FEATURE_USES_MAX = 20;
 export const FEATURE_OVERSPEND_MAX = 9;
 const FEATURE_USED_MAX = FEATURE_USES_MAX + FEATURE_OVERSPEND_MAX;
 
+/** FR-CRES-09: what a feature row's Use spends (`amount` "ask" = asked at each Use). */
+export const SPEND_AMOUNT_MAX = 20;
+export const SpendLink = z.strictObject({
+  from: z.union([
+    z.strictObject({ feature: Id }),
+    z.strictObject({ pact: z.literal(true) }),
+    z.strictObject({ slot: z.literal("any") }),
+  ]),
+  amount: z.union([int(1, SPEND_AMOUNT_MAX), z.literal("ask")]),
+});
+export type SpendLink = z.infer<typeof SpendLink>;
+
 const featureFields = {
   name: rowName(60),
   source: text(40).default(""),
@@ -111,6 +123,8 @@ const featureFields = {
   reset: RestKind.optional(),
   /** FR-CRES-05: this row is the sorcerer's sorcery points (`usesMax` = the points). */
   pool: z.literal("sorcery-points").optional(),
+  /** FR-CRES-09: the row's Use spends this. */
+  spend: SpendLink.optional(),
 };
 
 export const FeatureRow = z
@@ -122,6 +136,10 @@ export const FeatureRow = z
   .refine((f) => f.pool === undefined || f.usesMax !== undefined, {
     path: ["usesMax"],
     message: "Sorcery points need a number of uses",
+  })
+  .refine((f) => !(f.spend && "feature" in f.spend.from && f.spend.from.feature === f.id), {
+    path: ["spend"],
+    message: "A row can't spend from itself",
   });
 export type FeatureRow = z.infer<typeof FeatureRow>;
 
@@ -250,6 +268,8 @@ export const CHARX_INTENTS = {
   rest: "char.rest",
   convertSlot: "char.convertSlot",
   createSlot: "char.createSlot",
+  useFeature: "char.useFeature",
+  undoResourceUse: "char.undoResourceUse",
 } as const;
 
 /** `char.create` (FR-CHARX-08). Player: `{name}` only; DM: `ownerPlayerId` required. */
@@ -399,14 +419,44 @@ export const SlotSource = z.union([
   z.strictObject({ pact: z.literal(true) }),
 ]);
 export type SlotSource = z.infer<typeof SlotSource>;
-export const CharConvertSlotIntent = z.strictObject({ characterId: Id, from: SlotSource });
+/** FR-CRES-12: the game-log line's audience; absent = public (OQ-CRES-05 A). */
+const LinePublic = z.boolean().optional();
+export const CharConvertSlotIntent = z.strictObject({
+  characterId: Id,
+  from: SlotSource,
+  public: LinePublic,
+});
 export type CharConvertSlotIntent = z.input<typeof CharConvertSlotIntent>;
 /** FR-CRES-07: Flexible Casting, points → a created slot of 1st–5th level. */
-export const CharCreateSlotIntent = z.strictObject({ characterId: Id, level: int(1, 5) });
+export const CharCreateSlotIntent = z.strictObject({
+  characterId: Id,
+  level: int(1, 5),
+  public: LinePublic,
+});
 export type CharCreateSlotIntent = z.input<typeof CharCreateSlotIntent>;
-/** Sorcery points left after the conversion. */
-export const CharSlotPointsResult = z.object({ points: z.int() });
+/** Sorcery points left after the conversion; the game-log line written. */
+export const CharSlotPointsResult = z.object({ points: z.int(), entryId: z.string() });
 export type CharSlotPointsResult = z.infer<typeof CharSlotPointsResult>;
+
+/**
+ * FR-CRES-11: Use a feature row with a spend link. `amount` iff the link asks; `slotLevel` iff it
+ * spends any slot; `overspend` spends a feature row's uses below zero (FR-MOD-59).
+ */
+export const CharUseFeatureIntent = z.strictObject({
+  characterId: Id,
+  rowId: Id,
+  amount: int(1, SPEND_AMOUNT_MAX).optional(),
+  slotLevel: int(1, 9).optional(),
+  overspend: z.boolean().optional(),
+  public: LinePublic,
+});
+export type CharUseFeatureIntent = z.input<typeof CharUseFeatureIntent>;
+export const CharUseFeatureResult = z.object({ entryId: z.string() });
+export type CharUseFeatureResult = z.infer<typeof CharUseFeatureResult>;
+
+/** FR-CRES-12: Undo a resource-use line (its sender or the DM, until the next long rest). */
+export const CharUndoResourceUseIntent = z.strictObject({ entryId: Id });
+export type CharUndoResourceUseIntent = z.input<typeof CharUndoResourceUseIntent>;
 
 /** FR-CHARX-121: the party's ticked characters at once (Party Manager) or one (the sheet). */
 export const REST_CHARACTERS_MAX = 20;

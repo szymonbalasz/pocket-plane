@@ -75,13 +75,16 @@ describe("FR-CRES-06 char.convertSlot", () => {
     const x = setup();
     x.spend(4);
     x.events.length = 0;
-    expect(x.convert({ slot: 2 }, x.t.p1Actor)).toEqual({ points: 3 });
+    expect(x.convert({ slot: 2 }, x.t.p1Actor).points).toBe(3);
     expect(x.sheet().slotsUsed).toEqual({ "2": 1 });
-    expect(x.convert({ pact: true }, x.t.p1Actor)).toEqual({ points: 4 });
+    expect(x.convert({ pact: true }, x.t.p1Actor).points).toBe(4);
     expect(x.sheet().pactUsed).toBe(1);
     const types = x.events.map((e) => e.event.type);
     expect(types).toEqual(["CharacterSlotConverted", "CharacterSlotConverted"]);
-    expect(x.events[0]?.event.changes.map((c) => c.type)).toEqual([CREATURE_SHEET_TYPE]);
+    expect(x.events[0]?.event.changes.map((c) => c.type)).toEqual([
+      CREATURE_SHEET_TYPE,
+      "game-log-entry",
+    ]);
   });
 
   test("FR-CRES-06 full points, no slot, another player → refused, nothing written", () => {
@@ -98,14 +101,14 @@ describe("FR-CRES-06 char.convertSlot", () => {
     const x = setup();
     x.spend(1);
     x.run(I.setLock, { characterId: x.t.miraId, locked: true });
-    expect(x.convert({ slot: 1 }, x.t.p1Actor)).toEqual({ points: 5 });
+    expect(x.convert({ slot: 1 }, x.t.p1Actor).points).toBe(5);
   });
 });
 
 describe("FR-CRES-07 char.createSlot", () => {
   test("FR-CRES-07 a 2nd-level slot costs 3; not enough points refused", () => {
     const x = setup();
-    expect(x.create(2, x.t.p1Actor)).toEqual({ points: 2 });
+    expect(x.create(2, x.t.p1Actor).points).toBe(2);
     expect(x.sheet().slotsCreated).toEqual({ "2": 1 });
     expect(x.fail(() => x.create(3)).message).toBe(
       "A 3rd-level slot costs 5 sorcery points (2 left)",

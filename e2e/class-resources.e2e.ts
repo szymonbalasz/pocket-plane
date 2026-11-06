@@ -149,3 +149,76 @@ test("FR-CRES-06 FR-CRES-07 FR-CRES-08 Flexible Casting: create a slot, convert 
   await dm.context().close();
   await p1.context().close();
 });
+
+test("FR-CRES-10 FR-CRES-11 FR-CRES-12 Use with a cost: Quickened spends points, Twinned asks, Smite a pact slot; public line, Undo, private switch", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const vex = recordId("char-vex", "entity");
+  const p1 = await rolePage(browser);
+  await p1.setViewportSize({ width: 1440, height: 900 });
+  await p1.goto(link("Player 1"));
+  await live(p1);
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+  const own = await openWindow(p1, "char.sheet");
+  await expect(own.getByTestId("char-sheet")).toHaveAttribute("data-record-id", vex);
+  await tab(own, "features");
+  const rowOf = (name: string) =>
+    own.getByTestId("charx-feature").filter({ hasText: name }).first();
+  const left = () => rowOf("Font of Magic").getByTestId("charx-feature-left");
+  await expect(left()).toHaveAttribute("data-value", "5");
+  await expect(own.getByTestId("cres-public")).toHaveAttribute("data-state", "checked");
+
+  // Quickened Spell: −2 at once; the DM's log shows the public line.
+  await expect(rowOf("Quickened Spell").getByTestId("cres-feature-cost")).toHaveText(
+    "2 sorcery points",
+  );
+  await rowOf("Quickened Spell").getByTestId("cres-feature-use").click();
+  await expect(left()).toHaveAttribute("data-value", "3");
+  const dmLog = await openWindow(dm, "dice.log");
+  const quickLine = dmLog
+    .locator('[data-testid="dice-log-entry"]')
+    .filter({ hasText: "Vex · Quickened Spell · −2 sorcery points" });
+  await expect(quickLine).toHaveCount(1);
+  await expect(quickLine).toHaveAttribute("data-public", "true");
+
+  // Twinned Spell asks the amount.
+  await rowOf("Twinned Spell").getByTestId("cres-feature-use").click();
+  const pop = p1.getByTestId("cres-use-popover");
+  await pop.getByTestId("cres-use-amount").fill("2");
+  await pop.getByTestId("cres-use-confirm").click();
+  await expect(left()).toHaveAttribute("data-value", "1");
+
+  // Eldritch Smite spends a pact slot.
+  await rowOf("Eldritch Smite").getByTestId("cres-feature-use").click();
+  await tab(own, "actions");
+  await expect(pactPip(own)).toHaveAttribute("data-used", "1");
+
+  // Undo the Quickened line from the player's log: 2 points back, line struck.
+  const log = await openWindow(p1, "dice.log");
+  const mine = log
+    .locator('[data-testid="dice-log-entry"]')
+    .filter({ hasText: "Vex · Quickened Spell" });
+  await mine.hover();
+  await mine.locator('[data-testid="dice-log-action"][data-value="cres.undo"]').click();
+  await mine.getByTestId("dice-log-action-yes").click();
+  await expect(mine).toHaveAttribute("data-undone", "true");
+  await tab(own, "features");
+  await expect(left()).toHaveAttribute("data-value", "3");
+
+  // Private: the next Use's line is not public.
+  await own.getByTestId("cres-public").click();
+  await expect(own.getByTestId("cres-public")).toHaveAttribute("data-state", "unchecked");
+  await rowOf("Quickened Spell").getByTestId("cres-feature-use").click();
+  await expect(left()).toHaveAttribute("data-value", "1");
+  await expect(
+    dmLog
+      .locator('[data-testid="dice-log-entry"][data-undone="false"]')
+      .filter({ hasText: "Vex · Quickened Spell" }),
+  ).toHaveAttribute("data-public", "false");
+  await dm.context().close();
+  await p1.context().close();
+});

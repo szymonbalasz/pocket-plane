@@ -2943,9 +2943,9 @@ Index: `note_campaign_title` (`campaign_id`, `title_fold`).
 - **Fixtures:** `notes-shared`, `notes-binned`, `notes-second-campaign`; bundle `notes`. Bodies are set by `notes.seedBody`, a fixtures-only command (not an intent) until co-writing exists.
 - **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap.
 
-## 155. Class resources: pact slots, pact weapons, sorcery points (build/cres-pact)
+## 155. Class resources: pact slots, pact weapons, sorcery points, uses with a cost (build/cres-pact)
 
-From [class-resources](../specs/class-resources.md) FR-CRES-01–08, -14, -15. **Two new columns on an existing table; no new table or record type.**
+From [class-resources](../specs/class-resources.md) FR-CRES-01–15. **Two new columns on an existing table; no new table or record type.**
 
 | Field | Type | Default | Rule | Source |
 |---|---|---|---|---|
@@ -2954,8 +2954,10 @@ From [class-resources](../specs/class-resources.md) FR-CRES-01–08, -14, -15. *
 | `entity.statBlock.attacks[].pactWeapon` (JSON leaf, zod) | bool optional | absent (= false) | Any number of rows | FR-CRES-14 |
 | `creature_sheet.slots_created` (`slotsCreated`) | **JSON leaf** `{"1"…"5": int 0–9}` | `{}` | Created slots not yet spent (Flexible Casting); ticking a level spends them first; a long rest clears them, a short rest keeps them; not clamped by the slot maxima | FR-CRES-07, -08 |
 | `creature_sheet.features[].pool` (JSON leaf, zod) | `"sorcery-points"` optional | absent | Marks the sorcery points row; needs `usesMax`; at most one per sheet | FR-CRES-05 |
+| `creature_sheet.features[].spend` (JSON leaf, zod) | `{from: {feature: id} \| {pact: true} \| {slot: "any"}, amount: 1–20 \| "ask"}` optional | absent | What the row's Use spends; never its own id; a missing source shows "Spend source missing" | FR-CRES-09 |
+| `game_log_entry` kind `char.resourceUse` | payload `{characterId, action use \| convert \| create, name, detail, left?, ops[1..4]}`; `ops` = `{on: feature, id, n} \| {on: slot \| created, level, n} \| {on: pact, n}` | — | One line per Use / conversion / created slot; public unless the sender's switch is off (then `audiencePlayerId` = owner); `undone` set by Undo | FR-CRES-12 |
 | `rule_trigger.rule.when[]` (JSON leaf, zod) | + `{if: "pactWeapon"}` | — | `hit` and `roll` triggers only; holds when the roll's row (by name, as `row`) is one of the owner's `pactWeapon` attack rows; never a spell row | FR-CRES-15 |
 
 - **Upgrade:** both columns are added by push with their defaults; existing sheets read 0 / `{}`. No boot copy.
 - **Visibility:** as the sheet (DM + owner) and the stat block.
-- **Fixtures:** `char-vex` (Sorcerer 5 / Warlock 2, pact `{1, 2}`, "Font of Magic" sorcery points 5, "Pact blade" pact weapon, "Smite" trigger); bundle `class-resources`.
+- **Fixtures:** `char-vex` (Sorcerer 5 / Warlock 2, pact `{1, 2}`, "Font of Magic" sorcery points 5, "Quickened Spell" / "Twinned Spell" / "Eldritch Smite" spend links, "Pact blade" pact weapon, "Smite" trigger; links set by the fixtures-only command `char.linkSpendByName`); bundle `class-resources`.

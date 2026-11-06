@@ -221,6 +221,7 @@ export const CharacterSlotConverted = defineEvent({
       z.strictObject({ pact: z.literal(true) }),
     ]),
     points: PointsChange,
+    entryId: Id,
   }),
   logged: true,
   undoable: false,
@@ -233,7 +234,30 @@ export const CharacterSlotCreated = defineEvent({
     characterId: Id,
     level: z.number().int().min(1).max(5),
     points: PointsChange,
+    entryId: Id,
   }),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `char.useFeature` (FR-CRES-11): a feature row's Use spent its link's cost; changes =
+ * `creature-sheet` upsert + the `char.resourceUse` `game-log-entry` (`entryId`).
+ */
+export const CharacterFeatureUsed = defineEvent({
+  type: "CharacterFeatureUsed",
+  payload: z.strictObject({ characterId: Id, rowId: Id, entryId: Id }),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `char.undoResourceUse` (FR-CRES-12): a resource-use line given back; changes =
+ * `creature-sheet` upsert + the entry marked undone.
+ */
+export const CharacterResourceUseUndone = defineEvent({
+  type: "CharacterResourceUseUndone",
+  payload: z.strictObject({ characterId: Id, entryId: Id }),
   logged: true,
   undoable: false,
 });
