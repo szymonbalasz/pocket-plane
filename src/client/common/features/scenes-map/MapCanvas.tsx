@@ -94,6 +94,7 @@ import {
   type MenuPoint,
   stageLayers,
 } from "./layers";
+import { LONG_PRESS_SLOP, LongPress } from "./long-press";
 import { selfOf } from "./mark-colors";
 import { createMiddlePan, type MiddlePan } from "./middle-pan";
 import {
@@ -815,10 +816,57 @@ export function MapCanvas(props: MapCanvasProps) {
     },
   );
 
+  // ---- FR-NOTES-29 / FR-MAP-18: a long-press on a token (touch) opens its token menu ----
+  const onTokenMenuRef = useRef(props.onTokenMenu);
+  onTokenMenuRef.current = props.onTokenMenu;
+  /** The token node under the current touch press (its drag waits past the slop meanwhile). */
+  const pressNode = useRef<Konva.Node | null>(null);
+  const longPress = useMemo(
+    () =>
+      new LongPress((at) => {
+        const node = pressNode.current;
+        const t = tokensRef.current.find((x) => x.id === at.tokenId);
+        if (!t || !liveRef.current || node?.isDragging()) return;
+        // This press is the menu's now: it never becomes a drag.
+        node?.dragDistance(Number.MAX_SAFE_INTEGER);
+        onTokenMenuRef.current?.(t, { x: at.x, y: at.y });
+      }),
+    [],
+  );
+  const endPress = useCallback(() => {
+    longPress.end();
+    const n = pressNode.current;
+    pressNode.current = null;
+    n?.setAttr("dragDistance", undefined);
+  }, [longPress]);
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      if (e.pointerType === "touch") longPress.move(e.clientX, e.clientY);
+    };
+    // After the canvas's own pointerup (a token's click / tap reads `fired` first).
+    const up = (e: PointerEvent) => {
+      if (e.pointerType === "touch") endPress();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      endPress();
+    };
+  }, [longPress, endPress]);
+  useEffect(() => {
+    if (!live) endPress();
+  }, [live, endPress]);
+
   const { onTokenClick, onTokenDoubleClick } = props;
   const tokenHandlers = useMemo<CanvasContextValue["token"]>(
     () => ({
       dragStart(t, node) {
+        // A drag is no long-press (FR-NOTES-29).
+        longPress.cancel();
         lastOwn.current = t.id;
         const n = footprint(t.size);
         pointers.setState({
@@ -871,6 +919,8 @@ export function MapCanvas(props: MapCanvasProps) {
       },
       click(t, toggle) {
         if (!tokenTakesLeftPress(toolDefRef.current)) return;
+        // The release of a long-press that opened the menu is no click.
+        if (longPress.fired) return;
         if (t.ownerPlayerId === myPlayerId) lastOwn.current = t.id;
         onTokenClick?.(t, toggle);
       },
@@ -889,6 +939,7 @@ export function MapCanvas(props: MapCanvasProps) {
       onTokenDoubleClick,
       move,
       sendSignal,
+      longPress,
     ],
   );
 
@@ -1260,6 +1311,22 @@ export function MapCanvas(props: MapCanvasProps) {
     }
   };
 
+  /** FR-NOTES-29: a touch press on a token with a menu, Select tool, live: time the hold. */
+  const onPointerDown = (e: Konva.KonvaEventObject<PointerEvent>) => {
+    if (e.evt.pointerType !== "touch") return;
+    // A second finger (pinch) ends any long-press.
+    const second = longPress.waiting;
+    endPress();
+    if (second) return;
+    const node = tokenNodeOf(e.target);
+    if (!node || !liveRef.current || !props.onTokenMenu || tool !== "select") return;
+    if (drawingRef.current || !tokenHasMenu(node.id())) return;
+    pressNode.current = node;
+    // A drag waits past the slop, so a still finger's wobble doesn't start one.
+    node.dragDistance(LONG_PRESS_SLOP);
+    longPress.start(node.id(), e.evt.clientX, e.evt.clientY);
+  };
+
   const onContextMenu = (e: Konva.KonvaEventObject<PointerEvent>) => {
     e.evt.preventDefault();
     // FR-SCN-58: this right press went to a layer's menu ahead of the token's.
@@ -1409,6 +1476,7 @@ export function MapCanvas(props: MapCanvasProps) {
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onContextMenu={onContextMenu}
+          onPointerDown={onPointerDown}
         >
           <SyncContext.Provider value={syncStore}>
             <CanvasContext.Provider value={ctx}>

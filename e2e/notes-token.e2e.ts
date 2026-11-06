@@ -2,11 +2,13 @@
 // Token notes (FR-NOTES-29, N9), DM + player-1 + player-2 in their own contexts: player-1
 // right-clicks their character token Mira → Create note → the note opens for them and shows in the
 // DM's list; player-2 right-clicks the NPC also named Mira → Open note → the same note. The DM's
-// Create on the hidden Shadow asks first ("Players will see this note's title").
+// Create on the hidden Shadow asks first ("Players will see this note's title"). r1: on touch
+// (real touch input), a ~500 ms hold on a token opens the same menu for a player and the DM; a
+// touch drag moves the token and opens none.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { NOTES_TOKENS } from "../fixtures/units/linked-notes/notes-tokens";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { konvaNodes } from "./support/konva";
+import { konvaNodes, tokenNode } from "./support/konva";
 import { mapPoint } from "./support/map";
 import { openWindow, shellWindow } from "./support/shell";
 
@@ -122,4 +124,93 @@ test("FR-NOTES-29 token notes: a player creates Mira's note from her token, the 
   await expect.poll(() => groupCount(p2Notes, "npc")).toBe(npcBefore + 1);
 
   for (const page of [dm, p1, p2]) await page.context().close();
+});
+
+/** A touch-screen page (real touch input: Chromium turns it into `pointerType: "touch"`). */
+async function touchPage(browser: Parameters<typeof rolePage>[0], url?: string) {
+  const ctx = await browser.newContext({ hasTouch: true, viewport: { width: 1920, height: 1080 } });
+  const page = await ctx.newPage();
+  if (url) await page.goto(url);
+  const cdp = await ctx.newCDPSession(page);
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", x = 0, y = 0) =>
+    cdp.send("Input.dispatchTouchEvent", {
+      type,
+      touchPoints: type === "touchEnd" ? [] : [{ x: Math.round(x), y: Math.round(y) }],
+    });
+  return { page, touch };
+}
+
+/** The token's id at a cell, from its label (the labels sit under their tokens). */
+async function tokenAt(page: Page, name: string, cell: { col: number; row: number }) {
+  const at = await mapPoint(page, cell.col, cell.row);
+  const labels = (await konvaNodes(page, "map-token-label")).filter((l) => l.text === name);
+  labels.sort((a, b) => Math.abs(a.x - at.x) - Math.abs(b.x - at.x));
+  const id = labels[0]?.id;
+  if (!id) throw new Error(`no token ${name}`);
+  return { id, at };
+}
+
+test("FR-NOTES-29 r1 touch: a long-press on a token opens its menu (player and DM), with no drag; a touch drag moves the token and opens no menu", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const p1 = await touchPage(browser, link("Player 1"));
+  const dm = await touchPage(browser);
+  await loginDm(dm.page, secret);
+  await live(p1.page);
+  await live(dm.page);
+  await tokensDrawn(p1.page, 2);
+  await tokensDrawn(dm.page, 3);
+
+  // player-1 holds their Mira still for 700 ms: the menu, and Mira stays on her cell.
+  const mira = await tokenAt(p1.page, "Mira", PC_MIRA);
+  const before = await tokenNode(p1.page, mira.id);
+  await p1.touch("touchStart", mira.at.x, mira.at.y);
+  await p1.touch("touchMove", mira.at.x + 3, mira.at.y + 2); // a still finger wobbles
+  await p1.page.waitForTimeout(700);
+  const menu = p1.page.getByTestId("map-token-menu");
+  await expect(menu).toBeVisible();
+  await expect(menu).toHaveAttribute("data-record-id", mira.id);
+  await p1.touch("touchMove", mira.at.x + 90, mira.at.y); // moving after the menu opened: no drag
+  await p1.touch("touchEnd");
+  await expect(menu).toBeVisible();
+  // (The first test may have made the Mira note already.)
+  await expect(menu.getByTestId("notes-token-note")).toHaveText(/(Create|Open) note/);
+  await p1.page.waitForTimeout(300);
+  expect(await tokenNode(p1.page, mira.id)).toMatchObject({ x: before?.x, y: before?.y });
+  await p1.page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+
+  // A short tap opens nothing.
+  await p1.touch("touchStart", mira.at.x, mira.at.y);
+  await p1.page.waitForTimeout(150);
+  await p1.touch("touchEnd");
+  await p1.page.waitForTimeout(700);
+  await expect(menu).toHaveCount(0);
+
+  // A touch drag two cells right moves Mira and opens no menu.
+  const cell = (await mapPoint(p1.page, PC_MIRA.col + 1, PC_MIRA.row)).x - mira.at.x;
+  await p1.touch("touchStart", mira.at.x, mira.at.y);
+  for (let i = 1; i <= 8; i++) {
+    await p1.touch("touchMove", mira.at.x + (2 * cell * i) / 8, mira.at.y);
+    await p1.page.waitForTimeout(40);
+  }
+  await p1.page.waitForTimeout(700); // held after the drag: still no menu
+  await p1.touch("touchEnd");
+  await expect
+    .poll(async () => ((await tokenNode(p1.page, mira.id))?.x ?? 0) - (before?.x ?? 0))
+    .toBeGreaterThan(cell * 1.5);
+  await expect(menu).toHaveCount(0);
+
+  // The DM's long-press on the hidden Shadow: the DM menu, its note line.
+  const shadow = await tokenAt(dm.page, NOTES_TOKENS.hidden.name, NOTES_TOKENS.hidden);
+  await dm.touch("touchStart", shadow.at.x, shadow.at.y);
+  await dm.page.waitForTimeout(700);
+  await dm.touch("touchEnd");
+  const dmMenu = dm.page.getByTestId("map-token-menu");
+  await expect(dmMenu).toBeVisible();
+  await expect(dmMenu).toHaveAttribute("data-record-id", shadow.id);
+  await expect(dmMenu.getByTestId("notes-token-note")).toHaveText(/(Create|Open) note/);
+
+  for (const page of [p1.page, dm.page]) await page.context().close();
 });
