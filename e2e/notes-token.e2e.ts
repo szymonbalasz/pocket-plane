@@ -6,6 +6,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { NOTES_TOKENS } from "../fixtures/units/linked-notes/notes-tokens";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { konvaNodes } from "./support/konva";
 import { mapPoint } from "./support/map";
 import { openWindow, shellWindow } from "./support/shell";
 
@@ -21,6 +22,10 @@ async function open(browser: Parameters<typeof rolePage>[0], url?: string) {
   if (url) await page.goto(url);
   return page;
 }
+
+/** Waits until the map draws `n` token labels (the DM sees the hidden one too). */
+const tokensDrawn = (page: Page, n: number) =>
+  expect.poll(async () => (await konvaNodes(page, "map-token-label")).length).toBe(n);
 
 /** Right-clicks the token on `cell`; returns the menu's note line once the menu shows. */
 async function tokenNoteLine(page: Page, cell: { col: number; row: number }, name: string) {
@@ -50,6 +55,9 @@ test("FR-NOTES-29 token notes: a player creates Mira's note from her token, the 
   await live(dm);
   await live(p1);
   await live(p2);
+  await tokensDrawn(dm, 3);
+  await tokensDrawn(p1, 2);
+  await tokensDrawn(p2, 2);
 
   // player-1: their character token → Create note → the Mira note opens for them.
   const create = await tokenNoteLine(p1, PC_MIRA, "Mira");
