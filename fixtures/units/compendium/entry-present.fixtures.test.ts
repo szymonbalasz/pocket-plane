@@ -48,7 +48,7 @@ describe("item-present fixtures (CMP §13, #455)", () => {
     const mine = a.players.filter((p) => p.campaignId === a.lantern?.campaignId);
     expect(mine.map((p) => p.name).sort()).toEqual(["Player 1", "Player 2"]);
     expect(a.rows.map((r) => [r.playerId, r.entryId])).toEqual(
-      mine.map((p) => [p.id, a.lantern?.id]).sort(),
+      mine.map((p) => [p.id, a.lantern?.id as string]).sort(),
     );
     expect(a.manifest.records["entry-present-1"]?.["entry-present"]).toHaveLength(2);
     const b = await read();
