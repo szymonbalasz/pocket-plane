@@ -4,7 +4,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Now (2026-10-31)
 
-**State:** [sprint 15](sprint-15.md) **done**: upgrade guards, play fixes, window position memory and **linked notes** (shared notes, live co-writing) are merged and green on CI; session-sim-18 22 / 22 PASS. **Notes enhancements (#454) building:** categories, Recent sort, taller Linked from (N8), token notes (N9). The DM's real campaign runs from `bun run play` in the main checkout: never touch `%LOCALAPPDATA%/PocketPlane`, its backups or port 4090, and don't build or start servers in the main checkout. Other sessions merge to `main`: leave their branches and worktrees alone. Test agents start with `--strict-mcp-config --mcp-config .mcp.json`, so the real campaign's MCP tools can't reach them.
+**State:** [sprint 15](sprint-15.md) **done**: upgrade guards, play fixes, window position memory and **linked notes** (shared notes, live co-writing) are merged and green on CI; session-sim-18 22 / 22 PASS. **Notes enhancements merged** (#460): categories, Recent sort, taller Linked from, token notes. Waiting for the DM's notes playtest. The DM's real campaign runs from `bun run play` in the main checkout: never touch `%LOCALAPPDATA%/PocketPlane`, its backups or port 4090, and don't build or start servers in the main checkout. Other sessions merge to `main`: leave their branches and worktrees alone. Test agents start with `--strict-mcp-config --mcp-config .mcp.json`, so the real campaign's MCP tools can't reach them.
 
 | Track | Branch | Agent | Worktree | State |
 |---|---|---|---|---|
@@ -14,8 +14,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Linked notes spec | `spec/linked-notes` | — | — | **merged, complete** (#446) |
 | Window position memory | `fix/window-memory` | — | — | **merged** (#438) |
 | Linked notes build | N1–N7 | — | — | **merged** (#447–#452); session-sim-18 PASS (#453) |
-| Notes categories (#454) | N8 `build/notes-categories` | wA5 | — | building |
-| Token notes (#454) | N9 `build/notes-token` | wA8 | — | building |
+| Notes categories, token notes (#454) | N8, N9 | — | — | **merged** (#460) |
 
 **Memory:** ran low once with 13 agents across sessions (Claude Code stopped a background wait); check before starting more.
 
@@ -33,7 +32,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 **Migrations (#416):** stay on schema push at start until someone else runs the app.
 
-**Shared-file locks:** `src/server/db/schema.ts`, `docs/protocol/`, `docs/data-model/` → N8 (`build/notes-categories`); `MapCanvas.tsx` player right-click → N9.
+**Shared-file locks:** none.
 
 **Briefs:** `%TEMP%/pocket-plane/briefs/`.
 

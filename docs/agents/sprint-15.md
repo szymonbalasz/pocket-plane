@@ -88,6 +88,19 @@ Restart `bun run play` in the main checkout (it backs up first, then builds). Yo
 | 11 | Ctrl+Z after others typed | Only your own typing goes; Ctrl+Shift+Z or Ctrl+Y brings it back |
 | 12 | Open Notes at the table with the sheet, Dice tray and Initiative up | Notes sits beside them (narrower when space is tight), covering no buttons |
 
+**Added 2026-11-06 (categories, token notes):**
+
+| # | Do | Expect |
+|---|---|---|
+| 13 | Open Notes | Notes grouped in fold-outs (Session first); your older notes sit in Other |
+| 14 | + New: type a title, pick Session | It shows under Session for everyone |
+| 15 | Type `@` and a new name, Create note | The eight categories show in the popup; pick one, the chip goes in |
+| 16 | Change a note's category in its header | It moves group for everyone |
+| 17 | Click Recent | One list, newest edit first, with who and when; click again for groups |
+| 18 | A player right-clicks their character's token (long-press on a tablet) | Create note → a Player note with the character's name opens |
+| 19 | Right-click a monster token | Create note → NPC note; on a hidden token you're warned that players will see the title |
+| 20 | Right-click the same token again | Open note: the same note |
+
 Known and logged: after closing Notes a player's map may stay small (BL-189); a reload reopens Notes on its list, not the open note (BL-191); name tags can cover a line while someone types (BL-187).
 
 ## Playtest: sprint 15 fixes

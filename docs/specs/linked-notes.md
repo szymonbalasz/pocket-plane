@@ -108,7 +108,7 @@ A note can have the same name as a token or creature; nothing ties them together
 
 Gilt & Stone kit and [visual-direction](../design/visual-direction.md) only.
 
-- **Window:** `notes.main` in both clients, placed per [ADR-0025](../architecture/adr/0025-play-shell-windows.md) / [0060](../architecture/adr/0060-one-window-placer.md), remembered per [0064](../architecture/adr/0064-window-memory.md). Size row: default 760 × 560, useful 560 × 420, minimum 360 × 320.
+- **Window:** `notes.main` in both clients, placed per [ADR-0025](../architecture/adr/0025-play-shell-windows.md) / [0060](../architecture/adr/0060-one-window-placer.md), remembered per [0064](../architecture/adr/0064-window-memory.md). Size row: default 760 × 560, useful 560 × 420, minimum 360 × 320 (built as 760 × 560 / 440 × 420 / 320 × 280, [#449](../decisions-log.md)).
 - **Opened from:** the launcher ("Notes") and the command palette ("Open Notes", "New note").
 
 ```text

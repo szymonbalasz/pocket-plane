@@ -202,3 +202,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-190 | DM 1280×720 with Notes open: the map's fit keeps only the PCs, 9 monsters sit under Initiative (sim-18, `.verify/20261106-001903-session-sim-18/` d03) | S | scenes-map fit | none | — | open |
 | BL-191 | A reload brings Notes back on "Pick a note", not the note that was open (sim-18, `.verify/20261106-001903-session-sim-18/` r01) | S | linked-notes window | none | — | open |
 | BL-192 | The DM, back from another campaign, sees "This note is no longer available" with no note open (sim-18, `.verify/20261106-001903-session-sim-18/` n10) | S | linked-notes window | none | — | open |
+| BL-193 | Notes at ≤ 360 px wide: cramped toolbar, the note dropdown is 26 px wide and wraps, the Recycle bin button runs past the window's edge at 320 px (notes-cat r1 walk) | S | linked-notes window | none | — | open |
+| BL-194 | Simple Dark: the picked category in + New (grey tile on near-black) is low-contrast (notes-cat r1 walk) | S | linked-notes, kit | none | — | open |
+| BL-195 | At a 480 px viewport the map tool rail draws over a window's top-left corner (seen with Notes) (notes-cat r1 walk) | S | play-shell, scenes-map | none | — | open |
+| BL-196 | The token menu opens up-right of the pointer and can cover the next token (DM and players) (notes-cat r1 walk) | S | scenes-map token menu | none | — | open |
