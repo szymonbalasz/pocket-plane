@@ -853,7 +853,7 @@ One applied HP change to one target: the stats unit (#54, gate I9). Written by `
 | Effective public settings | settings row, else all false | FR-DICE-12 |
 | Difficulty rating, base / adjusted XP, thresholds, total CR | `difficultyMethods` (`dmg-2014`): party levels + monster CRs (XP table, CR 0 = 10) | FR-CBT-03, #136, gate I27 |
 | Party | `partyCharacterIds`, `null` = all characters at read time (*(sprint 1, built, fix/charx-combat-routes)* but drafts, a `creature-sheet` with `status: draft`) | FR-CBT-02 |
-| Health band | `down` if hp = 0; `bloodied` if 2 × hp ≤ hpMax; else `healthy`; computed in the visibility fn | [FR-CBT-26](../specs/combat-tracker.md#6-functional-requirements), #139 P9 |
+| Health band | `down` if hp = 0; `critical` if 20 × hp < 3 × hpMax (under 15 %); `bloodied` if 2 × hp ≤ hpMax; else `healthy`; computed in the visibility fn | [FR-CBT-26](../specs/combat-tracker.md#6-functional-requirements), #139 P9 |
 | Eligible turns; hit hint | not removed and not a monster at 0 HP; nat 20 hit, nat 1 miss, else total ≥ AC (per target) | FR-CBT-14, [FR-CBT-33](../specs/combat-tracker.md#6-functional-requirements) |
 | Sheet values | signed bonuses, "Down", roll specs `characterRolls(statBlock, kind, ability?)` (`@shared/character-sheet`; `check` / `save` kinds and `char.roll` built, #149) | [FR-CHAR-05](../specs/character-sheet.md#6-functional-requirements), CHAR §8 |
 | Pending for me, unread count | notifications × seen marker | FR-NOTE-18 |
@@ -999,7 +999,7 @@ From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD, `comple
 | Table / leaf | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|
 | `effect` | + `modifiers` (**JSON leaf** Modifier[] 0–6), `preset_key` (text ≤ 40 \| null: built-in key or preset id, soft) | `[]`, null | DM full; players iff PC effect (`targetCharacterId` set), `presetKey` built-in keys only | [FR-MOD-03](../specs/effect-modifiers.md#6-functional-requirements), [FR-MOD-21](../specs/effect-modifiers.md#6-functional-requirements) |
-| `effect` *(spell-fx, built, fix/vfx-core, [§142](#142-spell-fx-core-effectfx-spellsfx-vfx-core))* | + `fx` (**JSON leaf** `{preset, params, spellId?}` ≤ 200 B \| null) | null | Rides the effect's rule; the player redaction gains `fx` | [FR-VFX-03](../specs/spell-fx.md#61-presets-and-the-map-effect) |
+| `effect` *(spell-fx, built, fix/vfx-core, [§142](#142-spell-fx-core-effectfx-spellsfx-vfx-core))* | + `fx` (**JSON leaf** `{preset, params, spellId?}` ≤ 200 B \| null; *#456:* `templateId?` = the kept `aoe-template` a template preset was cast into, FR-VFX-40) | null | Rides the effect's rule; the player redaction gains `fx` | [FR-VFX-03](../specs/spell-fx.md#61-presets-and-the-map-effect) |
 | `effect_preset` (new, record type `effect-preset`) | see below | — | DM full; player own rows (`ownerPlayerId`) | [FR-MOD-22](../specs/effect-modifiers.md#6-functional-requirements) |
 | `game_log_entry.payload` (`roll` items) | + optional `mods [{label \| null, value, expression?, auto?, rollId?}]`, `modes [label \| null]`; `total` includes the parts | absent; old rows parse | as the payload (labels null for effects players don't receive) | [FR-MOD-19](../specs/effect-modifiers.md#6-functional-requirements) |
 | `game_log_entry.dmPayload` (`roll`) | new: `{items: [{mods: [{effectId, label}], modes?}]}` | null (no parts) | DM only | FR-MOD-19, [FR-DICE-28](../specs/dice-roll-log.md#6-functional-requirements) |

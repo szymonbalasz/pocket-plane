@@ -3,12 +3,13 @@
 // labels: spirits, flames, Moil's cover, reactions, hit looks), both on the `objects` Konva layer.
 // Each pass is one non-listening Shape drawing every aura from the page's FX engine; empty Groups
 // carry the test IDs (VFX §7.3): `vfx-aura` (id = effect id; attrs `preset`, `tokenId`,
-// `radiusFt`, `level`), `vfx-hit` (id = cue id; attrs `look`, `tokenId`), `vfx-cells` (id =
+// `templateId` (FR-VFX-40), `radiusFt`, `level`), `vfx-hit` (id = cue id; attrs `look`, `tokenId`), `vfx-cells` (id =
 // effect id; attrs `tokenId`, `count`); the `vfx-over` Group carries `frameMs` (median FX frame,
 // FR-VFX-27) and `lastHit` (`<cueId>:<look>`). The under entry syncs the engine (auras, level,
 // positions); the over entry owns the frame loop and the cues, so the DM's Layers switch
 // **Effects** (on `vfx-over`, FR-VFX-28) drops both passes and the cues on that screen.
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
+import type { TemplateRecordView } from "@shared/scene-tools/schemas";
 import { cellToPx, footprint, type MapRect } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { emanationCells } from "@shared/spell-fx/cells";
@@ -17,13 +18,15 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { Group, Shape } from "react-konva";
 import { useSync } from "../../sync/store";
 import { startedIn } from "../combat-tracker/store";
+import { canvasBlind } from "../fog-of-war/blind";
+import { useAoe } from "../scene-tools/aoe-store";
 import { diagonalRuleIn } from "../scene-tools/diagonal-rule";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import { useCanvas } from "../scenes-map/canvas-context";
 import type { LayerContextMenu, LayerToggle } from "../scenes-map/layers";
 import { markColor, selfOf } from "../scenes-map/mark-colors";
 import { useLayerToggles } from "../scenes-map/tool-store";
-import { aurasOf } from "./anchors";
+import { aurasOf, drawnTemplates, templateBox, templateOfAnchor } from "./anchors";
 import { openCellsMenu, useCellsMenuIsland } from "./CellsMenu";
 import { pruneCells, useFxCells } from "./cells-store";
 import { useHitCues, usePoofCues } from "./cues";
@@ -37,18 +40,57 @@ export const VFX_LAYER_SWITCH: LayerToggle = { key: "vfx", label: "Effects", lay
 
 const nativeOf = (kctx: Konva.Context) => kctx._context as unknown as CanvasRenderingContext2D;
 
-/** The canvas' tokens as drawn now (own drag, others' previews, shown cells), for the engine. */
-function useFxView(): { view: FxView; drawn: readonly TokenView[] } {
+/**
+ * FR-VFX-40: a kept template as this client draws it now: its own origin / end handle drag
+ * (`useAoe` gesture) ahead of the record.
+ */
+function templateNow(t: TemplateRecordView): TemplateRecordView {
+  const g = useAoe.getState().gesture;
+  if (!g || !("id" in g) || g.id !== t.id) return t;
+  if (g.kind === "move") return g.at ? { ...t, x: g.at.x, y: g.at.y } : t;
+  return { ...t, angle: g.template.angle, size: g.template.size };
+}
+
+/**
+ * The canvas' tokens as drawn now (own drag, others' previews, shown cells), for the engine;
+ * FR-VFX-40: and the kept templates it draws (`tpl:<id>` anchors).
+ */
+function useFxView(): {
+  view: FxView;
+  drawn: readonly TokenView[];
+  templates: readonly TemplateRecordView[];
+} {
   const c = useCanvas();
   const off = useLayerToggles((s) => s.off);
   const drawn = useMemo(() => withoutDmOnly(c.tokens, c.client, off), [c.tokens, c.client, off]);
+  const templatesOff = off.templates === true;
+  const dmOnlyOff = off["dm-only"] === true;
+  const blind = canvasBlind(c.client, c.store, c.scene.id, c.myPlayerId);
+  const templates = useMemo(
+    () =>
+      drawnTemplates(c.store, {
+        client: c.client,
+        myPlayerId: c.myPlayerId,
+        sceneId: c.scene.id,
+        templatesOff,
+        dmOnlyOff,
+        blind,
+      }),
+    [c.store, c.client, c.myPlayerId, c.scene.id, templatesOff, dmOnlyOff, blind],
+  );
   const view = useMemo<FxView>(() => {
     const byId = new Map(drawn.map((t) => [t.id, t]));
+    const tplById = new Map(templates.map((t) => [t.id, t]));
     const grid = c.grid;
     const previews = c.previews;
     return {
       cell: grid.gridCellSize,
       position(id): DrawnBox | null {
+        const tplId = templateOfAnchor(id);
+        if (tplId !== null) {
+          const tpl = tplById.get(tplId);
+          return tpl ? templateBox(grid, templateNow(tpl)) : null;
+        }
         const t = byId.get(id);
         if (!t) return null;
         const s = previews.getState();
@@ -57,8 +99,8 @@ function useFxView(): { view: FxView; drawn: readonly TokenView[] } {
         return { x: p.x, y: p.y, size: footprint(t.size) * grid.gridCellSize };
       },
     };
-  }, [drawn, c.grid, c.previews]);
-  return { view, drawn };
+  }, [drawn, templates, c.grid, c.previews]);
+  return { view, drawn, templates };
 }
 
 function useSnapshot(engine: FxEngine) {
@@ -73,13 +115,13 @@ const useSwitchedOff = (client: "dm" | "player") =>
 export function VfxUnderLayer() {
   const c = useCanvas();
   const engine = fxEngine();
-  const { view, drawn } = useFxView();
+  const { view, drawn, templates } = useFxView();
   const { level } = useVfxLevel();
   const switchedOff = useSwitchedOff(c.client);
   const store = c.store;
   const specs = useMemo(
-    () => aurasOf(store, drawn, { client: c.client, myPlayerId: c.myPlayerId }),
-    [store, drawn, c.client, c.myPlayerId],
+    () => aurasOf(store, drawn, { client: c.client, myPlayerId: c.myPlayerId }, templates),
+    [store, drawn, c.client, c.myPlayerId, templates],
   );
   engine.setView(view);
   useEffect(() => {
@@ -256,6 +298,7 @@ export function VfxOverLayer() {
           id={a.effectId}
           preset={a.preset.key}
           tokenId={a.tokenId}
+          templateId={a.templateId ?? undefined}
           radiusFt={a.radiusFt ?? undefined}
           level={snap.level}
           hidden={a.hidden}

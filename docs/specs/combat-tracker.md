@@ -212,7 +212,7 @@ All commands: rows + event-log entry + domain event in one transaction, then hel
 | **Undo** | | |
 | FR-CBT-25 | `cbt.undo {expectedHpChangeId}` (DM): the latest non-undone combat log entry of the started encounter (by `seq`); none → `conflict` "Nothing to undo"; ≠ expected → `conflict`. Applies the inverse delta, clamped (monster or `characters.adjustHp`); marks the row undone, `gameLog.markUndone`; emits `CombatEntryUndone`, **then** `reopenNotification` if from a card. One step per click; a step = one apply (FR-CBT-35). | I2, I28, #139 (P4). *Amended by [FR-CBTX-22](combat-extras.md#6-functional-requirements): inverse via `hpRules.revert`* |
 | **Visibility and resilience** | | |
-| FR-CBT-26 | Health band (players, monsters): `down` if hp = 0; `bloodied` if 2 × hp ≤ hpMax; else `healthy`. Computed in the visibility fn; HP numbers never sent. | #139 (P9) |
+| FR-CBT-26 | Health band (players, monsters): `down` if hp = 0; `critical` if hp < 15 % of hpMax (`20 × hp < 3 × hpMax`; red, `hp.down`; DM, 2026-11-06); `bloodied` if 2 × hp ≤ hpMax; else `healthy`. Computed in the visibility fn; HP numbers never sent. | #139 (P9) |
 | FR-CBT-27 | Visibility per §9; DM always full. Visibility fns read only the record and the connection context; every command lists every record whose visibility changes. | ADR-0021 |
 | FR-CBT-28 | No combat state in memory: after a hard kill + restart, snapshots equal pre-crash state. | Vision |
 | FR-CBT-29 | Controls disabled unless `live`; one intent in flight per control; an in-flight intent lost to a drop → Toast "Connection lost — check the game log / HP before trying again". Reject → Toast with message. | as FR-CHAR-12 |

@@ -3,6 +3,7 @@
 // Elemental 2), Mira 15, Owlbear (after Mira, pet), Goblin 12, Thorn 10 (+ in-turn Wolf pet),
 // Fire Elemental 3 (Thorn's, own 9). DM records, player-1's view (Mira, Brakka) and player-2's
 // (Thorn), plus a static render with a live fake sync store and the shell. Tests only.
+import { healthBand } from "@shared/combat-tracker/rules";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import { lazyAfterSnapshot } from "@shared/protocol/lazy";
 import { viewAsAfterSnapshot } from "@shared/protocol/scene-window";
@@ -202,7 +203,7 @@ const playerOf = (r: Record<string, unknown>, viewer: string): Record<string, un
   if (r.kind === "pc") return { ...common, entityId: r.entityId, initiative: r.initiative };
   const cur = r.hpCurrent as number;
   const max = r.hpMax as number;
-  const band = cur <= 0 ? "down" : 2 * cur <= max ? "bloodied" : "healthy";
+  const band = healthBand(cur, max);
   const owner = r.ownerCharacterId
     ? { ownerCharacterId: r.ownerCharacterId, ownerPlayerId: r.ownerPlayerId, turnMode: r.turnMode }
     : {};

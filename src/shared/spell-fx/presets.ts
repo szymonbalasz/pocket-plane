@@ -23,6 +23,17 @@ export interface FxPreset {
   /** The aura's radius in feet (affected cells, turn reaction); absent = none. */
   radiusFt?(params: FxParamsOut): number;
   reactions?: readonly FxReaction[];
+  /**
+   * FR-VFX-40: anchored to a kept AoE template placed at cast (not to the caster's token): its
+   * shape and size as placed. Absent = a token aura.
+   */
+  template?: FxTemplate;
+}
+
+/** FR-VFX-40: the kept template a template-anchored preset is cast into. */
+export interface FxTemplate {
+  shape: "cube";
+  sizeFt: number;
 }
 
 function definePreset<S extends z.ZodType<FxParamsOut, unknown>>(p: {
@@ -32,6 +43,7 @@ function definePreset<S extends z.ZodType<FxParamsOut, unknown>>(p: {
   params: S;
   radiusFt?(params: z.output<S>): number;
   reactions?: readonly FxReaction[];
+  template?: FxTemplate;
 }): FxPreset {
   return p as unknown as FxPreset;
 }
@@ -65,9 +77,23 @@ export const shadowOfMoil = definePreset({
   reactions: ["hitOnAnchor"],
 });
 
+/**
+ * FR-VFX-40: Evard's Black Tentacles, a 20 ft cube placed on the map at cast (the template
+ * anchor); a creature starting its turn inside is grabbed (`turnInside`).
+ */
+export const blackTentacles = definePreset({
+  key: "black-tentacles",
+  label: "Black Tentacles",
+  names: ["black tentacles", "evard's black tentacles"],
+  params: z.strictObject({}),
+  reactions: ["turnInside"],
+  template: { shape: "cube", sizeFt: 20 },
+});
+
 export const fxPresets: readonly FxPreset[] = [
   spiritGuardians,
   shadowOfMoil,
+  blackTentacles,
   // New presets: one line here (FR-VFX-01).
 ];
 
@@ -76,8 +102,11 @@ const byKey = new Map(fxPresets.map((p) => [p.key, p]));
 /** The catalogue entry for `key`, or null (unknown: a newer server's preset, FR-VFX §11). */
 export const presetOf = (key: string): FxPreset | null => byKey.get(key) ?? null;
 
-/** FR-VFX-04: the preset whose `names` holds the trimmed, lower-cased spell name, else null. */
+/**
+ * FR-VFX-04: the preset whose `names` holds the trimmed, lower-cased spell name (a curly
+ * apostrophe read as a straight one), else null.
+ */
 export function suggestPreset(spellName: string): FxPreset | null {
-  const name = spellName.trim().toLowerCase();
+  const name = spellName.trim().toLowerCase().replaceAll("’", "'");
   return fxPresets.find((p) => p.names.includes(name)) ?? null;
 }

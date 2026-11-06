@@ -15,8 +15,10 @@ export interface AuraFrame {
   /** The anchor token's drawn centre (map px), lagged by the engine at Full / Reduced. */
   x: number;
   y: number;
-  /** Footprint side (map px). */
+  /** Footprint side (map px); FR-VFX-40: a template anchor's square side. */
   size: number;
+  /** FR-VFX-40: a template anchor's rotation (radians, about the centre); absent = 0. */
+  angle?: number;
   /** Map px per 5 ft (one grid cell). */
   cell: number;
   /** Emanation edge from the centre: `radiusFt / 5 × cell + size / 2` (map px). */
