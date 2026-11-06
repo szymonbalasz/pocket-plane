@@ -458,6 +458,15 @@ export function slotPips(
   })).filter((p) => p.max > 0);
 }
 
+/** FR-CRES-04: the pact slots' pips (one level), or null without pact slots. */
+export function pactPips(
+  stats: { spellcasting?: Spellcasting },
+  sheet: Pick<SheetData, "pactUsed">,
+): { level: number; max: number; used: number } | null {
+  const pact = stats.spellcasting?.pact;
+  return pact ? { level: pact.level, max: pact.slots, used: sheet.pactUsed } : null;
+}
+
 /** K13: a spell level as the kit's slot label ("1st", "2nd", "3rd", "4th" … "9th"). */
 export const levelOrdinal = (level: number | string): string => {
   const n = Number(level);

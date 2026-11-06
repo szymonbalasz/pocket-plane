@@ -936,6 +936,7 @@ From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`
 | items | **JSON leaf** 0–80 rows `{id, name, qty 0–9999, equipped, notes ≤ 120}` | No weight | CHARX §8.2 |
 | notes | text ≤ 4000, default "" | Rendered as text | CHARX §8.2 |
 | slotsUsed, hitDiceUsed | **JSON leaf** `{1…9: int}`, `{d6…d12: int}` | ≤ slot max / levels with that die; lowering a max clamps `used` in the same tx | [FR-CHARX-17](../specs/character-sheet-full.md#6-functional-requirements) |
+| pactUsed | int 0–4, default 0 | ≤ `spellcasting.pact.slots`; back on a short or long rest ([§155](#155-class-resources-pact-slots-and-pact-weapons-buildcres-pact)) | [FR-CRES-02](../specs/class-resources.md#6-functional-requirements) |
 | createdAt, updatedAt | timestamp | `ctx.clock` | CHARX §8.2 |
 
 - **Caps:** row ≤ 48 KB, stat block ≤ 12 KB, else `invalid` "Sheet is full" ([FR-CHARX-03](../specs/character-sheet-full.md#6-functional-requirements)). Typical 5–15 KB.
@@ -2940,3 +2941,18 @@ Index: `note_campaign_title` (`campaign_id`, `title_fold`).
 - **Not stored:** subscriptions, who is here, cursors (N2, memory only).
 - **Fixtures:** `notes-shared`, `notes-binned`, `notes-second-campaign`; bundle `notes`. Bodies are set by `notes.seedBody`, a fixtures-only command (not an intent) until co-writing exists.
 - **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap.
+
+## 155. Class resources: pact slots and pact weapons (build/cres-pact)
+
+From [class-resources](../specs/class-resources.md) FR-CRES-01–04, -14, -15. **One new column on an existing table; no new table or record type.**
+
+| Field | Type | Default | Rule | Source |
+|---|---|---|---|---|
+| `creature_sheet.pact_used` (`pactUsed`) | int 0–4 | 0 | ≤ `spellcasting.pact.slots`; lowering it (or removing `pact`) clamps in the same tx (CHARX definition hook). `char.rest` short **and** long set it to 0 | FR-CRES-02, -03 |
+| `entity.statBlock.spellcasting.pact` (JSON leaf, zod) | `{level 1–5, slots 1–4}` optional | absent | The pact slots' level and count, beside `slots`; both kinds | FR-CRES-01 |
+| `entity.statBlock.attacks[].pactWeapon` (JSON leaf, zod) | bool optional | absent (= false) | Any number of rows | FR-CRES-14 |
+| `rule_trigger.rule.when[]` (JSON leaf, zod) | + `{if: "pactWeapon"}` | — | `hit` and `roll` triggers only; holds when the roll's row (by name, as `row`) is one of the owner's `pactWeapon` attack rows; never a spell row | FR-CRES-15 |
+
+- **Upgrade:** the column is added by push with its default; existing sheets read 0. No boot copy.
+- **Visibility:** as the sheet (DM + owner) and the stat block.
+- **Fixtures:** `char-vex` (Sorcerer 5 / Warlock 2, pact `{1, 2}`, "Pact blade" pact weapon, "Smite" trigger); bundle `class-resources`.

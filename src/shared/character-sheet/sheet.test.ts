@@ -373,6 +373,7 @@ describe("FR-CHARX-17 counters", () => {
     slotsUsed: { "1": 2, "2": 1 },
     hitDiceUsed: { d10: 3, d6: 2 },
     features: [FeatureRow.parse({ id: "f", name: "Rage", usesMax: 2, used: 1 })],
+    pactUsed: 0,
   };
 
   test("FR-CHARX-17 counterOf + nextUsed: clamp 0…max, reset → 0, unknown feature → null", () => {
@@ -394,7 +395,11 @@ describe("FR-CHARX-17 counters", () => {
       spellcasting: { ability: "wis" as const, slots: { "1": 1 } },
       classes: [{ name: "Fighter", level: 2, hitDie: "d10" as const }],
     };
-    expect(clampCounters(s, lowered)).toEqual({ slotsUsed: { "1": 1 }, hitDiceUsed: { d10: 2 } });
-    expect(clampCounters(s, {})).toEqual({ slotsUsed: {}, hitDiceUsed: {} });
+    expect(clampCounters(s, lowered)).toEqual({
+      slotsUsed: { "1": 1 },
+      hitDiceUsed: { d10: 2 },
+      pactUsed: 0,
+    });
+    expect(clampCounters(s, {})).toEqual({ slotsUsed: {}, hitDiceUsed: {}, pactUsed: 0 });
   });
 });
