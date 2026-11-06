@@ -1,7 +1,8 @@
 // Compendium (CMP, ADR-0046): import kinds for the pipeline, `cmp.import` /
 // `cmp.importRecorded`, homebrew `cmp.putEntry` / `cmp.deleteEntry`, `cmp.deriveMonster` (REST,
 // routes mounted in app.ts), the WS intent `cmp.addToSheet` (FR-CMP-28) and the search index's
-// drop listener (FR-CMP-34).
+// drop listener (FR-CMP-34). *(#458)* Entry present: `cmp.presentEntry` / `cmp.closeEntryPresent`
+// and the `entry-present` record (in the snapshot).
 import type { Feature } from "../../services";
 import { addToSheet } from "./add-to-sheet";
 import { deriveMonster } from "./derive";
@@ -9,6 +10,7 @@ import { registerEntryImport } from "./entries";
 import { deleteEntry, putEntry } from "./homebrew";
 import { importCommand, importRecordedCommand } from "./import";
 import { applyImportedArt, importedArtOf } from "./imported-art";
+import { closeEntryPresent, entryPresentType, presentEntry, presentEntryByName } from "./present";
 import { searchIndexListener } from "./search-index";
 
 export const compendium: Feature = {
@@ -22,6 +24,11 @@ export const compendium: Feature = {
     r.command(deleteEntry);
     r.command(deriveMonster);
     r.command(addToSheet, { intent: true });
+    // FR-CMP-78–82 (DM #458): an entry open on players' screens.
+    r.command(presentEntry, { intent: true });
+    r.command(closeEntryPresent, { intent: true });
+    r.command(presentEntryByName);
+    r.recordType(entryPresentType);
     r.listener("compendium.searchIndex", searchIndexListener(s.db));
     // FR-CMPX-24: a placed 5etools monster's token art.
     r.command(applyImportedArt);

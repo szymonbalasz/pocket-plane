@@ -46,3 +46,29 @@ export const CompendiumEntryDeleted = defineEvent({
   logged: true,
   undoable: false,
 });
+
+/**
+ * `cmp.presentEntry` (FR-CMP-79): changes = `entry-present`, per target their old row deleted (any
+ * entry) and a new row upserted. Each target receives only their own rows (FR-CMP-78).
+ */
+export const EntryPresented = defineEvent({
+  type: "EntryPresented",
+  payload: z.strictObject({ entryId: z.string(), playerIds: z.array(z.string()).min(1) }),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `cmp.closeEntryPresent` (FR-CMP-81): changes = `entry-present` → null for the closed rows. An
+ * unshare or delete closes rows inside `CompendiumEntrySaved` / `CompendiumEntryDeleted` (FR-CMP-82).
+ */
+export const EntryPresentClosed = defineEvent({
+  type: "EntryPresentClosed",
+  payload: z.strictObject({
+    entryId: z.string(),
+    playerIds: z.array(z.string()).min(1),
+    by: z.enum(["dm", "player"]),
+  }),
+  logged: true,
+  undoable: false,
+});

@@ -75,6 +75,7 @@ import imageManageE2e from "./image-manage-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
+import itemPresent from "./item-present";
 import kitInitiative from "./kit-initiative";
 import kitLibrary from "./kit-library";
 import kitLog from "./kit-log";
@@ -425,4 +426,6 @@ export const bundles: readonly Bundle[] = [
   classResources,
   // Undo a counted move (build/undo-move): late-damage's moves in their own server
   undoMoveE2e,
+  // Compendium entry on players' screens (build/item-present, #458)
+  itemPresent,
 ];

@@ -4600,7 +4600,23 @@ From [class-resources](../specs/class-resources.md) FR-CRES-02, -03, -15. **No n
 - **`char.rest`**: short and long both write `pactUsed: 0` (in the `creature-sheet` change, only when it was above 0). The short-rest confirm reads "Resets short-rest feature uses and pact slots. Spend hit dice on the sheet."
 - **`char.edit`** `set.spellcasting` and **`char.putRow`** attacks accept `pact` / `pactWeapon` (the stat-block zod); the content tools (`character_edit`, `character_put_row`) take them through the same schemas.
 - **`mod.putTrigger`** filters: + `{if: "pactWeapon"}` on `hit` / `roll` (`turnStart` → `invalid`). The roll hook and the tray preview set the fire fact from the owner's stat block: a weapon roll whose `row` name matches a `pactWeapon` attack row. Words: "with a pact weapon".
-## 202. Compendium character options (build/cmpx-options)
+
+## 202. Entry present (build/item-present, DM #458)
+
+From [compendium §6.2](../specs/compendium.md#62-entry-present-an-awarded-item-pops-up-dm-458-2026-11-06) FR-CMP-78–83. A compendium entry open on players' screens, as `handout-present` (§86–87).
+
+| Item | Shape / rule |
+|---|---|
+| Record type `entry-present` (`src/server/features/compendium/present.ts`) | `{id, campaignId, entryId, playerId, presentedAt}`; campaign scope, **not lazy**; DM every row, a player only their own (`entryPresentVisibility`, `@shared/compendium/present`) |
+| `cmp.presentEntry {entryId}` (DM) | Every player of the campaign; `not_found` (not visible to the DM), `invalid` (monster), `conflict` "Share it to show it on players' screens" (unshared homebrew) or "No players to show it to". Result `{presentIds}` |
+| `cmp.closeEntryPresent {presentId}` (DM any; player own) | Another player's row → `not_found`; gone → `ack`, no event |
+| `EntryPresented {entryId, playerIds}` | Logged. Changes per target: old row delete, new row upsert. A target receives only their own rows |
+| `EntryPresentClosed {entryId, playerIds, by: dm \| player}` | Logged. Changes: the row → null |
+| `cmp.putEntry` (`shared: false`), `cmp.deleteEntry` | Delete the entry's `entry-present` rows; the changes ride on `CompendiumEntrySaved` / `CompendiumEntryDeleted` |
+| `cmp.presentEntryByName {kind, name}` | Fixtures only (not an intent): the campaign's homebrew entry by name, then as `cmp.presentEntry` |
+| Client | DM: Add to party's tick "Show it on players' screens" sends `cmp.presentEntry` after the `party.addItem` ack. Player: `player/features/compendium/entry-present-popup.tsx`, mounted next to the handout popup in `PlayerPlayPage.tsx`, same layer (`PRESENT_POPUP_Z`); a shown handout present goes first. Entry body over REST (`GET /api/compendium/entries/:id`) |
+| Snapshot | ≤ 1 row (~250 B) per player; DM ≤ players rows |
+## 203. Compendium character options (build/cmpx-options)
 
 [compendium-expansion](../specs/post-mvp/compendium-expansion.md#6-functional-requirements) X5 (FR-CMPX-30–35). No new event, intent or route; shapes in `@shared/compendium`.
 

@@ -21,7 +21,7 @@ phase: post-mvp
 
 - **X1 core:** config, folder reader, 5etools adapter (monsters, spells, items), per-book sources, import / update, replace rule, fixtures.
 - **X2 panel:** the DM import panel lists the folder's books; import / update per book; About credits.
-- **X5 character options** *(DM, 2026-11-06, [#458](../../decisions-log.md))*: feats, races (subraces merged), backgrounds and class options (5etools `optionalfeatures`: invocations, fighting styles, maneuvers, metamagic, infusions…) as four new compendium kinds, text first: searchable, readable by players; feats and class options **Add to sheet** as feature rows. Nothing about them is automated on a sheet.
+- **X5 character options** *(DM, 2026-11-06, [#459](../../decisions-log.md))*: feats, races (subraces merged), backgrounds and class options (5etools `optionalfeatures`: invocations, fighting styles, maneuvers, metamagic, infusions…) as four new compendium kinds, text first: searchable, readable by players; feats and class options **Add to sheet** as feature rows. Nothing about them is automated on a sheet.
 - **X3 token art:** a 5etools monster's token image is copied into the campaign's assets the first time it is placed, then reused ([OQ-CMPX-01](#15-open-questions) A).
 - A local probe script `bun scripts/cmpx-probe.ts` reporting mapping counts and warnings over the real folder (dev aid, never in CI, prints no entry text).
 
