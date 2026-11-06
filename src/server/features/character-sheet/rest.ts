@@ -37,6 +37,7 @@ export const charRest = defineCommand({
         hitDiceUsed: sheet.hitDiceUsed,
         features: sheet.features,
         pactUsed: sheet.pactUsed,
+        slotsCreated: sheet.slotsCreated,
       };
       const out = restOutcome(kind, { ...now, sheet: counters }, c.statBlock);
       const { sheet: nextCounters, ...next } = out;

@@ -12,7 +12,11 @@ phase: post-mvp
 
 > **DM decisions (2026-11-05).** Spending a slot from the spell row comes later (OQ-CRES-04 B). Use lines are seen by everyone (OQ-CRES-05 A). The other open questions go as suggested. New: **pact weapons** (FR-CRES-14–16), because Soel's pact weapon is a hand crossbow, so "melee" can't stand in for "pact weapon".
 
-> **Built, slice 1 (`build/cres-pact`, 2026-11-06):** pact slots and pact weapons, FR-CRES-01–04 and -14–16. Tests `FR-CRES-…` in `pact-slots.test.ts`, `pact-weapon.test.ts` (server and shared), `pact.test.ts`; e2e `class-resources.e2e.ts`; bundle `class-resources`. Next: sorcery points (FR-CRES-05–08), then spend links (FR-CRES-09–13).
+> **Built, slice 1 (`build/cres-pact`, 2026-11-06):** pact slots and pact weapons, FR-CRES-01–04 and -14–16. Tests `FR-CRES-…` in `pact-slots.test.ts`, `pact-weapon.test.ts` (server and shared), `pact.test.ts`; e2e `class-resources.e2e.ts`; bundle `class-resources`.
+>
+> **Built, slice 2 (2026-11-06):** sorcery points and Flexible Casting, FR-CRES-05–08 (`char.convertSlot`, `char.createSlot`; Convert menu on the sorcery-points row; created-slot pips). Tests in `sorcery.test.ts` (server and shared); e2e `class-resources.e2e.ts`. The game-log lines for conversions come with slice 3 (FR-CRES-12).
+>
+> **Built, slice 3 (2026-11-06):** feature uses with a cost, FR-CRES-09–13 (`char.useFeature`, `char.undoResourceUse`, log kind `char.resourceUse`, game-log action `cres.undo`). The "public" switch is per browser on the Features tab (test ID `cres-public`), not in the DM's Public rolls menu: players own their lines too. Tests in `resource-use.test.ts` (server and shared); e2e `class-resources.e2e.ts`.
 
 ## 1. Summary
 
@@ -85,7 +89,7 @@ flowchart LR
 | FR-CRES-09 | A feature row may carry `spend: {from, amount}`: `from` = `{feature: rowId}` \| `{pact: true}` \| `{slot: "any"}`; `amount` = 1–20 or `"ask"` (Twinned Spell: the spell's level). The row can't spend from itself. A dangling `rowId` shows "Spend source missing" and disables Use. | §8.2 |
 | FR-CRES-10 | **Use** button on a row with `spend` (view mode, Features tab and Main's Features box; owner and DM, also locked). `ask` → a small number input first. `{slot: "any"}` → a pick of the levels with a slot left, created ones included. | `cres-feature-use` |
 | FR-CRES-11 | `char.useFeature {characterId, rowId, amount?, slotLevel?}`: one transaction, the spend per FR-CRES-09. A feature-row source may overspend after a confirm, exactly as toggles do (FR-MOD-59). Slots and pact: none left → `invalid`. A row that also has its own `usesMax` spends 1 of its own too (Shadow Darkness: no; Eldritch Smite: no; a once-per-rest option: yes). | |
-| FR-CRES-12 | Every Use, conversion and slot creation writes **one game-log line**, for example "Quirin · Quickened Spell · −2 sorcery points (3 left)" or "Quirin · pact slot → 1 sorcery point". The line has **Undo** for its sender and the DM until the next long rest, and Undo restores exactly what was spent. **Everyone** in the campaign sees the line, like a public roll. The sheet's public-rolls switch (FR-CHARX-114, BL-139) gets a "Resource use" entry; with it off, only the DM and the owner see the line. | OQ-CRES-05 A |
+| FR-CRES-12 | Every Use, conversion and slot creation writes **one game-log line**, for example "Quirin · Quickened Spell · −2 sorcery points (3 left)" or "Quirin · pact slot → 1 sorcery point". The line has **Undo** for its sender and the DM until the next long rest, and Undo restores exactly what was spent. **Everyone** in the campaign sees the line, like a public roll. A per-browser switch on the Features tab ("Resource use: everyone sees it", owner and DM) turns it off: then only the DM and the owner see the next lines. | OQ-CRES-05 A |
 | FR-CRES-13 | None of these intents rolls, changes HP or starts an effect. A Use with a linked toggle preset is out (§16). | |
 | **Pact weapons** | | |
 | FR-CRES-14 | Attack rows gain `pactWeapon: boolean` (default false). Set in the attack row editor (owner unlocked, DM), and it shows a "Pact" chip on the row in view mode. Any number of rows may carry it (Hexblade: a summoned blade and a bound crossbow). | `cres-pact-weapon` |

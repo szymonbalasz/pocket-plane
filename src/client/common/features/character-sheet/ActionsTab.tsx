@@ -2,7 +2,13 @@
 // header (spell attack, DC, slot pips), spells grouped by level with their rolls. The only place
 // attacks are rolled (FR-CHARX-44). Edit mode: rows editable in place.
 import { signed } from "@shared/character-sheet/logic";
-import { CHARX_INTENTS, ROW_LIMITS, type SpellRow } from "@shared/character-sheet/sheet";
+import {
+  CHARX_INTENTS,
+  CREATED_SLOT_LEVELS,
+  type CreatedSlotLevel,
+  ROW_LIMITS,
+  type SpellRow,
+} from "@shared/character-sheet/sheet";
 import {
   ABILITIES,
   ABILITY_NAMES,
@@ -564,6 +570,8 @@ interface PipRow {
   countId: string;
   max: number;
   used: number;
+  /** FR-CRES-08: created slots of this level (outlined pips after the normal ones). */
+  created: number;
 }
 
 function pipRows(ctx: ReturnType<typeof useSheet>): PipRow[] {
@@ -577,7 +585,29 @@ function pipRows(ctx: ReturnType<typeof useSheet>): PipRow[] {
     countId: "charx-slot-count",
     max: p.max,
     used: p.used,
+    created: ctx.sheet.slotsCreated[p.level as CreatedSlotLevel] ?? 0,
   }));
+  // FR-CRES-08: a level with created slots but no normal ones still gets its row.
+  for (const l of CREATED_SLOT_LEVELS) {
+    const n = ctx.sheet.slotsCreated[l] ?? 0;
+    if (n > 0 && !rows.some((r) => r.key === l)) {
+      rows.push({
+        key: l,
+        label: `Level ${l}`,
+        kitLabel: levelOrdinal(l),
+        tip: `Level ${l} slots: 0 of 0 used`,
+        resource: { slot: Number(l) },
+        pipId: "charx-slot",
+        countId: "charx-slot-count",
+        max: 0,
+        used: 0,
+        created: n,
+      });
+    }
+  }
+  rows.sort((a, b) =>
+    a.key === "pact" ? 1 : b.key === "pact" ? -1 : Number(a.key) - Number(b.key),
+  );
   const pact = pactPips(ctx.stats, ctx.sheet);
   if (pact) {
     const lvl = levelOrdinal(pact.level);
@@ -591,9 +621,53 @@ function pipRows(ctx: ReturnType<typeof useSheet>): PipRow[] {
       countId: "cres-pact-count",
       max: pact.max,
       used: pact.used,
+      created: 0,
     });
   }
   return rows;
+}
+
+/**
+ * FR-CRES-08: a level's created slots (Flexible Casting), outlined and dashed after its pips; a
+ * click spends one (the server takes created slots first). Gone on a long rest.
+ */
+function CreatedPips({
+  r,
+  disabled,
+  use,
+}: {
+  r: PipRow;
+  disabled: boolean;
+  use(r: PipRow, op: object): void;
+}) {
+  const live = useSync((s) => s.state === "live");
+  const busy = useBusy();
+  if (r.created === 0) return null;
+  const tip = `Created level ${r.key} slot${r.created === 1 ? "" : "s"}: ${r.created}, gone on a long rest`;
+  return (
+    <>
+      {Array.from({ length: r.created }, (_, i) => (
+        <Tip
+          // biome-ignore lint/suspicious/noArrayIndexKey: pips are positional.
+          key={`c${i}`}
+          content={tip}
+          off={!live || busy.busy || disabled}
+        >
+          <button
+            type="button"
+            data-testid="cres-created-pip"
+            data-value={r.key}
+            data-created={r.created}
+            aria-label={tip}
+            disabled={!live || busy.busy || disabled}
+            data-slot="sheet-pip"
+            className="size-3 rounded-full border border-dashed border-foreground/60"
+            onClick={() => use(r, { delta: 1 })}
+          />
+        </Tip>
+      ))}
+    </>
+  );
 }
 
 /** The Reset link's `data-value`: `slot.<level>` or `pact`. */
@@ -649,6 +723,7 @@ function SlotPips() {
                 />
               </Tip>
             ))}
+            <CreatedPips r={r} disabled={!counters} use={use} />
           </span>
           {counters && r.used > 0 && (
             <button
@@ -720,6 +795,7 @@ function KitSlots({
                 />
               </Tip>
             ))}
+            <CreatedPips r={r} disabled={!counters} use={use} />
           </span>
           <span data-testid={r.countId} data-value={r.key} className="tabular-nums">
             {r.used} / {r.max}

@@ -10,7 +10,13 @@ const stats = {
   spellcasting: { ability: "cha" as const, slots: { "1": 4 }, pact: { level: 1, slots: 2 } },
   classes: [{ name: "Warlock", level: 2, hitDie: "d8" as const }],
 };
-const sheet = { slotsUsed: { "1": 3 }, hitDiceUsed: {}, features: [], pactUsed: 2 };
+const sheet = {
+  slotsUsed: { "1": 3 },
+  hitDiceUsed: {},
+  features: [],
+  pactUsed: 2,
+  slotsCreated: {},
+};
 
 describe("FR-CRES-01 pact field", () => {
   test("FR-CRES-01 spellcasting.pact: level 1–5, 1–4 slots, optional", () => {

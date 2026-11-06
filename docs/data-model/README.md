@@ -938,7 +938,8 @@ From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`
 | items | **JSON leaf** 0–80 rows `{id, name, qty 0–9999, equipped, notes ≤ 120}` | No weight | CHARX §8.2 |
 | notes | text ≤ 4000, default "" | Rendered as text | CHARX §8.2 |
 | slotsUsed, hitDiceUsed | **JSON leaf** `{1…9: int}`, `{d6…d12: int}` | ≤ slot max / levels with that die; lowering a max clamps `used` in the same tx | [FR-CHARX-17](../specs/character-sheet-full.md#6-functional-requirements) |
-| pactUsed | int 0–4, default 0 | ≤ `spellcasting.pact.slots`; back on a short or long rest ([§155](#155-class-resources-pact-slots-and-pact-weapons-buildcres-pact)) | [FR-CRES-02](../specs/class-resources.md#6-functional-requirements) |
+| pactUsed | int 0–4, default 0 | ≤ `spellcasting.pact.slots`; back on a short or long rest ([§155](#155-class-resources-pact-slots-pact-weapons-sorcery-points-buildcres-pact)) | [FR-CRES-02](../specs/class-resources.md#6-functional-requirements) |
+| slotsCreated | **JSON leaf** `{"1"…"5": int 0–9}`, default `{}` | Created slots (Flexible Casting), gone on a long rest | [FR-CRES-08](../specs/class-resources.md#6-functional-requirements) |
 | createdAt, updatedAt | timestamp | `ctx.clock` | CHARX §8.2 |
 
 - **Caps:** row ≤ 48 KB, stat block ≤ 12 KB, else `invalid` "Sheet is full" ([FR-CHARX-03](../specs/character-sheet-full.md#6-functional-requirements)). Typical 5–15 KB.
@@ -2944,20 +2945,24 @@ Index: `note_campaign_title` (`campaign_id`, `title_fold`).
 - **Fixtures:** `notes-shared`, `notes-binned`, `notes-second-campaign`; bundle `notes`. Bodies are set by `notes.seedBody`, a fixtures-only command (not an intent) until co-writing exists.
 - **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap.
 
-## 155. Class resources: pact slots and pact weapons (build/cres-pact)
+## 155. Class resources: pact slots, pact weapons, sorcery points, uses with a cost (build/cres-pact)
 
-From [class-resources](../specs/class-resources.md) FR-CRES-01–04, -14, -15. **One new column on an existing table; no new table or record type.**
+From [class-resources](../specs/class-resources.md) FR-CRES-01–15. **Two new columns on an existing table; no new table or record type.**
 
 | Field | Type | Default | Rule | Source |
 |---|---|---|---|---|
 | `creature_sheet.pact_used` (`pactUsed`) | int 0–4 | 0 | ≤ `spellcasting.pact.slots`; lowering it (or removing `pact`) clamps in the same tx (CHARX definition hook). `char.rest` short **and** long set it to 0 | FR-CRES-02, -03 |
 | `entity.statBlock.spellcasting.pact` (JSON leaf, zod) | `{level 1–5, slots 1–4}` optional | absent | The pact slots' level and count, beside `slots`; both kinds | FR-CRES-01 |
 | `entity.statBlock.attacks[].pactWeapon` (JSON leaf, zod) | bool optional | absent (= false) | Any number of rows | FR-CRES-14 |
+| `creature_sheet.slots_created` (`slotsCreated`) | **JSON leaf** `{"1"…"5": int 0–9}` | `{}` | Created slots not yet spent (Flexible Casting); ticking a level spends them first; a long rest clears them, a short rest keeps them; not clamped by the slot maxima | FR-CRES-07, -08 |
+| `creature_sheet.features[].pool` (JSON leaf, zod) | `"sorcery-points"` optional | absent | Marks the sorcery points row; needs `usesMax`; at most one per sheet | FR-CRES-05 |
+| `creature_sheet.features[].spend` (JSON leaf, zod) | `{from: {feature: id} \| {pact: true} \| {slot: "any"}, amount: 1–20 \| "ask"}` optional | absent | What the row's Use spends; never its own id; a missing source shows "Spend source missing" | FR-CRES-09 |
+| `game_log_entry` kind `char.resourceUse` | payload `{characterId, action use \| convert \| create, name, detail, left?, ops[1..4]}`; `ops` = `{on: feature, id, n} \| {on: slot \| created, level, n} \| {on: pact, n}` | — | One line per Use / conversion / created slot; public unless the sender's switch is off (then `audiencePlayerId` = owner); `undone` set by Undo | FR-CRES-12 |
 | `rule_trigger.rule.when[]` (JSON leaf, zod) | + `{if: "pactWeapon"}` | — | `hit` and `roll` triggers only; holds when the roll's row (by name, as `row`) is one of the owner's `pactWeapon` attack rows; never a spell row | FR-CRES-15 |
 
-- **Upgrade:** the column is added by push with its default; existing sheets read 0. No boot copy.
+- **Upgrade:** both columns are added by push with their defaults; existing sheets read 0 / `{}`. No boot copy.
 - **Visibility:** as the sheet (DM + owner) and the stat block.
-- **Fixtures:** `char-vex` (Sorcerer 5 / Warlock 2, pact `{1, 2}`, "Pact blade" pact weapon, "Smite" trigger); bundle `class-resources`.
+- **Fixtures:** `char-vex` (Sorcerer 5 / Warlock 2, pact `{1, 2}`, "Font of Magic" sorcery points 5, "Quickened Spell" / "Twinned Spell" / "Eldritch Smite" spend links, "Pact blade" pact weapon, "Smite" trigger; links set by the fixtures-only command `char.linkSpendByName`); bundle `class-resources`.
 
 ## 156. Entry present (build/item-present, DM #458)
 
