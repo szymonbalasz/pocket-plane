@@ -30,7 +30,7 @@ import {
   WebGLRenderer,
 } from "three";
 import { type Arena, pixelRatioOf } from "../arena";
-import { dieFxOf } from "../die-fx";
+import { dieFxOf, richKindOf } from "../die-fx";
 import { dieMesh, drawAtlas, drawD4 } from "./faces";
 import { fxLayer } from "./fx-layer";
 import {
@@ -476,9 +476,10 @@ export function playThrow(o: PlayOptions): PlayHandle {
   // FR-DICEX-106: the damage effects, on the dice that have one.
   const fx = fxLayer(
     o.dice.flatMap((d, i) => {
-      const die = dieFxOf(d.damage);
+      const fx = dieFxOf(d.damage);
+      const rich = richKindOf(d.damage);
       const mesh = meshes[i];
-      return die && mesh ? [{ mesh, fx: die, radius: geometryOf(d.shape).radius }] : [];
+      return (fx || rich) && mesh ? [{ mesh, fx, rich, radius: geometryOf(d.shape).radius }] : [];
     }),
     o.seed,
   );
@@ -516,7 +517,7 @@ export function playThrow(o: PlayOptions): PlayHandle {
   const rest = () => {
     rested = true;
     pose(last);
-    // FR-DICEX-106: a short landing burst (fire, cold), drawn by the loop until it ends; a
+    // FR-DICEX-106: a short landing burst (full effects), drawn by the loop until it ends; a
     // miniature copies its still at once, so it lands clean.
     if (o.onStill) fx?.clear();
     else fx?.land();

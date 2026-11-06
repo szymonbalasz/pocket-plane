@@ -7,6 +7,12 @@ declare module "three" {
   export const PCFShadowMap: number;
   export const AdditiveBlending: number;
   export const NormalBlending: number;
+  export const SubtractiveBlending: number;
+  export const MultiplyBlending: number;
+  export const FrontSide: number;
+  export const BackSide: number;
+  export const DoubleSide: number;
+  export const DynamicDrawUsage: number;
 
   export class Vector3 {
     constructor(x?: number, y?: number, z?: number);
@@ -14,8 +20,31 @@ declare module "three" {
     y: number;
     z: number;
     set(x: number, y: number, z: number): this;
+    setScalar(s: number): this;
+    copy(v: Vector3): this;
+    add(v: Vector3): this;
+    sub(v: Vector3): this;
+    multiplyScalar(s: number): this;
+    normalize(): this;
+    length(): number;
+    distanceTo(v: Vector3): number;
+    lerp(v: Vector3, alpha: number): this;
     clone(): Vector3;
     project(camera: Camera): this;
+  }
+
+  export class Vector2 {
+    constructor(x?: number, y?: number);
+    x: number;
+    y: number;
+    set(x: number, y: number): this;
+  }
+
+  export class Euler {
+    x: number;
+    y: number;
+    z: number;
+    set(x: number, y: number, z: number): this;
   }
 
   export class Quaternion {
@@ -29,7 +58,12 @@ declare module "three" {
   export class Object3D {
     position: Vector3;
     quaternion: Quaternion;
+    rotation: Euler;
     scale: Vector3;
+    children: Object3D[];
+    parent: Object3D | null;
+    name: string;
+    userData: Record<string, unknown>;
     up: Vector3;
     renderOrder: number;
     frustumCulled: boolean;
@@ -39,6 +73,8 @@ declare module "three" {
     add(...objects: Object3D[]): this;
     remove(...objects: Object3D[]): this;
     lookAt(x: number, y: number, z: number): void;
+    clear(): this;
+    traverse(callback: (object: Object3D) => void): void;
   }
 
   export class Scene extends Object3D {}
@@ -73,8 +109,15 @@ declare module "three" {
   }
 
   export class BufferAttribute {
+    constructor(array: Float32Array, itemSize: number);
     array: Float32Array;
+    itemSize: number;
+    count: number;
     needsUpdate: boolean;
+    setUsage(usage: number): this;
+    setXYZ(index: number, x: number, y: number, z: number): this;
+    setXY(index: number, x: number, y: number): this;
+    setX(index: number, x: number): this;
   }
   export class Float32BufferAttribute extends BufferAttribute {
     constructor(array: ArrayLike<number>, itemSize: number);
@@ -82,12 +125,39 @@ declare module "three" {
 
   export class BufferGeometry {
     setAttribute(name: string, attribute: BufferAttribute): this;
+    getAttribute(name: string): BufferAttribute;
+    setIndex(index: number[] | null): this;
+    setFromPoints(points: Vector3[]): this;
     rotateX(angle: number): this;
+    rotateY(angle: number): this;
+    rotateZ(angle: number): this;
+    translate(x: number, y: number, z: number): this;
+    scale(x: number, y: number, z: number): this;
     setDrawRange(start: number, count: number): void;
+    computeBoundingSphere(): void;
     dispose(): void;
   }
   export class PlaneGeometry extends BufferGeometry {
-    constructor(width?: number, height?: number);
+    constructor(width?: number, height?: number, widthSegments?: number, heightSegments?: number);
+  }
+  export class RingGeometry extends BufferGeometry {
+    constructor(
+      innerRadius?: number,
+      outerRadius?: number,
+      thetaSegments?: number,
+      phiSegments?: number,
+      thetaStart?: number,
+      thetaLength?: number,
+    );
+  }
+  export class CircleGeometry extends BufferGeometry {
+    constructor(radius?: number, segments?: number, thetaStart?: number, thetaLength?: number);
+  }
+  export class SphereGeometry extends BufferGeometry {
+    constructor(radius?: number, widthSegments?: number, heightSegments?: number);
+  }
+  export class TorusGeometry extends BufferGeometry {
+    constructor(radius?: number, tube?: number, radialSegments?: number, tubularSegments?: number);
   }
 
   export class Texture {
@@ -104,11 +174,17 @@ declare module "three" {
     transparent?: boolean;
     opacity?: number;
     depthWrite?: boolean;
+    depthTest?: boolean;
+    blending?: number;
+    side?: number;
   }
   export class Material {
     transparent: boolean;
     opacity: number;
     depthWrite: boolean;
+    depthTest: boolean;
+    blending: number;
+    side: number;
     needsUpdate: boolean;
     clone(): this;
     dispose(): void;
@@ -139,11 +215,40 @@ declare module "three" {
     clearcoat?: number;
     clearcoatRoughness?: number;
   }
+  export interface MeshBasicMaterialParameters extends MaterialParameters {
+    map?: Texture | null;
+    color?: number | string;
+  }
+  export class MeshBasicMaterial extends Material {
+    constructor(parameters?: MeshBasicMaterialParameters);
+    color: Color;
+    map: Texture | null;
+  }
+  export interface LineBasicMaterialParameters extends MaterialParameters {
+    color?: number | string;
+    linewidth?: number;
+    vertexColors?: boolean;
+  }
+  export class LineBasicMaterial extends Material {
+    constructor(parameters?: LineBasicMaterialParameters);
+    color: Color;
+  }
+  export interface SpriteMaterialParameters extends MaterialParameters {
+    map?: Texture | null;
+    color?: number | string;
+    rotation?: number;
+    sizeAttenuation?: boolean;
+  }
+  export class SpriteMaterial extends Material {
+    constructor(parameters?: SpriteMaterialParameters);
+    color: Color;
+    map: Texture | null;
+    rotation: number;
+  }
   export interface ShaderMaterialParameters extends MaterialParameters {
     uniforms?: Record<string, { value: unknown }>;
     vertexShader?: string;
     fragmentShader?: string;
-    blending?: number;
   }
   export class ShaderMaterial extends Material {
     constructor(parameters?: ShaderMaterialParameters);
@@ -164,6 +269,19 @@ declare module "three" {
 
   export class Points extends Object3D {
     constructor(geometry?: BufferGeometry, material?: Material);
+  }
+
+  export class Line extends Object3D {
+    constructor(geometry?: BufferGeometry, material?: Material);
+    geometry: BufferGeometry;
+    material: Material;
+  }
+  export class LineSegments extends Line {}
+  export class LineLoop extends Line {}
+
+  export class Sprite extends Object3D {
+    constructor(material?: SpriteMaterial);
+    material: SpriteMaterial;
   }
 
   export class Light extends Object3D {}
