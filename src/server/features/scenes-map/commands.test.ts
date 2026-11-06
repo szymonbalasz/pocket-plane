@@ -368,12 +368,14 @@ describe("scenes-map commands", () => {
 
   test("FR-MAP-151 mark dead / alive: on the record and the player's copy; DM only; copies start alive", () => {
     const t = setup();
+    // The DB row holds a boolean; the wire record only `true`.
+    const isDead = (id: string) => (t.tokenRow(id) as { dead?: boolean }).dead;
     const s = t.newScene();
     t.run(I.activateScene, { sceneId: s.id });
     const a = t.place(s.id, t.h.goblinId, 3, 3);
-    expect(t.tokenRow(a.id).dead).toBe(false);
+    expect(isDead(a.id)).toBe(false);
     t.run(I.updateToken, { tokenId: a.id, dead: true });
-    expect(t.tokenRow(a.id).dead).toBe(true);
+    expect(isDead(a.id)).toBe(true);
     const ev = t.lastEvent();
     expect(ev?.type).toBe("TokenUpdated");
     const change = ev?.changes.find((c) => c.id === a.id) as RecordChange;
@@ -384,9 +386,9 @@ describe("scenes-map commands", () => {
       t.err(() => t.run(I.updateToken, { tokenId: a.id, dead: false }, t.player(t.h.p1))).code,
     ).toBe("forbidden");
     const { tokenId } = t.run<{ tokenId: string }>(I.duplicateToken, { tokenId: a.id });
-    expect(t.tokenRow(tokenId).dead).toBe(false);
+    expect(isDead(tokenId)).toBe(false);
     t.run(I.updateToken, { tokenId: a.id, dead: false });
-    expect(t.tokenRow(a.id).dead).toBe(false);
+    expect(isDead(a.id)).toBe(false);
     const alive = t.lastEvent()?.changes.find((c) => c.id === a.id) as RecordChange;
     expect(alive.after).not.toHaveProperty("dead");
   });
