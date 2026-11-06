@@ -7,7 +7,8 @@
 // (FR-PARTY-77); a Stores (the Stronghold window's Stores tab, FR-HOLD-28) lists its rows with
 // Take / Move… to the Party or a character, Give… into it, the DM's Add to Stores and "DM only"
 // rows (eye-off; OQ-HOLD-12 A, FR-LOOT-36, -37). *(S10 H4, BL-96)* A party row's Take / Move… also
-// goes into the Stores the viewer may use (players: shown strongholds, FR-LOOT-33).
+// goes into the Stores the viewer may use (players: shown strongholds, FR-LOOT-33). FR-CMP-84: a
+// row's name links to the compendium item of that name (as a sheet's, FR-CMP-77).
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { PARTY_ITEM_TYPE, type PartyItemRecord } from "@shared/party-board/schemas";
@@ -34,6 +35,7 @@ import {
 import { Input, Label } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useLazyRecords, useRecords, useSync } from "../../sync/store";
+import { CompendiumNameLinks, LinkedName } from "../compendium/name-links";
 import { useStores } from "../party-loot/LootLog";
 import { submitEnabled } from "../party-loot/logic";
 import {
@@ -63,6 +65,8 @@ import {
 } from "./inventory-logic";
 import { intentFailure } from "./logic";
 import { LoadingRows, RetryLoad } from "./Viewer";
+
+const ITEM_KIND = ["item"] as const;
 
 /** One item intent in flight per form: reject → inline, lost to a disconnect → toast. */
 function useItemIntent(lost: string) {
@@ -577,6 +581,11 @@ export function InventoryTab({
     [entities],
   );
   const sorted = useMemo(() => sortItems(holderRows(rows, holder)), [rows, holder]);
+  // FR-CMP-84: row names link to the item entry of that name the viewer may read.
+  const linkNames = useMemo(
+    () => sorted.map((i) => ({ kind: "item" as const, name: i.name })),
+    [sorted],
+  );
   const stores = useStores();
   const [open, setOpen] = useState<Open>(null);
   const campaignId = you?.campaignId ?? null;
@@ -632,7 +641,7 @@ export function InventoryTab({
                 data-testid="party-item-name"
                 className="min-w-0 flex-auto [overflow-wrap:anywhere]"
               >
-                {i.name}
+                <LinkedName kinds={ITEM_KIND} name={i.name} rowId={i.id} testId="party-item-link" />
               </span>
               <span data-testid="party-item-count" className="tabular-nums text-muted-foreground">
                 ×{i.qty}
@@ -729,7 +738,9 @@ export function InventoryTab({
       {open?.kind === "give" && (
         <GivePanel sources={sources} targetsOf={targetsOf} copy={copy} live={live} onDone={close} />
       )}
-      {list}
+      <CompendiumNameLinks client={viewer.role} names={linkNames}>
+        {list}
+      </CompendiumNameLinks>
     </div>
   );
 }

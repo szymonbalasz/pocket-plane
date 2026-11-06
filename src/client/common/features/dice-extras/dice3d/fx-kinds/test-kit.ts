@@ -19,16 +19,16 @@ export function fly(sim: RichSim, n: number, s: number, flying = true): SimDie[]
 
 /**
  * bun test has no DOM: a canvas whose 2D context is missing (the atlas stays blank). Returns the
- * undo: a stub left on the global breaks a later file in the same process that imports a DOM
- * library (sonner reads `document` at import).
+ * undo: a stub left on globalThis breaks later files in the same process (sonner's CSS insert).
  */
 export function stubCanvas(): () => void {
   const g = globalThis as { document?: unknown };
   if (g.document) return () => {};
-  const stub = { createElement: () => ({ width: 0, height: 0, getContext: () => null }) };
-  g.document = stub;
+  g.document = {
+    createElement: () => ({ width: 0, height: 0, getContext: () => null }),
+  };
   return () => {
-    if (g.document === stub) delete g.document;
+    delete g.document;
   };
 }
 
@@ -45,14 +45,13 @@ export function runLayer(
   def: RichKindDef,
   o: { n?: number; rollS?: number; afterS?: number; seed?: number } = {},
 ): { layer: RichLayer; meshes: Mesh[] } {
-  const undo = stubCanvas();
+  const unstub = stubCanvas();
   const meshes = Array.from({ length: o.n ?? 1 }, dieMesh);
-  // The layer draws its canvases once, when it is made.
   const layer = richLayer(
     meshes.map((mesh) => ({ mesh, kind, def, radius: 0.65 })),
     o.seed ?? 1,
   );
-  undo();
+  unstub();
   if (!layer) throw new Error("no layer");
   const rollS = o.rollS ?? 0.5;
   let t = 0;

@@ -4,6 +4,7 @@
 // `loot.move`, `loot.split`). DM-only parts render from `you.role`. *(S9)* The Move form offers the
 // Stores (FR-LOOT-34) and the log names them from `stronghold-index` (FR-LOOT-35; a name opens the
 // Stronghold window); the Stronghold window's Stores tab reuses `MoveForm` (preset) and `Purse`.
+// FR-CMP-84: an item line's name links to the compendium item of that name (as a sheet's).
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { formatCoin, formatGpValue, nonZeroCoins } from "@shared/party-loot/format";
@@ -45,6 +46,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useHasType, useRecords, useSync } from "../../sync/store";
+import { CompendiumNameLinks, LinkedName } from "../compendium/name-links";
 import { timeOf } from "../notifications/parts";
 import { useOpenStronghold } from "../strongholds/memory";
 import {
@@ -666,6 +668,14 @@ function EndName({
   return <>{endpointLabel(end, nameOf, strongholdName)}</>;
 }
 
+const ITEM_KIND = ["item"] as const;
+
+/** FR-CMP-84: the item lines' names, each looked up as a compendium item. */
+const itemNames = (entries: readonly LootEntryRecord[]) =>
+  entries
+    .filter((e) => e.kind === "item" && e.qty !== undefined)
+    .map((e) => ({ kind: "item" as const, name: e.text }));
+
 function EntryRow({
   entry,
   nameOf,
@@ -691,7 +701,14 @@ function EntryRow({
   // FR-PARTY-25's item line (as `itemLine` writes it), with named Stores as links.
   const line = isItem ? (
     <span data-testid="loot-entry-item">
-      {route(true)}: {entry.text} ×{entry.qty}
+      {route(true)}:{" "}
+      <LinkedName
+        kinds={ITEM_KIND}
+        name={entry.text}
+        rowId={entry.id}
+        testId="loot-entry-item-link"
+      />{" "}
+      ×{entry.qty}
     </span>
   ) : null;
   return (
@@ -855,27 +872,29 @@ export function LootLog() {
               No loot yet
             </span>
           ) : (
-            <ul className="flex flex-col divide-y">
-              {sorted.map((e) =>
-                editingEntry?.id === e.id ? (
-                  <EditRow
-                    key={`edit-${e.id}`}
-                    entry={e}
-                    live={live}
-                    onDone={() => setEditing(null)}
-                  />
-                ) : (
-                  <EntryRow
-                    key={e.id}
-                    entry={e}
-                    nameOf={(id) => names.get(id)}
-                    strongholdName={(id) => holdNames.get(id)}
-                    canEdit={live}
-                    onEdit={isDm && e.kind === "loot" ? () => setEditing(e.id) : undefined}
-                  />
-                ),
-              )}
-            </ul>
+            <CompendiumNameLinks client={you.role} names={itemNames(sorted)}>
+              <ul className="flex flex-col divide-y">
+                {sorted.map((e) =>
+                  editingEntry?.id === e.id ? (
+                    <EditRow
+                      key={`edit-${e.id}`}
+                      entry={e}
+                      live={live}
+                      onDone={() => setEditing(null)}
+                    />
+                  ) : (
+                    <EntryRow
+                      key={e.id}
+                      entry={e}
+                      nameOf={(id) => names.get(id)}
+                      strongholdName={(id) => holdNames.get(id)}
+                      canEdit={live}
+                      onEdit={isDm && e.kind === "loot" ? () => setEditing(e.id) : undefined}
+                    />
+                  ),
+                )}
+              </ul>
+            </CompendiumNameLinks>
           )}
         </section>
       </div>
