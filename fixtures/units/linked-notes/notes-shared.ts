@@ -16,8 +16,9 @@ const id = (i: number) => (r: { id(k: string, t: string, i?: number): string }) 
   r.id("notes-shared", NOTE_TYPE, i);
 
 /**
- * "Burnt Ledger" by `player-1` (links Duke Varen and Quest log, has `2d6`); "Quest log" by the DM
- * (links Burnt Ledger); "Duke Varen" by `player-2` (links `[[Burnt Ledger|the ledger]]`).
+ * "Burnt Ledger" (Item) by `player-1` (links Duke Varen and Quest log, has `2d6`); "Quest log"
+ * (Quest) by the DM (links Burnt Ledger); "Duke Varen" (NPC) by `player-2` (links
+ * `[[Burnt Ledger|the ledger]]`). Categories per #454.
  */
 export default defineFixture({
   key: "notes-shared",
@@ -25,9 +26,9 @@ export default defineFixture({
   requires: ["player-1", "player-2"],
   ownerSpec: "linked-notes",
   steps: [
-    step(createNote, { title: NOTES_SHARED.ledger }, { as: "player-1" }),
-    step(createNote, { title: NOTES_SHARED.quest }),
-    step(createNote, { title: NOTES_SHARED.duke }, { as: "player-2" }),
+    step(createNote, { title: NOTES_SHARED.ledger, category: "item" }, { as: "player-1" }),
+    step(createNote, { title: NOTES_SHARED.quest, category: "quest" }),
+    step(createNote, { title: NOTES_SHARED.duke, category: "npc" }, { as: "player-2" }),
     step(seedNoteBody, (r) => ({ noteId: id(0)(r), body: NOTES_SHARED.ledgerBody }), {
       as: "player-1",
     }),

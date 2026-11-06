@@ -36,12 +36,16 @@ function measure(s: Services, viewers: { label: string; viewer: Viewer }[], labe
 }
 
 describe("linked-notes load size (N1)", () => {
-  test("FR-NOTES-03 FR-NOTES-06 NOTES §12 `note` load: the fixture's few rows, and both caps under 4 MiB (< 500 B a row)", () => {
+  test("FR-NOTES-03 FR-NOTES-06 NOTES §12 `note` load: the fixture's few rows, and both caps under 4 MiB (< 530 B a row)", () => {
     const { s, t, viewers } = setup();
     const dm = { role: "dm" as const, playerId: null, campaignId: t.campaignId };
     const p1 = { role: "player" as const, playerId: t.p1.id, campaignId: t.campaignId };
     for (const title of ["Burnt Ledger", "Quest log", "Duke Varen", "Old rumours"])
-      s.commands.run(createNote, { title }, { actor: title === "Quest log" ? dm : p1 });
+      s.commands.run(
+        createNote,
+        { title, category: "other" },
+        { actor: title === "Quest log" ? dm : p1 },
+      );
     const old = s.db
       .select()
       .from(note)
@@ -81,9 +85,10 @@ describe("linked-notes load size (N1)", () => {
     for (const x of big) {
       expect(x.rows).toBe(NOTE_LIVE_MAX + NOTE_BIN_MAX);
       expect(x.bytes).toBeLessThan(MiB4);
-      // Measured: ≈ 484 B a row at the worst case (100-character titles, players everywhere),
-      // ≈ 0.97 MB in all, about twice §12's ≈ 250 B estimate and still a quarter of the cap.
-      expect(x.bytes / x.rows).toBeLessThan(500);
+      // Measured: ≈ 506 B a row at the worst case (100-character titles, players everywhere,
+      // `category` since N8), ≈ 1.0 MB in all, about twice §12's ≈ 250 B estimate and still a
+      // quarter of the cap.
+      expect(x.bytes / x.rows).toBeLessThan(530);
       expect(x.bytes).toBeLessThan(1024 * 1024);
     }
   });
@@ -92,7 +97,7 @@ describe("linked-notes load size (N1)", () => {
     const { s, t, viewers } = setup();
     s.commands.run(
       createNote,
-      { title: "Burnt Ledger" },
+      { title: "Burnt Ledger", category: "other" },
       { actor: { role: "dm", playerId: null, campaignId: t.campaignId } },
     );
     for (const { viewer } of viewers) {

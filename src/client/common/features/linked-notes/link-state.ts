@@ -1,7 +1,8 @@
 // Links in the editor, the state side (FR-NOTES-07 – -10; slice N5). No DOM: the `@` / `[[` title
 // picker (when it opens, its query, its rows, what a pick inserts), the "revealed" link shown as raw
 // `[[…]]` text (Alt+click, or arrowing into a chip, until the caret leaves), and the chip keys:
-// Backspace just after a chip / Delete just before it remove it whole. The view side draws.
+// Backspace just after a chip / Delete just before it remove it whole. N8: the category step that
+// a Create note row or a missing chip's click asks first (FR-NOTES-25). The view side draws.
 import {
   type EditorSelection,
   type EditorState,
@@ -217,3 +218,36 @@ export function resolveLink(
 export function titlesByFold(titles: readonly PickTitle[]): Map<string, PickTitle> {
   return new Map(titles.map((t) => [titleFold(t.title), t]));
 }
+
+// ---------- the category step (N8, FR-NOTES-25) ----------
+
+/**
+ * A new note's category, asked in the picker's popup: after the picker's Create note row
+ * (`after: "link"`: create, then insert the link in place of the picker's text) or a click on a
+ * missing chip (`after: "open"`: create, then open it). `index` = the highlighted category.
+ */
+export interface CategoryAsk {
+  title: string;
+  /** Where the popup sits (the caret, or the chip's start). */
+  pos: number;
+  after: "link" | "open";
+  index: number;
+}
+
+export const setCategoryAsk = StateEffect.define<CategoryAsk | null>();
+
+/**
+ * Open until a pick, Esc, or the person moving on: typing, deleting or moving the caret (others'
+ * typing only shifts it). In `link` mode it also goes when the picker closes.
+ */
+export const categoryField = StateField.define<CategoryAsk | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setCategoryAsk)) return e.value;
+    if (!value) return null;
+    if (tr.isUserEvent("input") || tr.isUserEvent("delete") || tr.isUserEvent("select"))
+      return null;
+    if (value.after === "link" && !tr.state.field(pickerField, false)) return null;
+    return tr.docChanged ? { ...value, pos: tr.changes.mapPos(value.pos) } : value;
+  },
+});

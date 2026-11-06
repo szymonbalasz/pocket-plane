@@ -133,8 +133,9 @@ export function notesListener(s: Services, rt: NotesRuntime): Listener {
             reason: "deleted",
           });
       }
-      // N5: a create, rename, delete or restore can change any open note's backlinks.
-      refreshBacklinks(s, rt, cid, fromOf(meta.actor));
+      // N5: a create, rename, delete or restore can change any open note's backlinks; a category
+      // change can't (N8).
+      if (p.change !== "categorized") refreshBacklinks(s, rt, cid, fromOf(meta.actor));
     }
   };
 }

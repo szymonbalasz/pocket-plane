@@ -12,12 +12,13 @@ const actor = (role: "dm" | "player", playerId: string | null): NoteActor => ({
   playerId: role === "dm" ? null : playerId,
 });
 
-/** §8.2: `{id, campaignId, title, createdBy, updatedAt, updatedBy, deletedAt, deletedBy}`. */
+/** §8.2: `{id, campaignId, title, category, createdBy, updatedAt, updatedBy, deletedAt, deletedBy}`. */
 export function toNoteRecord(r: NoteRow): NoteRecord {
   return {
     id: r.id,
     campaignId: r.campaignId,
     title: r.title,
+    category: r.category,
     createdBy: actor(r.createdByRole, r.createdByPlayerId),
     updatedAt: r.updatedAt,
     updatedBy: actor(r.updatedByRole, r.updatedByPlayerId),

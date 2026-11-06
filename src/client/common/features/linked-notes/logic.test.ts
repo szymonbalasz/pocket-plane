@@ -20,6 +20,7 @@ const note = (id: string, over: Partial<NoteRecord> = {}): NoteRecord => ({
   id,
   campaignId: "c1",
   title: id,
+  category: "other",
   createdBy: { role: "dm", playerId: null },
   updatedAt: "2026-11-05T10:00:00.000Z",
   updatedBy: { role: "dm", playerId: null },

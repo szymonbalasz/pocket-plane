@@ -95,7 +95,7 @@ describe("linked-notes rename rewrite (N6)", () => {
     const dm = await h.live(DM);
     // A binned note linking to Burnt Ledger (folded spelling).
     const scratch = new Peer(await h.live(as("Player 2")), "", "rn-scratch");
-    const made = await ask(scratch.c, N.create, { title: "Scrap" });
+    const made = await ask(scratch.c, N.create, { title: "Scrap", category: "other" });
     const scrap = (made as { result: { noteId: string } }).result.noteId;
     const s2 = new Peer(scratch.c, scrap, "rn-scrap");
     await s2.open();

@@ -1,4 +1,5 @@
-// linked-notes commands, N1 (NOTES §6, §9): `notes.create` / `rename` / `delete` / `restore`, for
+// linked-notes commands (NOTES §6, §9): `notes.create` / `rename` / `setCategory` (N8) / `delete` /
+// `restore`, for
 // the DM and every player (FR-NOTES-01), each checked against the actor's campaign: another
 // campaign's note is `not_found`. Not logged (FR-NOTES-24). The rename's link rewrite
 // (FR-NOTES-11) is N6's; bodies and `note_change` are N2's. `notes.seedBody` is fixtures-only.
@@ -20,6 +21,7 @@ import {
   RenameNoteIntent,
   RestoreNoteIntent,
   type RestoreNoteResult,
+  SetNoteCategoryIntent,
 } from "@shared/linked-notes/schemas";
 import { restoredTitle, titleFold } from "@shared/linked-notes/titles";
 import { fold } from "@shared/search/match";
@@ -35,6 +37,7 @@ import { getNoteRow, liveNoteByFold, type NoteRow, noteCount, toNoteRecord } fro
 export const NOTES_INTENTS = {
   create: "notes.create",
   rename: "notes.rename",
+  setCategory: "notes.setCategory",
   delete: "notes.delete",
   restore: "notes.restore",
 } as const;
@@ -85,14 +88,15 @@ function emitChanged(
 }
 
 /**
- * FR-NOTES-02, -03, -10: a new empty note. A live note with the same folded title: `ifMissing`
- * answers with it (`created: false`, no write), else `conflict`. At 1,000 live notes → `conflict`.
+ * FR-NOTES-02, -03, -10, -25: a new empty note of `category`. A live note with the same folded
+ * title: `ifMissing` answers with it (`created: false`, no write, its category kept), else
+ * `conflict`. At 1,000 live notes → `conflict`.
  */
 export const createNote = defineCommand({
   name: NOTES_INTENTS.create,
   input: CreateNoteIntent,
   roles: TABLE,
-  execute({ title, ifMissing }, env): CreateNoteResult {
+  execute({ title, category, ifMissing }, env): CreateNoteResult {
     const cid = campaignOf(env);
     const titleKey = titleFold(title);
     const clash = liveNoteByFold(env.tx, cid, titleKey);
@@ -111,6 +115,7 @@ export const createNote = defineCommand({
         campaignId: cid,
         title,
         titleFold: titleKey,
+        category,
         createdByRole: by.role,
         createdByPlayerId: by.playerId,
         createdAt: now,
@@ -167,6 +172,34 @@ export const renameNote = defineCommand({
 });
 
 /**
+ * FR-NOTES-25, -30 (N8): a live note's category, for anyone at the table; not logged. The same
+ * category → ack, no write. A binned note → `not_found`. Moves "who · when" like a rename.
+ */
+export const setNoteCategory = defineCommand({
+  name: NOTES_INTENTS.setCategory,
+  input: SetNoteCategoryIntent,
+  roles: TABLE,
+  execute({ noteId, category }, env): void {
+    const cid = campaignOf(env);
+    const before = loadNote(env, cid, noteId);
+    if (before.deletedAt !== null) throw notFound(NOTE_NOT_FOUND);
+    if (before.category === category) return;
+    const by = byOf(env);
+    env.tx
+      .update(note)
+      .set({
+        category,
+        updatedAt: env.ctx.clock.iso(),
+        updatedByRole: by.role,
+        updatedByPlayerId: by.playerId,
+      })
+      .where(eq(note.id, noteId))
+      .run();
+    emitChanged(env, cid, "categorized", before, noteId);
+  },
+});
+
+/**
  * FR-NOTES-04, -06: to the Recycle bin (`deletedAt`, `deletedBy`); body and links stay in the DB.
  * Already binned → ack, no write (two deletes at once). 1,000 binned → `conflict`, the spec's text.
  */
@@ -194,7 +227,7 @@ export const deleteNote = defineCommand({
 });
 
 /**
- * FR-NOTES-05: back from the bin with its text. A live note holding its folded title → "Title
+ * FR-NOTES-05, -25: back from the bin with its text and category. A live note holding its folded title → "Title
  * (restored)", "(restored 2)"…, within 100 characters. Live already → ack, no write (two restores
  * at once). 1,000 live notes → `conflict`.
  */

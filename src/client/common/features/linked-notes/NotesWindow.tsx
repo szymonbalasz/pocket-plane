@@ -1,18 +1,22 @@
-// The Notes window body (NOTES §7, FR-NOTES-01 – -06, -13 – -21; slice N3), one lazy chunk with
-// the editor. Left: + New, the live notes (last changed first) and the Recycle bin fold-out
-// (newest first, Restore). Right: the open note: title, who-is-here chips, status, Rename,
-// Delete, banners, the editor. Narrow (< 520 px): the list becomes a dropdown. DM view = player
-// view. The search box is ./NotesSearch.tsx (N4).
+// The Notes window body (NOTES §7, FR-NOTES-01 – -06, -13 – -21, -25 – -28; slices N3, N8), one
+// lazy chunk with the editor. Left: + New (title and category), the Recent toggle, the live notes
+// in category fold-outs (or one Recent list) and the Recycle bin fold-out (newest first,
+// Restore). Right: the open note: title, who-is-here chips, status, category, Rename, Delete,
+// banners, the editor, the Linked from box. Narrow (< 520 px): the list becomes a dropdown. DM
+// view = player view. The search box is ./NotesSearch.tsx (N4).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
+  NOTE_CATEGORIES,
+  NOTE_CATEGORY_LABEL,
   NOTE_ROLL_LABEL,
   NOTE_TYPE,
+  type NoteCategory,
   type NoteRecord,
   type RestoreNoteResult,
 } from "@shared/linked-notes/schemas";
 import { isNoteTitle, NOTE_TITLE_MAX } from "@shared/linked-notes/titles";
-import { ChevronRightIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { ChevronRightIcon, ClockIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "zustand";
@@ -26,7 +30,9 @@ import {
   DialogTitle,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/overlays";
@@ -48,9 +54,11 @@ import {
   bannerText,
   binnedNotes,
   deletedParts,
+  groupNotes,
   hereChips,
   liveNotes,
   nameOf,
+  recentNotes,
   renamedAliases,
   STATUS_TEXT,
   withAliases,
@@ -64,6 +72,7 @@ import {
   showsResults,
   useNotesApi,
 } from "./NotesSearch";
+import { useGroupsOpen, useNotesSort } from "./prefs";
 import { useNoteSearch } from "./search";
 import { notesUi } from "./ui";
 
@@ -101,7 +110,10 @@ function useIntent() {
   return { busy, error, setError, send };
 }
 
-/** New note / Rename: a title (FR-NOTES-02), refused inline on a clash or a cap. */
+/**
+ * New note / Rename: a title (FR-NOTES-02), refused inline on a clash or a cap. New also asks for
+ * one of the eight categories, none picked first (FR-NOTES-25).
+ */
 function TitleDialog({
   open,
   onOpenChange,
@@ -115,20 +127,22 @@ function TitleDialog({
   const live = useLive();
   const intent = useIntent();
   const [title, setTitle] = useState(note?.title ?? "");
+  const [category, setCategory] = useState<NoteCategory | null>(null);
   useEffect(() => {
     if (open) {
       setTitle(note?.title ?? "");
+      setCategory(null);
       intent.setError(null);
     }
   }, [open, note?.title, intent.setError]);
   const clean = title.trim();
-  const valid = isNoteTitle(clean);
+  const valid = isNoteTitle(clean) && (note !== undefined || category !== null);
   const save = async () => {
     if (note) {
       if (await intent.send("notes.rename", { noteId: note.id, title: clean })) onOpenChange(false);
       return;
     }
-    const r = await intent.send<{ noteId: string }>("notes.create", { title: clean });
+    const r = await intent.send<{ noteId: string }>("notes.create", { title: clean, category });
     if (r) {
       notesUi.getState().select(r.result.noteId);
       onOpenChange(false);
@@ -149,7 +163,7 @@ function TitleDialog({
           }}
         >
           <Input
-            data-testid="notes-title-input"
+            data-testid={note ? "notes-title-input" : "notes-new-title"}
             aria-label="Title"
             placeholder="Title"
             autoFocus
@@ -160,10 +174,38 @@ function TitleDialog({
               intent.setError(null);
             }}
           />
-          {clean !== "" && !valid && (
+          {clean !== "" && !isNoteTitle(clean) && (
             <p className="text-xs text-muted-foreground">
               1–{NOTE_TITLE_MAX} characters, no [[, ]], | or line break
             </p>
+          )}
+          {!note && (
+            <div
+              role="radiogroup"
+              aria-label="Category"
+              className="grid grid-cols-4 gap-1"
+              data-testid="notes-new-categories"
+            >
+              {NOTE_CATEGORIES.map((c) => (
+                <Button
+                  key={c}
+                  type="button"
+                  role="radio"
+                  aria-checked={category === c}
+                  size="sm"
+                  variant={category === c ? "default" : "outline"}
+                  className="h-7 px-1 text-xs"
+                  data-testid="notes-category-pick"
+                  data-category={c}
+                  onClick={() => {
+                    setCategory(c);
+                    intent.setError(null);
+                  }}
+                >
+                  {NOTE_CATEGORY_LABEL[c]}
+                </Button>
+              ))}
+            </div>
           )}
           {intent.error && (
             <p role="alert" className="text-xs text-destructive" data-testid="notes-title-error">
@@ -235,13 +277,25 @@ function DeleteDialog({
   );
 }
 
-function NoteRow({ note, selected, now }: { note: NoteRecord; selected: boolean; now: number }) {
+function NoteRow({
+  note,
+  selected,
+  now,
+  showCategory,
+}: {
+  note: NoteRecord;
+  selected: boolean;
+  now: number;
+  /** FR-NOTES-27: Recent rows name the category too. */
+  showCategory?: boolean;
+}) {
   const players = usePlayers();
   return (
     <button
       type="button"
       data-testid="notes-list-item"
       data-record-id={note.id}
+      data-category={note.category}
       aria-current={selected ? "true" : undefined}
       onClick={() => notesUi.getState().select(note.id)}
       className={`flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent ${
@@ -250,13 +304,56 @@ function NoteRow({ note, selected, now }: { note: NoteRecord; selected: boolean;
     >
       <span className="w-full truncate text-sm font-medium">{note.title}</span>
       <span className="text-xs text-muted-foreground">
+        {showCategory && `${NOTE_CATEGORY_LABEL[note.category]} · `}
         {nameOf(note.updatedBy, players)} · {relativeTime(note.updatedAt, now)}
       </span>
     </button>
   );
 }
 
-/** FR-NOTES-04 – -06: the Recycle bin fold-out, newest first: title, who deleted it, when, Restore. */
+/**
+ * FR-NOTES-26: one category's fold-out, like the Recycle bin's: its name and count; open as this
+ * browser last left it (Session open at first).
+ */
+function CategoryGroup({
+  category,
+  notes,
+  selected,
+  now,
+  open,
+  onOpenChange,
+}: {
+  category: NoteCategory;
+  notes: readonly NoteRecord[];
+  selected: string | null;
+  now: number;
+  open: boolean;
+  onOpenChange(o: boolean): void;
+}) {
+  return (
+    <Collapsible open={open} onOpenChange={onOpenChange}>
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="group h-7 w-full justify-start gap-1 px-1.5 font-semibold"
+          data-testid="notes-group"
+          data-category={category}
+          data-count={notes.length}
+        >
+          <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
+          {NOTE_CATEGORY_LABEL[category]} ({notes.length})
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="flex flex-col gap-0.5 pl-2">
+        {notes.map((n) => (
+          <NoteRow key={n.id} note={n} selected={n.id === selected} now={now} />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 /** FR-NOTES-04 – -06: the bin's rows, newest first: title, "Deleted by <name> · <when>", Restore. */
 function BinRows({
   rows,
@@ -378,8 +475,8 @@ function NarrowBin({ rows, now }: { rows: NoteRecord[]; now: number }) {
 /** The open note: header, chips, status, banner, editor. Keyed by note (a fresh session each). */
 /**
  * N5: what the editor's links, picker and die buttons call. Follow opens the note with that
- * folded title, creating it first when missing (FR-NOTES-10: `ifMissing`, so a note someone
- * created meanwhile opens); a die click rolls labelled "Note" (FR-NOTES-23), or goes to the dice
+ * folded title; a missing one is made with the category the chip asked for (FR-NOTES-10, -25:
+ * `ifMissing`, so a note someone created meanwhile opens); a die click rolls labelled "Note" (FR-NOTES-23), or goes to the dice
  * tray on Alt+click or in physical-dice mode (FR-DICE-07, FR-DICEX-06).
  */
 function useLinkHost(live: readonly NoteRecord[]): { host: LinkHost; titlesKey: string } {
@@ -397,11 +494,13 @@ function useLinkHost(live: readonly NoteRecord[]): { host: LinkHost; titlesKey: 
     return withAliases(titlesByFold(titles), aliases.current, now);
   }, [titles]);
   const titlesKey = titles.map((t) => `${t.id}:${t.title}`).join("|");
-  const create = async (title: string): Promise<string | null> => {
+  const create = async (title: string, category: NoteCategory): Promise<string | null> => {
     try {
-      const r = (await connection.sendIntent("notes.create", { title, ifMissing: true })) as {
-        noteId: string;
-      };
+      const r = (await connection.sendIntent("notes.create", {
+        title,
+        category,
+        ifMissing: true,
+      })) as { noteId: string };
       return r.noteId;
     } catch (err) {
       toast.error(intentFailure(err, LOST).message);
@@ -414,12 +513,14 @@ function useLinkHost(live: readonly NoteRecord[]): { host: LinkHost; titlesKey: 
     follow: (link) => {
       const hit = byFold.get(link.fold);
       if (hit) notesUi.getState().select(hit.id);
-      else
-        void create(link.target).then((id) => {
-          if (id) notesUi.getState().select(id);
-        });
+      return hit !== undefined;
     },
-    create: async (title) => (await create(title)) !== null,
+    create: async (title, category) => (await create(title, category)) !== null,
+    createAndOpen: (title, category) => {
+      void create(title, category).then((id) => {
+        if (id) notesUi.getState().select(id);
+      });
+    },
     roll: (expression, e) => {
       const request = notationRequest(expression, { label: NOTE_ROLL_LABEL }, e, undefined);
       if (physical || e.altKey) {
@@ -466,6 +567,7 @@ function NotePane({
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const restore = useIntent();
+  const recategorize = useIntent();
   const me = { role: (you?.role ?? "player") as "dm" | "player", playerId: you?.playerId ?? null };
   const person = (c: { role: "dm" | "player"; playerId: string | null }) => {
     const mine = c.role === me.role && (c.role === "dm" || c.playerId === me.playerId);
@@ -528,7 +630,32 @@ function NotePane({
           {STATUS_TEXT[session?.status ?? "loading"]}
         </span>
       </div>
-      <div className="flex items-center gap-1 px-3 py-1">
+      <div className="flex flex-wrap items-center gap-1 px-3 py-1">
+        {/* FR-NOTES-25: anyone changes the category here; it reaches everyone (FR-NOTES-30). */}
+        <Select
+          value={note?.category ?? ""}
+          disabled={!live || !note || note.deletedAt !== null || recategorize.busy}
+          onValueChange={(v) => {
+            if (note && v !== note.category)
+              void recategorize.send("notes.setCategory", { noteId: note.id, category: v });
+          }}
+        >
+          <SelectTrigger
+            className="h-7 w-auto min-w-24 gap-1 text-xs"
+            aria-label="Category"
+            data-testid="notes-category"
+            data-category={note?.category ?? ""}
+          >
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            {NOTE_CATEGORIES.map((c) => (
+              <SelectItem key={c} value={c} data-testid="notes-category-option" data-category={c}>
+                {NOTE_CATEGORY_LABEL[c]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           size="sm"
           variant="outline"
@@ -549,6 +676,15 @@ function NotePane({
         >
           Delete
         </Button>
+        {recategorize.error && (
+          <span
+            role="alert"
+            className="text-xs text-destructive"
+            data-testid="notes-category-error"
+          >
+            {recategorize.error}
+          </span>
+        )}
       </div>
       {banner && (
         <div
@@ -605,28 +741,41 @@ function NotePane({
           onSession={() => setTick((n) => n + 1)}
         />
       </div>
-      {/* FR-NOTES-12: the live notes linking here, refreshed live. */}
-      <div
-        className="flex flex-wrap items-center gap-1 border-t px-3 py-1.5 text-xs text-muted-foreground"
+      {/* FR-NOTES-12, -28: the live notes linking here, refreshed live, in a titled box four rows
+          tall (the same when empty), scrolling past that. */}
+      <section
+        className="mx-3 mb-2 shrink-0 rounded-md border"
+        aria-label="Linked from"
         data-testid="notes-backlinks"
         data-count={session?.backlinks.length ?? 0}
       >
-        <span>Linked from:</span>
-        {(session?.backlinks ?? []).length === 0 && <span>No links here yet</span>}
-        {(session?.backlinks ?? []).map((b) => (
-          <Button
-            key={b.id}
-            variant="link"
-            size="sm"
-            className="h-auto px-1 py-0 text-xs"
-            data-testid="notes-backlink"
-            data-record-id={b.id}
-            onClick={() => notesUi.getState().select(b.id)}
-          >
-            {b.title}
-          </Button>
-        ))}
-      </div>
+        <h4 className="border-b px-2 py-1 text-xs font-semibold text-muted-foreground">
+          Linked from ({session?.backlinks.length ?? 0})
+        </h4>
+        <ul
+          className="m-0 h-24 list-none overflow-y-auto p-0 py-0.5"
+          data-testid="notes-backlinks-list"
+        >
+          {(session?.backlinks ?? []).length === 0 && (
+            <li className="flex h-6 items-center px-2 text-xs text-muted-foreground">
+              No links here yet
+            </li>
+          )}
+          {(session?.backlinks ?? []).map((b) => (
+            <li key={b.id} className="h-6">
+              <button
+                type="button"
+                className="flex h-6 w-full items-center truncate px-2 text-left text-xs hover:bg-accent hover:underline"
+                data-testid="notes-backlink"
+                data-record-id={b.id}
+                onClick={() => notesUi.getState().select(b.id)}
+              >
+                <span className="truncate">{b.title}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
       {note && <TitleDialog open={renaming} onOpenChange={setRenaming} note={note} />}
       {note && <DeleteDialog note={note} open={deleting} onOpenChange={setDeleting} />}
     </div>
@@ -654,6 +803,11 @@ export default function NotesWindow() {
     }
   }, [newRequest]);
   const live_ = useMemo(() => liveNotes(rows), [rows]);
+  const [sort, setSort] = useNotesSort();
+  const [isOpen, setOpen] = useGroupsOpen();
+  const groups = useMemo(() => groupNotes(rows), [rows]);
+  const recent = useMemo(() => recentNotes(rows), [rows]);
+  const recentOn = sort === "recent";
   const notesApi = useNotesApi();
   const search = useNoteSearch(notesApi, q, live_);
   const results = showsResults(q, search);
@@ -675,18 +829,44 @@ export default function NotesWindow() {
           <PlusIcon className="size-3.5" /> New
         </Button>
       </div>
+      {/* FR-NOTES-27: category fold-outs, or one list last edited first; per browser. */}
+      <div className="flex items-center" hidden={results}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className={`h-7 gap-1 px-2 text-xs ${recentOn ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`}
+          aria-pressed={recentOn}
+          data-testid="notes-sort"
+          data-sort={sort}
+          onClick={() => setSort(recentOn ? "category" : "recent")}
+        >
+          <ClockIcon className="size-3.5" /> Recent
+        </Button>
+      </div>
       <ScrollArea className="min-h-0 flex-1">
         <SearchingLine q={q} search={search} />
-        <div className="flex flex-col gap-0.5 py-1" hidden={results}>
+        <div className="flex flex-col gap-0.5 py-1" hidden={results} data-testid="notes-list">
           {state === "loading" && [0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
           {loaded && live_.length === 0 && (
             <p className="px-2 py-1 text-sm text-muted-foreground" data-testid="notes-empty">
               No notes yet
             </p>
           )}
-          {live_.map((n) => (
-            <NoteRow key={n.id} note={n} selected={n.id === selected} now={now} />
-          ))}
+          {recentOn
+            ? recent.map((n) => (
+                <NoteRow key={n.id} note={n} selected={n.id === selected} now={now} showCategory />
+              ))
+            : groups.map((g) => (
+                <CategoryGroup
+                  key={g.category}
+                  category={g.category}
+                  notes={g.notes}
+                  selected={selected}
+                  now={now}
+                  open={isOpen(g.category)}
+                  onOpenChange={(o) => setOpen(g.category, o)}
+                />
+              ))}
         </div>
         {results && (
           <div className="py-1">
@@ -715,18 +895,57 @@ export default function NotesWindow() {
             <SelectValue placeholder={live_.length === 0 ? "No notes yet" : "Pick a note"} />
           </SelectTrigger>
           <SelectContent>
-            {live_.map((n) => (
-              <SelectItem
-                key={n.id}
-                value={n.id}
-                data-testid="notes-list-item"
-                data-record-id={n.id}
-              >
-                {n.title}
-              </SelectItem>
-            ))}
+            {/* The wide list's order: Recent, or every category's notes under its name. */}
+            {recentOn
+              ? recent.map((n) => (
+                  <SelectItem
+                    key={n.id}
+                    value={n.id}
+                    data-testid="notes-list-item"
+                    data-record-id={n.id}
+                    data-category={n.category}
+                  >
+                    {n.title}
+                  </SelectItem>
+                ))
+              : groups.map((g) => (
+                  <SelectGroup
+                    key={g.category}
+                    data-testid="notes-group-narrow"
+                    data-category={g.category}
+                  >
+                    <SelectLabel>
+                      {NOTE_CATEGORY_LABEL[g.category]} ({g.notes.length})
+                    </SelectLabel>
+                    {g.notes.map((n) => (
+                      <SelectItem
+                        key={n.id}
+                        value={n.id}
+                        data-testid="notes-list-item"
+                        data-record-id={n.id}
+                        data-category={n.category}
+                      >
+                        {n.title}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
           </SelectContent>
         </Select>
+        <Tip content={recentOn ? "Group by category" : "Recent first"}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className={`h-8 shrink-0 px-2 ${recentOn ? "bg-accent text-accent-foreground" : ""}`}
+            aria-label="Recent"
+            aria-pressed={recentOn}
+            data-testid="notes-sort-narrow"
+            data-sort={sort}
+            onClick={() => setSort(recentOn ? "category" : "recent")}
+          >
+            <ClockIcon className="size-3.5" />
+          </Button>
+        </Tip>
         <Tip content="New note" off={!live}>
           <Button
             size="sm"

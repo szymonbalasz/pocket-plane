@@ -17,7 +17,7 @@ export default defineFixture({
   ownerSpec: "linked-notes",
   steps: [
     step(activateCampaign, (r) => ({ id: r.id("campaign-second", "campaign") })),
-    step(createNote, { title: NOTES_SECOND.title }),
+    step(createNote, { title: NOTES_SECOND.title, category: "item" }),
     step(seedNoteBody, (r) => ({
       noteId: r.id("notes-second-campaign", NOTE_TYPE),
       body: NOTES_SECOND.body,

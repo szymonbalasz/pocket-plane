@@ -132,7 +132,10 @@ describe("linked-notes campaign isolation (records N1, signals N2)", () => {
     const p2 = await h.live(as("Player 2"));
     const mainClients = [dm, p1a, p1b, p2];
     for (const c of mainClients) await ok(c, c.load(NOTE_TYPE));
-    const { noteId } = (await ok(p1a, p1a.intent(N.create, { title: "Canary" }))) as {
+    const { noteId } = (await ok(
+      p1a,
+      p1a.intent(N.create, { title: "Canary", category: "other" }),
+    )) as {
       noteId: string;
     };
     await ok(p2, p2.intent(N.rename, { noteId, title: "Canary watch" }));
@@ -164,7 +167,10 @@ describe("linked-notes campaign isolation (records N1, signals N2)", () => {
       await ok(c, c.load(NOTE_TYPE));
       expect(titles(c)).toEqual([NOTES_SECOND.title]);
     }
-    const made = (await ok(sp, sp.intent(N.create, { title: "Second only" }))) as {
+    const made = (await ok(
+      sp,
+      sp.intent(N.create, { title: "Second only", category: "other" }),
+    )) as {
       noteId: string;
     };
     await ok(dm2, dm2.intent(N.rename, { noteId: made.noteId, title: "Second renamed" }));
@@ -172,7 +178,7 @@ describe("linked-notes campaign isolation (records N1, signals N2)", () => {
     await ok(dm2, dm2.intent(N.restore, { noteId: made.noteId }));
     await foreignIdsRefused(secondClients, [mainIds[0] as string, noteId]);
     // The main campaign's title is free here: "Quest log" is created anew, not a clash.
-    await ok(dm2, dm2.intent(N.create, { title: NOTES_SHARED.quest }));
+    await ok(dm2, dm2.intent(N.create, { title: NOTES_SHARED.quest, category: "other" }));
     const secondNow = noteIds(second);
     for (const c of secondClients) {
       await barrier(c);

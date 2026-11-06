@@ -38,7 +38,7 @@ describe("linked-notes fsync cost (N2)", () => {
     ];
     const { noteId } = s.commands.run(
       createNote,
-      { title: "Typing" },
+      { title: "Typing", category: "other" },
       { actor: actors[0] as Actor },
     );
     for (const [i, actor] of actors.entries())
