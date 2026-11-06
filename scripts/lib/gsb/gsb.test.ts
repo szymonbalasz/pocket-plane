@@ -9,9 +9,10 @@ import { parseFlags } from "../../gsb-import";
 import { EXPORTER_ENV, exporterRoot, GsbError, Item, readDataset } from "./dataset";
 import { diff } from "./diff";
 import { emptyLedger, ledgerPath, loadLedger, saveLedger } from "./ledger";
-import { canonicalJson, entryHash, mapItem, TRUNCATED } from "./map";
-import { patchOf } from "./run";
+import { canonicalJson, entryHash, mapItem, TRUNCATED, uniqueNames } from "./map";
+import { patchOf, runImport } from "./run";
 import { type RawItem, rawItem, testExport, uidOf } from "./testing";
+import { type ToolCaller, ToolFailure } from "./tools";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -113,6 +114,16 @@ describe("GSB mapper", () => {
     const { entry } = mapItem(it, dataDir);
     expect(entry.facets.attunement).toBe(true);
     expect(entry.body.typeLine).toBe("Weapon (longsword) (requires attunement by a druid)");
+    const bare = item("c", {
+      attunement: { required: true, requirement: " Requires Attunement " },
+    });
+    expect(mapItem(bare, dataDir).entry.body.typeLine).toBe("Wondrous item (requires attunement)");
+    const full = item("d", {
+      attunement: { required: true, requirement: "requires attunement by a bard" },
+    });
+    expect(mapItem(full, dataDir).entry.body.typeLine).toBe(
+      "Wondrous item (requires attunement by a bard)",
+    );
     const plain = item("b", { attunement: { required: true }, typeLabel: null, type: null });
     expect(mapItem(plain, dataDir).entry.body.typeLine).toBe("Magic item (requires attunement)");
   });
@@ -165,6 +176,47 @@ describe("GSB mapper", () => {
     expect(entry.body.text).toContain(uidOf("a"));
     expect(warnings.some((w) => w.startsWith("description cut"))).toBe(true);
     expect(warnings).toContain("name cut to 80 characters");
+  });
+
+  test("GSB text caps: a huge flavour and tag list are cut too; the footer stays", () => {
+    const it = item("a", {
+      flavor: "murmur ".repeat(3_000),
+      description: "Short.",
+      tags: Array.from({ length: 2_000 }, (_, i) => `tag${i}`),
+    });
+    const { entry, warnings } = mapItem(it, dataDir);
+    expect(entry.body.text.length).toBeLessThanOrEqual(HOMEBREW_TEXT_MAX);
+    expect(PutEntryBody.safeParse({ entry }).success).toBe(true);
+    expect(entry.body.text).toEndWith(it.uid);
+    expect(warnings.some((w) => w.startsWith("description cut"))).toBe(true);
+    expect(warnings.some((w) => w.startsWith("flavour cut"))).toBe(true);
+    expect(entry.body.text).toContain(TRUNCATED);
+  });
+
+  test("GSB names shared in the dataset (any case): later uids get (2), (3), cut to fit, never a taken name", () => {
+    const [a, b, c] = ["n1", "n2", "n3"].sort((x, y) => (uidOf(x) < uidOf(y) ? -1 : 1)) as [
+      string,
+      string,
+      string,
+    ];
+    const long = "L".repeat(80);
+    const all = [
+      item(c, { name: "Twin" }),
+      item(a, { name: "twin" }),
+      item(b, { name: "TWIN " }),
+      item("taken", { name: "Twin (2)" }),
+      item("x", { name: long }),
+      item("y", { name: long.toLowerCase() }),
+    ];
+    const m = uniqueNames(all);
+    expect(m.get(uidOf(a))).toBeUndefined();
+    expect(m.get(uidOf(b))).toBe("TWIN (3)");
+    expect(m.get(uidOf(c))).toBe("Twin (4)");
+    expect(m.get(uidOf("taken"))).toBeUndefined();
+    const later = uidOf("x") < uidOf("y") ? "y" : "x";
+    expect(m.get(uidOf(later))?.length).toBe(80);
+    expect(m.get(uidOf(later))).toEndWith(" (2)");
+    expect(m.size).toBe(3);
   });
 
   test("GSB entry hash ignores key order, not image order", () => {
@@ -290,6 +342,64 @@ describe("GSB ledger", () => {
     expect(readdirSync(path.dirname(file))).toEqual(["dev-camp_1.json"]);
     writeFileSync(file, "{not json");
     expect(() => loadLedger(file)).toThrow(GsbError);
+  });
+});
+
+describe("GSB stops", () => {
+  const campaign = (id: string) => ({ campaigns: [{ id, name: id, active: true }] });
+  function fake(handle: (name: string, n: number) => unknown): ToolCaller & { calls: string[] } {
+    const calls: string[] = [];
+    return {
+      calls,
+      async call<T>(name: string): Promise<T> {
+        calls.push(name);
+        return (await handle(name, calls.filter((c) => c === name).length)) as T;
+      },
+      close: async () => {},
+    };
+  }
+  const opts = (caller: ToolCaller) => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "pp gsb stops "));
+    dirs.push(dir);
+    return {
+      caller,
+      dataset: {
+        root: dir,
+        dataDir: dir,
+        manifest: { schemaVersion: 1, datasetHash: "sha256:x" },
+        items: [item("a"), item("b")],
+      },
+      target: "dev",
+      ledgerDir: dir,
+      filters: {},
+      apply: true,
+      overwrite: false,
+    };
+  };
+
+  test("GSB the active campaign switching mid-run stops it before any write", async () => {
+    const c = fake((name, n) => {
+      if (name === "campaigns_list") return campaign(n === 1 ? "camp-a" : "camp-b");
+      return { entryId: "e" };
+    });
+    const s = await runImport(opts(c));
+    expect(s.stopped?.code).toBe("campaign_changed");
+    expect(s.result).toMatchObject({ created: 0, failed: 1, skipped: 1 });
+    expect(c.calls).not.toContain("homebrew_create");
+  });
+
+  test("GSB 'no active campaign' during the run is fatal, not one failure per item", async () => {
+    const c = fake((name) => {
+      if (name === "campaigns_list") return campaign("camp-a");
+      throw new ToolFailure("conflict", "No active campaign: open one in the DM client.");
+    });
+    const s = await runImport(opts(c));
+    expect(s.stopped).toEqual({
+      code: "conflict",
+      message: "No active campaign: open one in the DM client.",
+    });
+    expect(c.calls.filter((x) => x === "homebrew_create")).toHaveLength(1);
+    expect(s.result).toMatchObject({ failed: 1, skipped: 1 });
   });
 });
 

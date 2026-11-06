@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 import { toMarkdownLite } from "@server/features/compendium/adapter/text";
 import {
   ENTRY_MAX_BYTES,
+  entryNameKey,
   HOMEBREW_TEXT_MAX,
   IMAGE_SLOTS_MAX,
   NAME_MAX,
@@ -76,10 +77,9 @@ export function rarityOf(item: Item): string | undefined {
  */
 export function typeLineOf(item: Item): string {
   const type = item.typeLabel?.trim() || item.type?.trim() || "Magic item";
-  const req = item.attunement.requirement?.trim();
-  const att = item.attunement.required
-    ? ` (requires attunement${req ? ` ${req.replace(/^requires attunement\s*/i, "")}` : ""})`
-    : "";
+  // "by a druid", "requires attunement by a druid" and a bare "requires attunement" all fit.
+  const req = (item.attunement.requirement ?? "").trim().replace(/^requires attunement\s*/i, "");
+  const att = item.attunement.required ? ` (requires attunement${req ? ` ${req}` : ""})` : "";
   return clip(`${type}${att}`, SHORT_TEXT_MAX);
 }
 
@@ -116,27 +116,64 @@ export function footerLine(item: Item): string {
 
 const bytes = (v: unknown) => Buffer.byteLength(JSON.stringify(v), "utf8");
 
-/** The entry text; the description is cut (with `TRUNCATED`) only if the caps need it. */
+/** The footer's own cap: it is never cut by the text fit, so it can't crowd the rest out. */
+export const FOOTER_MAX = 1_000;
+
+/** `s` cut to `n` UTF-16 units (not inside a surrogate pair) + the marker. */
+const cut = (s: string, n: number) => {
+  const end = n > 0 && /[\uD800-\uDBFF]/.test(s.charAt(n - 1)) ? n - 1 : n;
+  const kept = s.slice(0, end).trimEnd();
+  return kept ? `${kept} ${TRUNCATED}` : TRUNCATED;
+};
+
+/**
+ * The entry text, always within the homebrew text cap and the entry byte cap. Over a cap, parts
+ * are cut in this order, each with `TRUNCATED`, until it fits: description, flavour, info line.
+ * The footer (source + uid, the adoption key) is kept.
+ */
 function textOf(item: Item, facets: ItemFacets, typeLine: string, warnings: string[]): string {
-  const head = flavorText(item.flavor);
-  const tail = [infoLine(item), footerLine(item)].filter(Boolean).join("\n\n");
-  const desc = toMarkdownLite(item.description);
-  const build = (d: string) => [head, d, tail].filter(Boolean).join("\n\n");
-  const fits = (t: string) =>
-    t.length <= HOMEBREW_TEXT_MAX &&
-    bytes({ facets, body: { typeLine, text: t } }) <= ENTRY_MAX_BYTES;
-  const full = build(desc);
-  if (fits(full)) return full;
-  // Longest description prefix that fits with the marker (binary search on UTF-16 length).
-  let lo = 0;
-  let hi = desc.length;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    if (fits(build(`${desc.slice(0, mid).trimEnd()} ${TRUNCATED}`))) lo = mid;
-    else hi = mid - 1;
+  const footer = clip(footerLine(item), FOOTER_MAX);
+  const parts = {
+    flavour: flavorText(item.flavor),
+    description: toMarkdownLite(item.description),
+    info: infoLine(item),
+  };
+  type Part = keyof typeof parts;
+  const build = (p: Record<Part, string>) =>
+    [p.flavour, p.description, p.info, footer].filter(Boolean).join("\n\n");
+  const fits = (p: Record<Part, string>) => {
+    const t = build(p);
+    return (
+      t.length <= HOMEBREW_TEXT_MAX &&
+      bytes({ facets, body: { typeLine, text: t } }) <= ENTRY_MAX_BYTES
+    );
+  };
+  const now: Record<Part, string> = { ...parts };
+  if (fits(now)) return build(now);
+  for (const part of ["description", "flavour", "info"] as const) {
+    const full = parts[part];
+    if (full === "") continue;
+    const at = (n: number) => ({ ...now, [part]: cut(full, n) });
+    if (!fits(at(0))) {
+      // Even the marker alone is too much with the rest: drop this part to the marker, go on.
+      now[part] = TRUNCATED;
+      warnings.push(`${part} cut to 0 of ${full.length} characters`);
+      continue;
+    }
+    // Longest prefix that fits with the marker (binary search on UTF-16 length).
+    let lo = 0;
+    let hi = full.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (fits(at(mid))) lo = mid;
+      else hi = mid - 1;
+    }
+    now[part] = cut(full, lo);
+    warnings.push(`${part} cut to ${lo} of ${full.length} characters`);
+    return build(now);
   }
-  warnings.push(`description cut to ${lo} of ${desc.length} characters`);
-  return build(`${desc.slice(0, lo).trimEnd()} ${TRUNCATED}`);
+  // Only with an absurd footer + typeLine: hard cut, the caps still hold.
+  return clip(build(now), HOMEBREW_TEXT_MAX);
 }
 
 /** Up to 4 images, main (`image`) first; each its medium file, else the largest present. */
@@ -175,14 +212,52 @@ export function imagesOf(
   return out;
 }
 
+/**
+ * Entry names for the whole dataset: homebrew names are unique per kind (case-insensitive), so
+ * items sharing a name keep it in uid order and the later ones get " (2)", " (3)", … (cut to fit
+ * 80). Only renamed items are in the map. Deterministic for a given dataset.
+ */
+export function uniqueNames(items: readonly Item[]): Map<string, string> {
+  const base = (it: Item) => clip(it.name.trim(), NAME_MAX);
+  const taken = new Set(items.map((it) => entryNameKey(base(it))));
+  const groups = new Map<string, Item[]>();
+  for (const it of items) {
+    const k = entryNameKey(base(it));
+    groups.set(k, [...(groups.get(k) ?? []), it]);
+  }
+  const out = new Map<string, string>();
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const sorted = [...group].sort((a, b) => (a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0));
+    let n = 1;
+    for (const it of sorted.slice(1)) {
+      let name: string;
+      do {
+        n++;
+        const suffix = ` (${n})`;
+        name = `${clip(base(it), NAME_MAX - suffix.length)}${suffix}`;
+      } while (taken.has(entryNameKey(name)));
+      taken.add(entryNameKey(name));
+      out.set(it.uid, name);
+    }
+  }
+  return out;
+}
+
 export function mapItem(
   item: Item,
   dataDir: string,
   exists: (p: string) => boolean = existsSync,
+  /** From `uniqueNames`: this item's name is shared with another item. */
+  rename?: string,
 ): Mapped {
   const warnings: string[] = [];
-  const name = clip(item.name.trim(), NAME_MAX);
+  let name = clip(item.name.trim(), NAME_MAX);
   if (name !== item.name.trim()) warnings.push(`name cut to ${NAME_MAX} characters`);
+  if (rename !== undefined) {
+    name = rename;
+    warnings.push(`name shared with another item: imported as "${rename}"`);
+  }
   const rarity = rarityOf(item);
   const facets: ItemFacets = {
     category: "magic",

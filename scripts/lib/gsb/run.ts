@@ -7,7 +7,14 @@ import type { Dataset, Item } from "./dataset";
 import { GsbError } from "./dataset";
 import { type Diff, diff, type Filters, isFiltered } from "./diff";
 import { type Ledger, type LedgerRow, ledgerPath, loadLedger, saveLedger } from "./ledger";
-import { entryHash, type ItemEntry, MAPPER_VERSION, type Mapped, mapItem } from "./map";
+import {
+  entryHash,
+  type ItemEntry,
+  MAPPER_VERSION,
+  type Mapped,
+  mapItem,
+  uniqueNames,
+} from "./map";
 import { FATAL_CODES, type ToolCaller, ToolFailure } from "./tools";
 
 export const PLAN_CHUNK = 50;
@@ -157,6 +164,36 @@ export async function findImported(
   return null;
 }
 
+/**
+ * Ids of the active campaign's homebrew items, from the item search's pages (duplicate groups
+ * opened with `sameAs`): one cheap existence check per run instead of a read per entry.
+ */
+export async function homebrewItemIds(caller: ToolCaller): Promise<Set<string>> {
+  const ids = new Set<string>();
+  let cursor: string | null = null;
+  do {
+    const page: { results: SearchHit[]; nextCursor: string | null } = await caller.call(
+      "compendium_search",
+      cursor ? { kind: "item", cursor } : { kind: "item" },
+    );
+    for (const r of page.results) {
+      if (r.group) {
+        const { results } = await caller.call<{ results: SearchHit[] }>("compendium_search", {
+          sameAs: r.id,
+        });
+        for (const m of results) if (m.sourceLabel === HOMEBREW) ids.add(m.id);
+      } else if (r.sourceLabel === HOMEBREW) ids.add(r.id);
+    }
+    cursor = page.nextCursor;
+  } while (cursor);
+  return ids;
+}
+
+/** A refusal that holds for every later call too: no active campaign (`conflict`). */
+const NO_CAMPAIGN = /^No active campaign|isn't active/;
+export const isFatal = (code: string, message: string) =>
+  FATAL_CODES.has(code) || (code === "conflict" && NO_CAMPAIGN.test(message));
+
 const emptyCounts = () => Object.fromEntries(BUCKETS.map((b) => [b, 0])) as Record<Bucket, number>;
 
 function namesOf(list: readonly string[]) {
@@ -188,17 +225,44 @@ export async function runImport(o: ImportOptions): Promise<Summary> {
   buckets.removed = d.removed;
 
   const warnings: ItemNote[] = [];
+  const renames = uniqueNames(dataset.items);
   const mapped = (item: Item) => {
-    const m = mapItem(item, dataset.dataDir, exists);
+    const m = mapItem(item, dataset.dataDir, exists, renames.get(item.uid));
     for (const w of m.warnings) warnings.push({ uid: item.uid, name: item.name, message: w });
     return m;
   };
 
-  // Changed upstream: the stored entry decides edit / locallyEdited / deleted.
   const work: Work[] = [];
   const order = new Map(dataset.items.map((it, i) => [it.uid, i]));
   for (const item of d.new) work.push({ op: "create", item, m: mapped(item) });
-  for (const item of d.changed) {
+
+  // Entries gone from the campaign (DM delete, fixtures reset): `deleted`, changed or not.
+  let existing: Set<string> | null = null;
+  if (d.changed.length + d.unchanged.length > 0) {
+    progress(`[gsb] listing the homebrew items of "${active.name}"`);
+    existing = await homebrewItemIds(caller);
+  }
+  const gone = (item: Item) =>
+    existing !== null && !existing.has((ledger.items[item.uid] as LedgerRow).entryId);
+  const recreate = (item: Item) => {
+    buckets.deleted.push(item.name);
+    if (o.overwrite) {
+      work.push({ op: "create", item, m: mapped(item), row: ledger.items[item.uid] });
+    }
+  };
+  buckets.unchanged = [];
+  for (const item of d.unchanged) {
+    if (gone(item)) recreate(item);
+    else buckets.unchanged.push(item.name);
+  }
+
+  // Changed upstream: the stored entry decides edit / locallyEdited / deleted.
+  const reads = d.changed.filter((i) => !gone(i));
+  for (const item of d.changed) if (gone(item)) recreate(item);
+  for (const [n, item] of reads.entries()) {
+    if ((n + 1) % (o.progressEvery ?? 25) === 0 || n + 1 === reads.length) {
+      progress(`[gsb] reading changed entries ${n + 1}/${reads.length}`);
+    }
     const row = ledger.items[item.uid] as LedgerRow;
     const stored = await getEntry(caller, row.entryId);
     if (!stored) {
@@ -222,7 +286,8 @@ export async function runImport(o: ImportOptions): Promise<Summary> {
     datasetChanged: ledger.datasetHash !== dataset.manifest.datasetHash,
     filtered,
     overwrite: o.overwrite,
-    nothingChanged: d.new.length + d.changed.length + d.removed.length === 0,
+    nothingChanged:
+      d.new.length + d.changed.length + d.removed.length + buckets.deleted.length === 0,
     counts: emptyCounts(),
     names: {} as Summary["names"],
     work: work.length,
@@ -317,26 +382,16 @@ async function uploadImages(
   caller: ToolCaller,
   w: Work,
 ): Promise<{ ids: string[]; shas: string[] }> {
-  const known = new Map<string, string>();
-  const row = w.row;
-  if (row) {
-    for (const [i, sha] of row.imageSha256s.entries()) {
-      const id = row.imageAssetIds[i];
-      if (id) known.set(sha, id);
-    }
-  }
+  // Always uploaded: the server answers the same bytes with the same id ("existing"), so this is
+  // cheap and never trusts a ledger id whose asset may be gone.
   const ids: string[] = [];
   const shas: string[] = [];
   for (const im of w.m.images) {
-    let id = known.get(im.sha256);
-    if (!id) {
-      const r = await caller.call<{ assetId: string }>("asset_upload", {
-        path: im.path,
-        name: w.m.entry.name,
-        context: "compendium-item",
-      });
-      id = r.assetId;
-    }
+    const { assetId: id } = await caller.call<{ assetId: string }>("asset_upload", {
+      path: im.path,
+      name: w.m.entry.name,
+      context: "compendium-item",
+    });
     if (ids.includes(id)) continue;
     ids.push(id);
     shas.push(im.sha256);
@@ -358,6 +413,17 @@ async function applyWork(
   const every = o.progressEvery ?? 25;
   for (const [n, w] of todo.entries()) {
     try {
+      // The run writes into the campaign it started with; a switch (or none) stops it.
+      const { campaigns } = await caller.call<{
+        campaigns: { id: string; name: string; active: boolean }[];
+      }>("campaigns_list", {});
+      const now = campaigns.find((c) => c.active);
+      if (now?.id !== summary.campaign.id) {
+        throw new ToolFailure(
+          "campaign_changed",
+          `The active campaign is now ${now ? `"${now.name}"` : "none"}, not "${summary.campaign.name}": open it again, then rerun`,
+        );
+      }
       const { ids, shas } = await uploadImages(caller, w);
       const want = { ...w.m.entry, imageAssetIds: ids };
       let entryId: string;
@@ -413,7 +479,7 @@ async function applyWork(
       const message = f
         ? [f.message, ...f.issues.map((i) => `${i.path.join(".")}: ${i.message}`)].join("; ")
         : String(err);
-      if (FATAL_CODES.has(code)) {
+      if (isFatal(code, message)) {
         summary.stopped = { code, message };
         summary.failures.push({ uid: w.item.uid, name: w.item.name, code, message });
         res.failed++;

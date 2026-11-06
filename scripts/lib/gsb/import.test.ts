@@ -64,8 +64,18 @@ async function run(
     apply: opts.apply ?? false,
     overwrite: opts.overwrite ?? false,
     now: () => "2026-11-06T00:00:00.000Z",
+    progress: (l) => progressLines.push(l),
     mapperVersion: opts.mapperVersion,
   });
+}
+const progressLines: string[] = [];
+/** The DM deletes an entry in the client (REST, as the DM client does). */
+async function deleteEntry(id: string) {
+  const r = await fetch(`${h.http}/api/compendium/entries/${id}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${TEST_SECRET}` },
+  });
+  expect(r.ok).toBe(true);
 }
 const ledgerRow = (s: Summary, key: string) => loadLedger(s.ledger).items[uidOf(key)];
 
@@ -252,6 +262,45 @@ describe("GSB import over the MCP server", () => {
     expect(ledgerRow(back, "gamma")?.removedAt).toBeUndefined();
   });
 
+  test("GSB import: an entry deleted in the campaign is 'deleted', changed or not; --overwrite recreates it", async () => {
+    const old = ledgerRow(await run(), "gamma")?.entryId as string;
+    await deleteEntry(old);
+    progressLines.length = 0;
+    const dry = await run();
+    expect(progressLines.some((l) => l.startsWith("[gsb] listing the homebrew items"))).toBe(true);
+    expect([dry.counts.deleted, dry.counts.unchanged, dry.work]).toEqual([1, 2, 0]);
+    expect(dry.names.deleted.shown).toEqual(["Test gamma"]);
+    expect(dry.nothingChanged).toBe(false);
+    expect((await run({ apply: true })).result).toMatchObject({ created: 0, skipped: 1 });
+    const o = await run({ apply: true, overwrite: true });
+    expect(o.result).toMatchObject({ created: 1, failed: 0 });
+    const now = ledgerRow(o, "gamma")?.entryId as string;
+    expect(now).not.toBe(old);
+    expect((await get(now)).name).toBe("Test gamma");
+    expect((await run()).nothingChanged).toBe(true);
+  });
+
+  test("GSB import: images are uploaded on every write, so a stale ledger asset id can't break an edit", async () => {
+    const s0 = await run();
+    const before = ledgerRow(s0, "beta");
+    const ledger = loadLedger(s0.ledger);
+    const row = ledger.items[uidOf("beta")];
+    if (row) row.imageAssetIds = ["gone-asset-id"];
+    writeFileSync(s0.ledger, JSON.stringify(ledger));
+    items[1] = {
+      ...items[1],
+      contentHash: `sha256:${"3".repeat(64)}`,
+      description: "Upstream v3.",
+    };
+    progressLines.length = 0;
+    const s = await run({ apply: true });
+    expect(s.result).toMatchObject({ updated: 1, failed: 0 });
+    expect(progressLines).toContain("[gsb] reading changed entries 1/1");
+    const e = await get(before?.entryId as string);
+    expect(e.imageAssetIds).toEqual(before?.imageAssetIds as string[]);
+    expect(ledgerRow(s, "beta")?.imageAssetIds).toEqual(before?.imageAssetIds as string[]);
+  });
+
   test("GSB import: no ledger row + name taken by an earlier import → adopted by its footer uid; else a clash", async () => {
     const fresh = mkdtempSync(path.join(os.tmpdir(), "pp gsb ledger2 "));
     try {
@@ -282,5 +331,29 @@ describe("GSB import over the MCP server", () => {
     } finally {
       rmSync(fresh, { recursive: true, force: true });
     }
+  });
+
+  test("GSB import: items sharing a name (any case) import as Name and Name (2), by uid order", async () => {
+    const [first, second] = ["twin-x", "twin-y"].sort((a, b) => (uidOf(a) < uidOf(b) ? -1 : 1));
+    items.push(
+      rawItem(second as string, { name: "TEST TWIN" }),
+      rawItem(first as string, { name: "Test twin" }),
+    );
+    const dry = await run();
+    expect(dry.planIssues).toEqual([]);
+    expect(dry.names.clash.shown).toEqual(["Test delta"]);
+    expect(dry.warnings).toEqual([
+      {
+        uid: uidOf(second as string),
+        name: "TEST TWIN",
+        message: 'name shared with another item: imported as "TEST TWIN (2)"',
+      },
+    ]);
+    const s = await run({ apply: true });
+    expect(s.result).toMatchObject({ created: 2 });
+    expect((await get(ledgerRow(s, first as string)?.entryId as string)).name).toBe("Test twin");
+    expect((await get(ledgerRow(s, second as string)?.entryId as string)).name).toBe(
+      "TEST TWIN (2)",
+    );
   });
 });

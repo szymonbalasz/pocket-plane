@@ -28,6 +28,8 @@ export const FATAL_CODES = new Set([
   "auth",
   "throttled",
   "mcp_closed",
+  // Raised by the import itself: the active campaign isn't the one the run started with.
+  "campaign_changed",
 ]);
 
 export interface ToolCaller {

@@ -39,7 +39,7 @@ The DM's Griffon's Saddlebag exporter writes `data/manifest.json`, `data/items.j
 | `--uid <a,b>` | those items |
 | `--limit <n>` | the first n items (after the other filters, dataset order; a rerun picks the same n) |
 
-A filtered run never reports removals and doesn't move the "last full import" mark.
+A filtered run never reports removals and doesn't move the "last full import" mark. Items sharing a name (any case) are imported as `Name`, `Name (2)`, … in uid order; each rename shows in `warnings`.
 
 JSON fields to read: `campaign`, `counts`, `names.<bucket>.shown` / `.more`, `work`, `planIssues`, `warnings`, `nothingChanged`, `datasetChanged`.
 
@@ -50,7 +50,7 @@ JSON fields to read: `campaign`, `counts`, `names.<bucket>.shown` / `.more`, `wo
 | `unchanged` | same as last import | nothing |
 | `removed` | gone from the dataset (uids) | reported, marked; the entry stays |
 | `locallyEdited` | changed upstream, but the DM edited the entry in Pocket Plane | skipped; `--overwrite` replaces it |
-| `deleted` | changed upstream, the entry was deleted in Pocket Plane | skipped; `--overwrite` recreates it |
+| `deleted` | the entry is gone from the campaign (DM deleted it, or the data was reset), changed upstream or not | skipped; `--overwrite` recreates it |
 | `adopt` | name taken by an earlier import of the same item (no ledger row, e.g. a new checkout) | linked, edited if needed |
 | `clash` | name taken by another homebrew item | fails; the DM renames one |
 
@@ -62,7 +62,7 @@ Show the DM **one table**: bucket, count, sample names (from `names`), plus `pla
 
 - Same command with `--apply` (and `--overwrite` only if the DM said so), without `--json` unless you need it. ~2,000 items take minutes: run it in the background and wait for it to finish; don't poll in the foreground.
 - Progress goes to stderr every 25 items; the summary ends with `created, updated, adopted, skipped, failed, removed`.
-- Images upload once: the same bytes give the same asset id, so a rerun is cheap. The ledger is saved after every item, so a stop loses at most one.
+- Images are uploaded on every write; the server answers the same bytes with the same asset id, so it is cheap. The ledger is saved after every item, so a stop loses at most one.
 - Exit 1 = a refusal or failed items: report each `FAILED <name> [<uid>] <code>: <message>`. Rerunning picks up where it stopped.
 
 ## 5. Errors
@@ -74,7 +74,8 @@ Show the DM **one table**: bucket, count, sample names (from `names`), plus `pla
 | `server_stopped` | The run stopped. The last write may or may not be saved: start the server, then **dry-run** again (it reads back what's there). Never retry blind. |
 | `auth` | `PP_DM_SECRET` was rejected: the DM fixes `.env`. |
 | `throttled` | Too many DM sign-ins: wait a minute. |
-| `conflict` | No active campaign, or a name clash (`clash` bucket): the DM renames. |
+| `conflict` | "No active campaign" stops the run: the DM opens the campaign, rerun. A name clash (`clash` bucket): the DM renames. |
+| `campaign_changed` | The active campaign changed mid-run: stopped before the next write. The DM reopens the run's campaign, rerun. |
 | `invalid` | An entry or image the server refused: report the item and the message. |
 | `mcp_closed` | The MCP server process died: report its stderr. |
 | `internal` | Report it; "server too old" → update Pocket Plane. |
