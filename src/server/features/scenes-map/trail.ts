@@ -43,7 +43,7 @@ export function appendTrail(env: Env, t: TokenRecord, from: Cell, to: Cell): voi
 }
 
 /**
- * FR-CBT-180 (#456): the move `from → to` is taken back: the trail drops its last cell when it
+ * FR-CBT-180 (#457): the move `from → to` is taken back: the trail drops its last cell when it
  * ends with that move (a lone start cell left → no trail). Else (cleared by a turn change, or
  * hidden at the time) nothing changes.
  */

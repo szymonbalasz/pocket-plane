@@ -1,4 +1,4 @@
-// FR-CBT-179 / -180 (#456): counted moves keep undoable steps; the DM's `cbt.undoMove` walks the
+// FR-CBT-179 / -180 (#457): counted moves keep undoable steps; the DM's `cbt.undoMove` walks the
 // last one back (token, feet, trail). In-process.
 import { describe, expect, test } from "bun:test";
 import { CBT_INTENTS, COMBATANT_TYPE, MOVE_STEPS_MAX } from "@shared/combat-tracker/schemas";

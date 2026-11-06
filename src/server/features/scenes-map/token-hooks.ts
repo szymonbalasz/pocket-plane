@@ -23,7 +23,7 @@ export type TokenHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor"> & {
   /** FR-MAP-123: this move is a teleport, not walked (combat adds no `movedFt`). */
   teleport?: boolean;
   /**
-   * FR-CBT-180 (#456): this move takes back combat's move step with this id (`cbt.undoMove`):
+   * FR-CBT-180 (#457): this move takes back combat's move step with this id (`cbt.undoMove`):
    * combat pops the step and its feet, and shortens the trail, instead of counting it.
    */
   undoStep?: string;

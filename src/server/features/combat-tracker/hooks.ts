@@ -103,7 +103,7 @@ export function combatantTokenHook(
 }
 
 /**
- * FR-CBT-39 / -179 / -180 (#456): a walked move adds its feet (capped) and pushes a move step of
+ * FR-CBT-39 / -179 / -180 (#457): a walked move adds its feet (capped) and pushes a move step of
  * what it added (≤ `MOVE_STEPS_MAX`, the oldest drops); `cbt.undoMove`'s move back (`undoStep`)
  * pops that step and takes its feet off; a teleport clears the steps (moves before a jump can't
  * be walked back). The combatant after, or null when nothing changed.

@@ -559,7 +559,7 @@ export function TokenNode({ t }: { t: TokenView }) {
         if (e.evt.button === 0) c.token.click(t, e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey);
       }}
       onDblClick={(e) => {
-        // #456: Konva counts any two presses; two quick right-clicks (menu, menu) aren't one.
+        // #457: Konva counts any two presses; two quick right-clicks (menu, menu) aren't one.
         if (e.evt.button === 0) c.token.dblClick(t);
       }}
       onMouseEnter={setCursor(draggable ? "grab" : "")}

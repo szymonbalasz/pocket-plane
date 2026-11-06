@@ -801,7 +801,7 @@ export const combatant = sqliteTable(
      */
     tieOrder: integer("tie_order"),
     /**
-     * FR-CBT-179 (#456): JSON leaf, the undoable counted moves, oldest first (≤ 20); null = none.
+     * FR-CBT-179 (#457): JSON leaf, the undoable counted moves, oldest first (≤ 20); null = none.
      * Cleared with `movedFt`'s reset and by a teleport. DM only. Nullable, no default: push-safe.
      */
     moveSteps: text("move_steps", { mode: "json" }).$type<MoveStep[]>(),

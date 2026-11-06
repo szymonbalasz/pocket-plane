@@ -68,7 +68,7 @@ export function turnCommand(direction: "next" | "prev", hooks: CombatRuleHooks) 
           : before.round === 0
             ? ranked
             : ranked.filter((r) => turnIds.has(r.id));
-      // FR-CBT-179 (#456): its undoable moves go with the count.
+      // FR-CBT-179 (#457): its undoable moves go with the count.
       for (const r of reset) {
         if (r.movedFt === 0 && !r.moveSteps) continue;
         env.tx

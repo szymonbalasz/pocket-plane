@@ -1,9 +1,10 @@
 // Turn reaction (FR-VFX-15, OQ-VFX-03 A; pure, client only): when the turn the viewer is shown
 // passes to a combatant on the other side whose token the viewer has and whose footprint is inside
-// a `turnInside` aura's radius, that aura strikes it. DOM-free.
+// a `turnInside` aura's radius, that aura strikes it. FR-VFX-40: a template aura (Black
+// Tentacles) grabs any creature whose footprint is in its square, either side. DOM-free.
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import type { TokenView } from "@shared/scenes-map/schemas";
-import { type AuraSpec, insideAura, sideOfCombatant } from "./anchors";
+import { type AuraSpec, insideAura, insideSquare, sideOfCombatant } from "./anchors";
 import type { DrawnBox } from "./engine";
 
 export interface Strike {
@@ -30,7 +31,14 @@ export function turnStrikes(
   const side = sideOfCombatant(c, token);
   const out: Strike[] = [];
   for (const a of auras) {
-    if (!a.preset.reactions?.includes("turnInside") || a.radiusFt === null) continue;
+    if (!a.preset.reactions?.includes("turnInside")) continue;
+    if (a.templateId !== null) {
+      // FR-VFX-40: the area holds everyone in it, friend or foe.
+      const square = position(a.tokenId);
+      if (square && insideSquare(square, target, cell)) out.push({ key: a.key, tokenId: token.id });
+      continue;
+    }
+    if (a.radiusFt === null) continue;
     if (a.tokenId === token.id || a.side === side) continue;
     const anchor = position(a.tokenId);
     if (!anchor) continue;

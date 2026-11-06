@@ -1,5 +1,5 @@
 // e2e-bundle: undo-move-e2e
-// Undo move (#456; FR-CBT-179–181), thin: the DM on `late-damage`'s Goblin Ambush, where
+// Undo move (#457; FR-CBT-179–181), thin: the DM on `late-damage`'s Goblin Ambush, where
 // `trail-moves` moved Goblin once (12,6 → 10,6) and Mira twice this turn. Goblin's token menu
 // offers "Undo move (10 ft)": the token goes back to 12,6, its trail and its menu item go, the
 // Initiative row reads 0 ft. Mira's undo takes only her last move (her trail keeps 2,7 → 4,7).

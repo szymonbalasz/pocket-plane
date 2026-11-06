@@ -58,7 +58,7 @@ export const combatTracker: Feature = {
       // Sprint 15 (FR-CBT-173, #385): a logged roll used as an attack / damage card.
       useRollCommand,
       clearDamageCommand,
-      // FR-CBT-180 (#456): the DM takes a counted move back.
+      // FR-CBT-180 (#457): the DM takes a counted move back.
       undoMoveCommand,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
