@@ -598,10 +598,19 @@ test("polish r1 (Gilt & Stone and Simple Dark): unfocused preview, redo, list te
         same++;
     return same >= (data.length / info.channels) * 0.8;
   };
-  await expect.poll(() => onTop(p2, p2Win), { timeout: 5_000 }).toBe(true);
+  // The tag shows for 2 s after its typist's last change (FR-NOTES-15). Under CI load those 2 s can
+  // pass before a look, so with no tag shown the typist types one more character.
+  const tagOnTop = async (page: Page, win: Locator, typist: Page) => {
+    if ((await win.locator(".cm-remote-caret[data-tag=shown]").count()) === 0) {
+      await typist.keyboard.type(".");
+      return false;
+    }
+    return onTop(page, win);
+  };
+  await expect.poll(() => tagOnTop(p2, p2Win, p1), { timeout: 10_000 }).toBe(true);
   await p2.keyboard.press("End");
   await p2.keyboard.type(" P2", { delay: 15 });
-  await expect.poll(() => onTop(p1, p1Win), { timeout: 5_000 }).toBe(true);
+  await expect.poll(() => tagOnTop(p1, p1Win, p2), { timeout: 10_000 }).toBe(true);
   await expect(p1Win.getByTestId("notes-status")).toHaveText("Saved");
 
   // The bin row names who deleted a note in full, in both themes, at the default width.
