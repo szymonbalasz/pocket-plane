@@ -143,7 +143,7 @@ describe("mid-combat over WS", () => {
     expect(Object.keys(dm.store.records[HP_CHANGE_TYPE] ?? {})).toContain(hpChangeId);
     const pa = await nextEvent(p1, "AttackApplied");
     expect(pa.changes.find((c) => c.type === COMBATANT_TYPE)).toMatchObject({
-      data: { band: "bloodied" },
+      data: { band: "critical" },
     });
     await nextEvent(p1, "NotificationResolved");
     expect(p1.store.records.notification?.[cardId]).toMatchObject({

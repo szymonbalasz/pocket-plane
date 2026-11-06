@@ -5,7 +5,7 @@
 // no bar on other PCs. After End (no bound combatant) only a PC's death state stays (FR-CBTX-50).
 import { healthBand } from "@shared/combat-tracker/rules";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
-import type { DeathState } from "@shared/entities/schemas";
+import type { DeathState, HealthBand } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { boundCombatant, DOWN_CROSS } from "../combat-tracker/token-overlay";
@@ -38,6 +38,10 @@ const TONE: Record<DeathState, TokenBadge["tone"]> = {
   dead: "down",
 };
 
+/** Band → bar tone: green, amber, red under 15 % (`hp.down`). */
+const barTone = (band: HealthBand): TokenBar["tone"] =>
+  band === "critical" ? "down" : band === "bloodied" ? "bloodied" : "full";
+
 /** A proportional bar (DM; the owner's PC): fill = HP / max, temp after it; none at 0 HP. */
 function proportional(hp: number, max: number, temp: number): TokenBar | null {
   if (hp <= 0 || max <= 0) return null;
@@ -45,7 +49,7 @@ function proportional(hp: number, max: number, temp: number): TokenBar | null {
     id: BAR_ID,
     fraction: Math.min(1, hp / max),
     ...(temp > 0 ? { temp: temp / max } : {}),
-    tone: healthBand(hp, max) === "bloodied" ? "bloodied" : "full",
+    tone: barTone(healthBand(hp, max)),
   };
 }
 
@@ -57,7 +61,7 @@ export function barFor(store: RecordStore, c: CombatantView): TokenBar | null {
     }
     // Players: the band's tone, full width, no proportion (#178); Down shows the X instead.
     if (!c.band || c.band === "down") return null;
-    return { id: BAR_ID, fraction: null, tone: c.band === "bloodied" ? "bloodied" : "full" };
+    return { id: BAR_ID, fraction: null, tone: barTone(c.band) };
   }
   const ch = c.entityId ? characterOf(store, c.entityId) : undefined;
   // Other players' PCs arrive redacted: no HP, so no bar.
