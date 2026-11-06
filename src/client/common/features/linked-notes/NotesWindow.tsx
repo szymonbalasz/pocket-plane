@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../components/ui/menus";
 import {
   Dialog,
@@ -72,7 +73,14 @@ import {
   showsResults,
   useNotesApi,
 } from "./NotesSearch";
-import { useGroupsOpen, useNotesSort } from "./prefs";
+import {
+  groupOpen,
+  parseGroups,
+  readGroupsRaw,
+  useGroupsOpen,
+  useNotesSort,
+  writeGroupOpen,
+} from "./prefs";
 import { useNoteSearch } from "./search";
 import { notesUi } from "./ui";
 
@@ -128,10 +136,13 @@ function TitleDialog({
   const intent = useIntent();
   const [title, setTitle] = useState(note?.title ?? "");
   const [category, setCategory] = useState<NoteCategory | null>(null);
+  /** r1: Enter in the title with no category picked says so. */
+  const [askCategory, setAskCategory] = useState(false);
   useEffect(() => {
     if (open) {
       setTitle(note?.title ?? "");
       setCategory(null);
+      setAskCategory(false);
       intent.setError(null);
     }
   }, [open, note?.title, intent.setError]);
@@ -173,39 +184,51 @@ function TitleDialog({
               setTitle(e.target.value);
               intent.setError(null);
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !note && category === null) {
+                e.preventDefault();
+                setAskCategory(true);
+              }
+            }}
           />
           {clean !== "" && !isNoteTitle(clean) && (
             <p className="text-xs text-muted-foreground">
               1–{NOTE_TITLE_MAX} characters, no [[, ]], | or line break
             </p>
           )}
+          {/* r1: the kit's segmented control (its on / off looks in every theme): one Tab stop,
+              the arrows move between the eight; none picked first. */}
           {!note && (
-            <div
-              role="radiogroup"
+            <ToggleGroup
+              type="single"
               aria-label="Category"
-              className="grid grid-cols-4 gap-1"
+              className="grid w-full grid-cols-4"
               data-testid="notes-new-categories"
+              value={category ?? ""}
+              onValueChange={(v) => {
+                if (v === "") return; // the picked one stays picked
+                setCategory(v as NoteCategory);
+                setAskCategory(false);
+                intent.setError(null);
+              }}
             >
               {NOTE_CATEGORIES.map((c) => (
-                <Button
+                <ToggleGroupItem
                   key={c}
-                  type="button"
-                  role="radio"
-                  aria-checked={category === c}
-                  size="sm"
-                  variant={category === c ? "default" : "outline"}
-                  className="h-7 px-1 text-xs"
+                  value={c}
+                  className="rounded-none px-1"
                   data-testid="notes-category-pick"
                   data-category={c}
-                  onClick={() => {
-                    setCategory(c);
-                    intent.setError(null);
-                  }}
                 >
                   {NOTE_CATEGORY_LABEL[c]}
-                </Button>
+                </ToggleGroupItem>
               ))}
-            </div>
+            </ToggleGroup>
+          )}
+          {!note && askCategory && category === null && (
+            <p role="alert" className="text-xs text-destructive" data-testid="notes-category-hint">
+              Pick a category
+            </p>
           )}
           {intent.error && (
             <p role="alert" className="text-xs text-destructive" data-testid="notes-title-error">
@@ -290,8 +313,14 @@ function NoteRow({
   showCategory?: boolean;
 }) {
   const players = usePlayers();
+  // r1: the open note's row comes into view (a regroup, a pick from the dropdown or a link).
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (selected) ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, [selected]);
   return (
     <button
+      ref={ref}
       type="button"
       data-testid="notes-list-item"
       data-record-id={note.id}
@@ -299,7 +328,7 @@ function NoteRow({
       aria-current={selected ? "true" : undefined}
       onClick={() => notesUi.getState().select(note.id)}
       className={`flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent ${
-        selected ? "bg-accent text-accent-foreground" : ""
+        selected ? "bg-accent text-accent-foreground shadow-[inset_3px_0_0_var(--primary)]" : ""
       }`}
     >
       <span className="w-full truncate text-sm font-medium">{note.title}</span>
@@ -308,6 +337,15 @@ function NoteRow({
         {nameOf(note.updatedBy, players)} · {relativeTime(note.updatedAt, now)}
       </span>
     </button>
+  );
+}
+
+/** r1: a count in lining figures (Gilt's label face draws old-style "1" as "ı"). */
+function Count({ n }: { n: number }) {
+  return (
+    <span className="tabular-nums" data-slot="notes-count">
+      ({n})
+    </span>
   );
 }
 
@@ -342,7 +380,7 @@ function CategoryGroup({
           data-count={notes.length}
         >
           <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
-          {NOTE_CATEGORY_LABEL[category]} ({notes.length})
+          {NOTE_CATEGORY_LABEL[category]} <Count n={notes.length} />
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-0.5 pl-2">
@@ -434,7 +472,7 @@ function RecycleBin({ rows, now }: { rows: NoteRecord[]; now: number }) {
           data-count={rows.length}
         >
           <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
-          Recycle bin ({rows.length})
+          Recycle bin <Count n={rows.length} />
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-1">
@@ -460,11 +498,13 @@ function NarrowBin({ rows, now }: { rows: NoteRecord[]; now: number }) {
         onClick={() => setOpen(true)}
       >
         <Trash2Icon className="size-3.5" />
-        Recycle bin ({rows.length})
+        Recycle bin <Count n={rows.length} />
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm" data-testid="notes-bin-dialog">
-          <DialogTitle>Recycle bin ({rows.length})</DialogTitle>
+          <DialogTitle>
+            Recycle bin <Count n={rows.length} />
+          </DialogTitle>
           <BinRows rows={rows} now={now} onRestored={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
@@ -727,7 +767,8 @@ function NotePane({
           )}
         </div>
       )}
-      <div className="min-h-0 flex-1">
+      {/* r1: the editor keeps about three lines; the Linked from box gives way first. */}
+      <div className="min-h-[4.75rem] flex-1" data-testid="notes-editor-box">
         <NoteEditor
           key={selected}
           ref={editor}
@@ -742,18 +783,24 @@ function NotePane({
         />
       </div>
       {/* FR-NOTES-12, -28: the live notes linking here, refreshed live, in a titled box four rows
-          tall (the same when empty), scrolling past that. */}
+          tall (the same when empty), scrolling past that. r1: in a short window it shrinks to its
+          title and one row (scrolling) before the editor gives up its last three lines. */}
       <section
-        className="mx-3 mb-2 shrink-0 rounded-md border"
+        className="mx-3 mb-2 flex min-h-[3.25rem] shrink flex-col overflow-hidden rounded-md border"
         aria-label="Linked from"
         data-testid="notes-backlinks"
         data-count={session?.backlinks.length ?? 0}
       >
-        <h4 className="border-b px-2 py-1 text-xs font-semibold text-muted-foreground">
-          Linked from ({session?.backlinks.length ?? 0})
+        {/* r1: the kit's section heading (`section-label`). */}
+        <h4
+          data-slot="section-label"
+          className="m-0 flex shrink-0 items-center gap-1 border-b px-2 py-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+          data-testid="notes-backlinks-title"
+        >
+          Linked from <Count n={session?.backlinks.length ?? 0} />
         </h4>
         <ul
-          className="m-0 h-24 list-none overflow-y-auto p-0 py-0.5"
+          className="m-0 h-24 min-h-6 shrink list-none overflow-y-auto p-0"
           data-testid="notes-backlinks-list"
         >
           {(session?.backlinks ?? []).length === 0 && (
@@ -808,6 +855,14 @@ export default function NotesWindow() {
   const groups = useMemo(() => groupNotes(rows), [rows]);
   const recent = useMemo(() => recentNotes(rows), [rows]);
   const recentOn = sort === "recent";
+  const current_ = selected ? rows.find((n) => n.id === selected) : undefined;
+  const openCategory = current_ && current_.deletedAt === null ? current_.category : null;
+  // r1: the open note's fold-out opens (picked elsewhere, or its category changed), so its row
+  // shows as selected; folding it again by hand afterwards is kept.
+  useEffect(() => {
+    if (sort !== "category" || openCategory === null || selected === null) return;
+    if (!groupOpen(parseGroups(readGroupsRaw()), openCategory)) writeGroupOpen(openCategory, true);
+  }, [sort, openCategory, selected]);
   const notesApi = useNotesApi();
   const search = useNoteSearch(notesApi, q, live_);
   const results = showsResults(q, search);
@@ -915,7 +970,7 @@ export default function NotesWindow() {
                     data-category={g.category}
                   >
                     <SelectLabel>
-                      {NOTE_CATEGORY_LABEL[g.category]} ({g.notes.length})
+                      {NOTE_CATEGORY_LABEL[g.category]} <Count n={g.notes.length} />
                     </SelectLabel>
                     {g.notes.map((n) => (
                       <SelectItem

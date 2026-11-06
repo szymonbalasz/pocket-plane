@@ -55,8 +55,8 @@ export interface TokenBar {
   fraction: number | null;
   /** A neutral segment after the fill, as a share of the width; fill + temp capped at 1. */
   temp?: number;
-  /** `full` = `hp.full`, `bloodied` = `hp.bloodied`. */
-  tone: "full" | "bloodied";
+  /** `full` = `hp.full`, `bloodied` = `hp.bloodied`, `down` = `hp.down` (critical, < 15 %). */
+  tone: "full" | "bloodied" | "down";
 }
 
 /**

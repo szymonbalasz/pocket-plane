@@ -32,7 +32,14 @@ test("VFX §13 bundle `spell-fx` loads from empty: fight, FX rows, the fire card
   const db = r.openDb();
   try {
     expect(r.manifest.fixtures).toEqual(
-      expect.arrayContaining(["mt-crowd", "vfx-fight", "sg-row", "moil-row", "fire-card"]),
+      expect.arrayContaining([
+        "mt-crowd",
+        "vfx-fight",
+        "sg-row",
+        "moil-row",
+        "fire-card",
+        "tentacles-row",
+      ]),
     );
     const ambush = db.select().from(scene).where(eq(scene.name, "Goblin Ambush")).get();
     expect(ambush?.active).toBe(true);
@@ -73,6 +80,7 @@ test("VFX §13 bundle `spell-fx` loads from empty: fight, FX rows, the fire card
     expect(mira[1]?.id).toBe(fireBoltRowId());
     expect(((sheetOf("Thorn")?.spells ?? []) as SpellRow[]).map((s) => [s.name, s.fx])).toEqual([
       ["Shadow of Moil", { preset: "shadow-of-moil", params: { radiusFt: 10 } }],
+      ["Evard's Black Tentacles", { preset: "black-tentacles", params: {} }],
     ]);
     const cards = db
       .select()

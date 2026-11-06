@@ -307,6 +307,8 @@ export const creatureSheet = sqliteTable(
     slotsUsed: text("slots_used", { mode: "json" }).notNull(),
     /** `{d6…d12: int}` */
     hitDiceUsed: text("hit_dice_used", { mode: "json" }).notNull(),
+    /** FR-CRES-02 (class-resources): pact slots used. Added column, default 0. */
+    pactUsed: integer("pact_used").notNull().default(0),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },

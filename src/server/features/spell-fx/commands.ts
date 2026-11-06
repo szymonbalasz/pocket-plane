@@ -1,20 +1,26 @@
 // spell-fx intents (VFX §9, ADR-0071): `vfx.cast` (FR-VFX-07, -08) starts a spell row's effect
 // through combat-extras' own paths (concentration or custom) with the row's map effect, in one
 // transaction with the effect's own events; `vfx.setEffectFx` (FR-VFX-09) sets or clears `fx` on
-// an active effect (`EffectFxSet`). Neither rolls, spends a slot or changes HP.
+// an active effect (`EffectFxSet`). Neither rolls, spends a slot or changes HP. FR-VFX-40: a
+// template-anchored preset's cast also places its kept AoE template (`place`), in the same
+// transaction; the effect's `fx.templateId` points at it.
 import { AddEffectInput, EffectLabel } from "@shared/combat-extras/intents";
 import { EFFECT_LABEL_MAX, effectVisibleToPlayers } from "@shared/combat-extras/schemas";
 import { EffectFxSet } from "@shared/events/spell-fx";
-import { Fx } from "@shared/spell-fx/fx";
+import { Fx, type FxRecord } from "@shared/spell-fx/fx";
 import {
   alreadyActiveMessage,
   CastInput,
+  type CastPlace,
   type CastResult,
+  castFromRowMessage,
   noFxMessage,
+  placeFirstMessage,
   ROW_DELETED_MESSAGE,
   SetEffectFxInput,
   VFX_INTENTS,
 } from "@shared/spell-fx/intents";
+import { type FxTemplate, presetOf } from "@shared/spell-fx/presets";
 import { and, eq } from "drizzle-orm";
 import { defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
@@ -33,6 +39,11 @@ import {
 } from "../combat-extras/rows";
 import { campaignOf, startedEncounter, toCombatantRecord } from "../combat-tracker/rows";
 import { getRow } from "../entities/rows";
+import {
+  assertActiveForPlayer,
+  insertKeptTemplate,
+  removeKeptTemplates,
+} from "../scene-tools/templates";
 
 const NOT_FOUND = "Character not found";
 
@@ -84,11 +95,52 @@ function caster(env: Env, creatureId: string): Target {
 /** FR-CBTX-04 labels are ≤ 40 characters; a longer spell name is cut. */
 const labelOf = (name: string) => EffectLabel.parse([...name].slice(0, EFFECT_LABEL_MAX).join(""));
 
+/**
+ * FR-VFX-40: places the cast's kept template: the preset's shape and size at `place`, labelled
+ * with the spell. Placer: a player → themselves; the DM → the character's owner (so they may move
+ * it), a monster → none (DM-placed, a fog subject). `hidden` is the DM's only.
+ */
+function placeTemplate(
+  env: Env,
+  t: Target,
+  tpl: FxTemplate,
+  place: CastPlace,
+  label: string,
+): string {
+  const player = env.actor.role === "player";
+  if (player && place.hidden !== undefined) {
+    throw invalid("Invalid input", [
+      { path: ["place", "hidden"], message: "Not allowed for players" },
+    ]);
+  }
+  assertActiveForPlayer(env.tx, env.actor, place.sceneId);
+  const placedBy = player
+    ? (env.actor.playerId ?? null)
+    : t.kind === "character"
+      ? readCharacter(env.tx, t.character.id).ownerPlayerId
+      : null;
+  return insertKeptTemplate(env, {
+    sceneId: place.sceneId,
+    geometry: {
+      shape: tpl.shape,
+      x: place.x,
+      y: place.y,
+      size: tpl.sizeFt,
+      width: null,
+      angle: place.angle,
+      footprint: null,
+    },
+    label,
+    placedBy,
+    hidden: player ? false : (place.hidden ?? false),
+  });
+}
+
 export const cast = defineCommand({
   name: VFX_INTENTS.cast,
   input: CastInput,
   roles: ["dm", "player"],
-  execute({ creatureId, spellId }, env): CastResult {
+  execute({ creatureId, spellId, place }, env): CastResult {
     const t = caster(env, creatureId);
     const spell = getSheet(env.tx, creatureId)?.spells.find((s) => s.id === spellId);
     if (!spell) throw notFound(ROW_DELETED_MESSAGE);
@@ -99,8 +151,17 @@ export const cast = defineCommand({
     // The stored row's preset is re-checked against the catalogue (defaults filled, ≤ 200 B).
     const parsed = Fx.safeParse({ ...spell.fx, spellId });
     if (!parsed.success) throw invalid(`Map effect of ${spell.name} is not valid`);
-    const extra = { fx: parsed.data };
     const label = labelOf(spell.name);
+    const tpl = presetOf(parsed.data.preset)?.template;
+    if (tpl && !place) throw conflict(placeFirstMessage(spell.name));
+    if (!tpl && place) {
+      throw invalid("Invalid input", [{ path: ["place"], message: "Not placed on the map" }]);
+    }
+    const fx: FxRecord =
+      tpl && place
+        ? { ...parsed.data, templateId: placeTemplate(env, t, tpl, place, label) }
+        : parsed.data;
+    const extra = { fx };
     if (spell.concentration) return concentrateOn(env, t, { label }, extra);
     // OQ-VFX-09 A: a custom effect with no duration, ended by hand.
     const ref =
@@ -126,12 +187,20 @@ export const setEffectFx = defineCommand({
       if (!own) throw forbidden("Only the DM can change this effect");
     }
     if (e.endedAt !== null) throw notFound("Effect not found");
+    // FR-VFX-40: a template-anchored preset is placed by a cast, never set on an effect.
+    const p = fx ? presetOf(fx.preset) : null;
+    if (p?.template) {
+      if (e.fx?.preset === p.key) return;
+      throw conflict(castFromRowMessage(p.label));
+    }
     if (Bun.deepEquals(e.fx, fx, true)) return;
+    // FR-VFX-40: the old map effect's template goes with it.
+    const gone = e.fx?.templateId ? removeKeptTemplates(env.tx, [e.fx.templateId]) : [];
     env.emit({
       type: EffectFxSet.type,
       campaignId: e.campaignId,
       payload: { effectId: e.id },
-      changes: [updateEffectRow(env, e, { fx }), ...runEffectHooks(env)],
+      changes: [updateEffectRow(env, e, { fx }), ...runEffectHooks(env), ...gone],
     });
   },
 });

@@ -20,6 +20,7 @@ import {
   keymap,
   showTooltip,
   type Tooltip,
+  tooltips,
   WidgetType,
 } from "@codemirror/view";
 import { findNotation } from "@shared/dice-extras/notation";
@@ -29,6 +30,7 @@ import {
   NOTE_CATEGORY_LABEL,
   type NoteCategory,
 } from "@shared/linked-notes/schemas";
+import { POPOVER_Z } from "../../components/ui/layers";
 import {
   arrowIntoChip,
   backspaceChip,
@@ -416,11 +418,17 @@ function pickerTooltip(state: EditorState, host: LinkHost): Tooltip | null {
           });
           dom.appendChild(item);
         });
+        showHighlighted(dom);
       };
       draw();
       return { dom, update: () => draw() };
     },
   };
+}
+
+/** r1: the highlighted row stays in view when the list scrolls (a short viewport). */
+function showHighlighted(dom: HTMLElement): void {
+  dom.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest" });
 }
 
 /** A pick: a note → `[[Title]]`; Create note → its category first (N8, FR-NOTES-25). */
@@ -504,6 +512,7 @@ function categoryTooltip(state: EditorState, host: LinkHost): Tooltip | null {
           });
           list.appendChild(item);
         });
+        showHighlighted(dom);
       };
       draw();
       return { dom, update: () => draw() };
@@ -620,7 +629,12 @@ const theme = EditorView.baseTheme({
     color: "var(--primary)",
   },
   ".cm-note-bullet-dot": { fontSize: "1.25em", fontWeight: "700", lineHeight: "1" },
+  // r1: drawn in the page's popover layer (not clipped by the editor's box); scrolls in a short
+  // viewport, its highlighted row kept in view.
   ".cm-tooltip.cm-note-picker, .cm-note-picker": {
+    zIndex: String(POPOVER_Z),
+    maxHeight: "min(70vh, 360px)",
+    overflowY: "auto",
     minWidth: "200px",
     maxWidth: "320px",
     padding: "4px",
@@ -640,7 +654,7 @@ const theme = EditorView.baseTheme({
     whiteSpace: "nowrap",
   },
   ".cm-note-picker-row[aria-selected=true]": { backgroundColor: "var(--accent)" },
-  ".cm-tooltip.cm-note-hint": { border: "none" },
+  ".cm-tooltip.cm-note-hint": { border: "none", zIndex: String(POPOVER_Z) },
 });
 
 const linesKey = (state: EditorState) => [...caretLines(state)].join(",");
@@ -699,6 +713,9 @@ export function noteLinks(host: LinkHost): Extension {
     picker,
     category,
     Prec.highest(pickerKeys(host)),
+    // r1: the picker, the category step and hints sit in the page (fixed), above the windows, so
+    // the editor's framed box never clips them; CodeMirror flips them above when there's no room.
+    typeof document === "undefined" ? [] : tooltips({ parent: document.body, position: "fixed" }),
     Prec.high(
       keymap.of([
         { key: "Backspace", run: backspaceChip },

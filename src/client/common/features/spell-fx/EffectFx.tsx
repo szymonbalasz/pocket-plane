@@ -77,7 +77,7 @@ function EffectFxForm({ e, onClose }: { e: EffectView; onClose(): void }) {
   );
   return (
     <>
-      <FxFields recordId={e.id} value={draft} onChange={setDraft} />
+      <FxFields recordId={e.id} value={draft} onChange={setDraft} tokenOnly />
       <Button
         size="sm"
         className="w-fit"

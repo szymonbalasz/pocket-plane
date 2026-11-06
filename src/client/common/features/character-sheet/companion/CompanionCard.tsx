@@ -82,8 +82,18 @@ export const OFFLINE_TEXT = "Disconnected — reconnecting…";
 /** FR-CBT-112 (server's `PRESS_NEXT_FIRST`): the turn combatant stays until Next. */
 export const DISMISS_TURN_HINT = "Press Next first";
 
-const HP_CLASS = { full: "text-hp-full", bloodied: "text-hp-bloodied", down: "text-hp-down" };
-const HP_BAR = { full: "bg-hp-full", bloodied: "bg-hp-bloodied", down: "bg-hp-down" };
+const HP_CLASS = {
+  full: "text-hp-full",
+  bloodied: "text-hp-bloodied",
+  critical: "text-hp-down",
+  down: "text-hp-down",
+};
+const HP_BAR = {
+  full: "bg-hp-full",
+  bloodied: "bg-hp-bloodied",
+  critical: "bg-hp-down",
+  down: "bg-hp-down",
+};
 
 /** The DM client's combat parts (`@dm` can't be imported here). */
 export interface CompanionDmParts {

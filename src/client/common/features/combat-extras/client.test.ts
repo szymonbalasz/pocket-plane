@@ -129,6 +129,12 @@ describe("FR-CBTX-28 FR-CBTX-29 FR-CBTX-30 token overlay cbtx", () => {
       temp: 4 / 12,
       tone: "full",
     });
+    const crit = store(dmYou, { combatants: [{ ...goblinDm, hpCurrent: 1, tempHp: 0 }] });
+    expect(cbtxTokenOverlay.decorate?.(t("t-gob"), crit, view("dm"))?.bar).toEqual({
+      id: "cbtx-token-bar",
+      fraction: 1 / 7,
+      tone: "down",
+    });
     const down = store(dmYou, { combatants: [{ ...goblinDm, hpCurrent: 0 }] });
     expect(cbtxTokenOverlay.decorate?.(t("t-gob"), down, view("dm"))?.bar).toBeUndefined();
   });
@@ -141,6 +147,8 @@ describe("FR-CBTX-28 FR-CBTX-29 FR-CBTX-30 token overlay cbtx", () => {
       fraction: null,
       tone: "bloodied",
     });
+    const crit = store(p1You, { combatants: [{ ...goblinPlayer, band: "critical" }] });
+    expect(cbtxTokenOverlay.decorate?.(t("t-gob"), crit, view("player"))?.bar?.tone).toBe("down");
     const other = store(p2You, { combatants: [goblinPlayer, miraC], entities: [miraRedacted] });
     expect(cbtxTokenOverlay.decorate?.(t("t-mira"), other, view("player"))).toBeNull();
   });

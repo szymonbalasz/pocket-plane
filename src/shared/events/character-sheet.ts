@@ -132,6 +132,8 @@ export const SheetResource = z.union([
   z.strictObject({ slot: z.number().int().min(1).max(9) }),
   z.strictObject({ hitDie: HitDie }),
   z.strictObject({ feature: Id }),
+  /** FR-CRES-02: the pact slots (one level, `spellcasting.pact`). */
+  z.strictObject({ pact: z.literal(true) }),
 ]);
 export type SheetResource = z.infer<typeof SheetResource>;
 

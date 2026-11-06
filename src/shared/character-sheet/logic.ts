@@ -506,9 +506,16 @@ export function abilityBlock(
 
 export const isDown = (hpCurrent: number): boolean => hpCurrent === 0;
 
-/** HP colour token (`hp.*`, visual-direction): down at 0, bloodied at ≤ half, else full. */
-export function hpState(hpCurrent: number, hpMax: number): "full" | "bloodied" | "down" {
+/**
+ * HP colour token (`hp.*`, visual-direction): down at 0, critical under 15 % (red, `hp.down`),
+ * bloodied at ≤ half, else full. Same thresholds as `healthBand` (FR-CBT-26).
+ */
+export function hpState(
+  hpCurrent: number,
+  hpMax: number,
+): "full" | "bloodied" | "critical" | "down" {
   if (hpCurrent <= 0) return "down";
+  if (20 * hpCurrent < 3 * hpMax) return "critical";
   return hpCurrent * 2 <= hpMax ? "bloodied" : "full";
 }
 

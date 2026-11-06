@@ -53,6 +53,7 @@ function spec(key: string, preset: string, tokenIndex: number): AuraSpec {
     key,
     effectId: key,
     tokenId: `t${tokenIndex}`,
+    templateId: null,
     preset: p,
     params,
     radiusFt: p.radiusFt?.(params) ?? null,

@@ -155,6 +155,8 @@ export const SlotsUsed = z.partialRecord(SpellLevelKey, int(0, 9));
 export type SlotsUsed = z.infer<typeof SlotsUsed>;
 export const HitDiceUsed = z.partialRecord(HitDie, int(0, 20));
 export type HitDiceUsed = z.infer<typeof HitDiceUsed>;
+/** FR-CRES-02: pact slots used, `0 … spellcasting.pact.slots`. */
+export const PactUsed = int(0, 4);
 
 export const BACKGROUND_MAX = 40;
 export const NOTES_MAX = 4000;
@@ -172,6 +174,7 @@ export const sheetDataShape = {
   notes: text(NOTES_MAX),
   slotsUsed: SlotsUsed,
   hitDiceUsed: HitDiceUsed,
+  pactUsed: PactUsed,
 };
 
 /**
@@ -211,6 +214,7 @@ export function defaultSheetData(): SheetData {
     notes: "",
     slotsUsed: {},
     hitDiceUsed: {},
+    pactUsed: 0,
   };
 }
 

@@ -26,9 +26,17 @@ const capped = <S extends z.ZodType>(s: S) =>
     message: `A map effect is at most ${FX_MAX_BYTES} bytes`,
   });
 
-/** `effect.fx` as stored and sent (FR-VFX-03): any kebab-case preset key. */
+/**
+ * `effect.fx` as stored and sent (FR-VFX-03): any kebab-case preset key. FR-VFX-40: `templateId`
+ * = the kept AoE template a template-anchored preset was cast into (server-set by `vfx.cast`).
+ */
 export const FxRecord = capped(
-  z.strictObject({ preset: FxPresetKey, params: FxParams, spellId: Id.optional() }),
+  z.strictObject({
+    preset: FxPresetKey,
+    params: FxParams,
+    spellId: Id.optional(),
+    templateId: Id.optional(),
+  }),
 );
 export type FxRecord = z.infer<typeof FxRecord>;
 
