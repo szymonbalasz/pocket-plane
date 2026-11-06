@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { CreateNoteIntent } from "@shared/linked-notes/schemas";
 import {
-  CREATE_SENDS_CATEGORY,
   tokenNoteAction,
   tokenNoteCategory,
   tokenNoteCreate,
@@ -47,10 +47,13 @@ describe("FR-NOTES-29 token note category", () => {
     expect(tokenNoteCategory({ characterId: null })).toBe("npc");
   });
 
-  test("FR-NOTES-29 create payload: ifMissing, the category once N8 is in", () => {
-    const p = tokenNoteCreate({ characterId: "c1" }, "Mira");
-    expect(p).toMatchObject({ title: "Mira", ifMissing: true });
-    expect(p.category).toBe(CREATE_SENDS_CATEGORY ? "player" : undefined);
+  test("FR-NOTES-29 FR-NOTES-25 create payload: ifMissing and the category, valid for notes.create", () => {
+    const pc = tokenNoteCreate({ characterId: "c1" }, "Mira");
+    expect(pc).toEqual({ title: "Mira", ifMissing: true, category: "player" });
+    const npc = tokenNoteCreate({ characterId: null }, "Goblin");
+    expect(npc).toEqual({ title: "Goblin", ifMissing: true, category: "npc" });
+    expect(CreateNoteIntent.safeParse(pc).success).toBe(true);
+    expect(CreateNoteIntent.safeParse(npc).success).toBe(true);
   });
 });
 

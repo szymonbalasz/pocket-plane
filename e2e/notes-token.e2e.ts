@@ -3,7 +3,7 @@
 // right-clicks their character token Mira → Create note → the note opens for them and shows in the
 // DM's list; player-2 right-clicks the NPC also named Mira → Open note → the same note. The DM's
 // Create on the hidden Shadow asks first ("Players will see this note's title").
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { NOTES_TOKENS } from "../fixtures/units/linked-notes/notes-tokens";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
@@ -18,7 +18,8 @@ const PC_MIRA = { col: 5, row: 5 };
 
 async function open(browser: Parameters<typeof rolePage>[0], url?: string) {
   const page = await rolePage(browser);
-  await page.setViewportSize({ width: 1440, height: 900 });
+  // Room for Notes' wide layout (category fold-outs) beside the open windows.
+  await page.setViewportSize({ width: 1920, height: 1080 });
   if (url) await page.goto(url);
   return page;
 }
@@ -44,6 +45,14 @@ async function tokenNoteLine(page: Page, cell: { col: number; row: number }, nam
 
 const notesTitle = (page: Page) => shellWindow(page, "notes.main").getByTestId("notes-title");
 
+/** N8: a category fold-out of the list; its `data-count` (absent = 0, empty groups don't show). */
+const group = (win: Locator, category: string) =>
+  win.locator(`[data-testid="notes-group"][data-category="${category}"]`);
+const groupCount = async (win: Locator, category: string) =>
+  (await group(win, category).count()) === 0
+    ? 0
+    : Number(await group(win, category).getAttribute("data-count"));
+
 test("FR-NOTES-29 token notes: a player creates Mira's note from her token, the other player opens it from a same-named NPC, the DM is asked first on a hidden token (DM + player-1 + player-2)", async ({
   browser,
 }) => {
@@ -66,16 +75,23 @@ test("FR-NOTES-29 token notes: a player creates Mira's note from her token, the 
   await expect(p1.getByTestId("map-token-menu")).toHaveCount(0);
   await expect(notesTitle(p1)).toHaveText("Mira");
 
-  // The DM sees it in their list.
+  // The DM sees it in their list, in the Player fold-out (a character token's note).
   const dmNotes = await openWindow(dm, "notes.main");
+  await expect.poll(() => groupCount(dmNotes, "player")).toBe(1);
+  await group(dmNotes, "player").click();
+  await expect(group(dmNotes, "player")).toHaveAttribute("data-state", "open");
   await expect(dmNotes.getByTestId("notes-list-item").filter({ hasText: /^Mira/ })).toHaveCount(1);
+  const npcBefore = await groupCount(dmNotes, "npc");
 
   // player-2: the NPC also named Mira → Open note → the same note.
   const openLine = await tokenNoteLine(p2, NOTES_TOKENS.npcMira, NOTES_TOKENS.npcMira.name);
   await expect(openLine).toHaveText("Open note");
   await openLine.click();
   await expect(notesTitle(p2)).toHaveText("Mira");
+  // Still one note, still Player (the NPC token didn't make a second one).
   await expect(dmNotes.getByTestId("notes-list-item").filter({ hasText: /^Mira/ })).toHaveCount(1);
+  expect(await groupCount(dmNotes, "player")).toBe(1);
+  expect(await groupCount(dmNotes, "npc")).toBe(npcBefore);
 
   // The DM's own menu has the line too: Open note on Mira.
   await expect(await tokenNoteLine(dm, PC_MIRA, "Mira")).toHaveText("Open note");
@@ -94,17 +110,16 @@ test("FR-NOTES-29 token notes: a player creates Mira's note from her token, the 
   );
   await dm.getByTestId("notes-token-note-cancel").click();
   await expect(ask).toHaveCount(0);
-  await expect(dmNotes.getByTestId("notes-list-item").filter({ hasText: /^Shadow/ })).toHaveCount(
-    0,
-  );
+  await dm.waitForTimeout(300);
+  expect(await groupCount(dmNotes, "npc")).toBe(npcBefore);
   // …then Create: the note opens for the DM, and players see its title.
   await (await tokenNoteLine(dm, shadow, shadow.name)).click();
   await dm.getByTestId("notes-token-note-confirm").click();
   await expect(notesTitle(dm)).toHaveText(shadow.name);
+  // An NPC note (no character): the NPC fold-out, for the players too.
+  await expect.poll(() => groupCount(dmNotes, "npc")).toBe(npcBefore + 1);
   const p2Notes = shellWindow(p2, "notes.main");
-  await expect(p2Notes.getByTestId("notes-list-item").filter({ hasText: /^Shadow/ })).toHaveCount(
-    1,
-  );
+  await expect.poll(() => groupCount(p2Notes, "npc")).toBe(npcBefore + 1);
 
   for (const page of [dm, p1, p2]) await page.context().close();
 });
