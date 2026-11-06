@@ -1,7 +1,12 @@
 // Pure parts of the Notes window (NOTES §7): list order, the Recycle bin, names, the status and
 // banner texts, who-is-here chips. No React, no CodeMirror (tests import it directly).
 import type { NoteHere } from "@shared/linked-notes/collab";
-import type { NoteActor, NoteRecord } from "@shared/linked-notes/schemas";
+import {
+  NOTE_CATEGORIES,
+  type NoteActor,
+  type NoteCategory,
+  type NoteRecord,
+} from "@shared/linked-notes/schemas";
 import { titleFold } from "@shared/linked-notes/titles";
 import { relativeTime } from "../notifications/logic";
 import type { NoteBanner, NoteStatus } from "./session";
@@ -11,6 +16,45 @@ export function liveNotes(rows: readonly NoteRecord[]): NoteRecord[] {
   return rows
     .filter((n) => n.deletedAt === null)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.title.localeCompare(b.title));
+}
+
+/** FR-NOTES-26: A–Z by title (case and accents aside), then id for a stable order. */
+export function byTitle(a: Pick<NoteRecord, "id" | "title">, b: Pick<NoteRecord, "id" | "title">) {
+  return (
+    a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }) ||
+    a.title.localeCompare(b.title) ||
+    a.id.localeCompare(b.id)
+  );
+}
+
+export interface NoteGroup {
+  category: NoteCategory;
+  notes: NoteRecord[];
+}
+
+/**
+ * FR-NOTES-26: the category view: live notes by category, in NOTE_CATEGORIES order (Session
+ * first), A–Z inside; empty groups left out.
+ */
+export function groupNotes(rows: readonly NoteRecord[]): NoteGroup[] {
+  const by = new Map<NoteCategory, NoteRecord[]>();
+  for (const n of rows) {
+    if (n.deletedAt !== null) continue;
+    const list = by.get(n.category);
+    if (list) list.push(n);
+    else by.set(n.category, [n]);
+  }
+  return NOTE_CATEGORIES.flatMap((category) => {
+    const notes = by.get(category);
+    return notes ? [{ category, notes: notes.sort(byTitle) }] : [];
+  });
+}
+
+/** FR-NOTES-27: Recent: live notes, last edited first (then A–Z). */
+export function recentNotes(rows: readonly NoteRecord[]): NoteRecord[] {
+  return rows
+    .filter((n) => n.deletedAt === null)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || byTitle(a, b));
 }
 
 /** The Recycle bin, newest first (FR-NOTES-04, NOTES §7). */

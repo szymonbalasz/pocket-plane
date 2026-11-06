@@ -31,11 +31,17 @@ describe("linked-notes titles", () => {
   });
 
   test("FR-NOTES-02 the intents trim the title, then apply the rule", () => {
-    expect(CreateNoteIntent.parse({ title: "  Quest log  " }).title).toBe("Quest log");
-    expect(CreateNoteIntent.safeParse({ title: "   " }).success).toBe(false);
-    expect(CreateNoteIntent.safeParse({ title: ` ${"x".repeat(100)} ` }).success).toBe(true);
+    expect(CreateNoteIntent.parse({ title: "  Quest log  ", category: "quest" }).title).toBe(
+      "Quest log",
+    );
+    expect(CreateNoteIntent.safeParse({ title: "   ", category: "quest" }).success).toBe(false);
+    expect(
+      CreateNoteIntent.safeParse({ title: ` ${"x".repeat(100)} `, category: "quest" }).success,
+    ).toBe(true);
     expect(RenameNoteIntent.safeParse({ noteId: "n1", title: "a|b" }).success).toBe(false);
-    expect(CreateNoteIntent.safeParse({ title: "Ok", extra: 1 }).success).toBe(false);
+    expect(CreateNoteIntent.safeParse({ title: "Ok", category: "quest", extra: 1 }).success).toBe(
+      false,
+    );
   });
 
   test("FR-NOTES-02 titles compare folded with the shared matcher's fold", () => {

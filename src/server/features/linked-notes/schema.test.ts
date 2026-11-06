@@ -1,6 +1,7 @@
 // FR-NOTES-24 new tables only (#416): a DB from before linked notes (today's schema minus `note`,
 // `note_change`, `note_link`, with a campaign row) gets the three tables from the schema push with
-// no data loss and no rename question; they start empty; a second push applies nothing.
+// no data loss and no rename question; they start empty; a second push applies nothing. N8: a
+// `note` table from before categories gains `category`, its notes Other (FR-NOTES-25).
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { createSchema, pushSchema } from "../../db/push";
@@ -43,6 +44,7 @@ describe("linked-notes schema (N1)", () => {
       "campaign_id",
       "title",
       "title_fold",
+      "category",
       "created_by_role",
       "created_by_player_id",
       "created_at",
@@ -69,6 +71,32 @@ describe("linked-notes schema (N1)", () => {
     expect(indexes(db, "note_link")).toContain("note_link_target");
     for (const t of ["note", "note_change", "note_link"]) expect([t, rows(db, t)]).toEqual([t, 0]);
     expect(db.query("SELECT id, name FROM campaign").all()).toEqual([{ id: "c1", name: "C" }]);
+    expect((await pushSchema(db)).applied).toBe(0);
+    db.close();
+  });
+
+  test("FR-NOTES-25 a note table from before categories gains the column: every note is Other, nothing lost", async () => {
+    const db = new Database(":memory:", { strict: true });
+    await createSchema(db);
+    db.run("ALTER TABLE note DROP COLUMN category");
+    db.query(
+      "INSERT INTO campaign (id, name, active, created_at, updated_at) VALUES ('c1', 'C', 1, ?, ?)",
+    ).run(AT, AT);
+    for (const [id, title] of [
+      ["n1", "Burnt Ledger"],
+      ["n2", "Quest log"],
+    ])
+      db.query(
+        `INSERT INTO note (id, campaign_id, title, title_fold, created_by_role, created_at, updated_at, updated_by_role, body)
+         VALUES (?, 'c1', ?, lower(?), 'dm', ?, ?, 'dm', 'kept')`,
+      ).run(id as string, title as string, title as string, AT, AT);
+    expect(columns(db, "note")).not.toContain("category");
+    const { applied } = await pushSchema(db);
+    expect(applied).toBeGreaterThan(0);
+    expect(db.query("SELECT id, title, category, body FROM note ORDER BY id").all()).toEqual([
+      { id: "n1", title: "Burnt Ledger", category: "other", body: "kept" },
+      { id: "n2", title: "Quest log", category: "other", body: "kept" },
+    ]);
     expect((await pushSchema(db)).applied).toBe(0);
     db.close();
   });

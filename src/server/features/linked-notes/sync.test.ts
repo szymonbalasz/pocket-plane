@@ -13,7 +13,7 @@ import { NOTE_TITLE_CLASH, NOTE_TYPE, type NoteRecord } from "@shared/linked-not
 import type { Credential } from "@shared/protocol/frames";
 import { and, eq, isNull } from "drizzle-orm";
 import { closeDb, type Db, openFileDb } from "../../db/client";
-import { campaign, note, player } from "../../db/schema";
+import { campaign, eventLog, note, player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { convergence, leakScan } from "../../ws/testing/convergence";
@@ -113,6 +113,7 @@ describe("linked-notes over WS (N1)", () => {
     expect(Object.keys(binned ?? {}).sort()).toEqual(
       [
         "campaignId",
+        "category",
         "createdBy",
         "deletedAt",
         "deletedBy",
@@ -131,7 +132,10 @@ describe("linked-notes over WS (N1)", () => {
     const p2 = await h.live(as("Player 2"));
     for (const c of [dm, p1, p2]) await ok(c, c.load(NOTE_TYPE));
 
-    const { noteId } = (await ok(p1, p1.intent(N.create, { title: "Session 4 recap" }))) as {
+    const { noteId } = (await ok(
+      p1,
+      p1.intent(N.create, { title: "Session 4 recap", category: "other" }),
+    )) as {
       noteId: string;
     };
     await ok(p2, p2.intent(N.rename, { noteId, title: "Session 4" }));
@@ -142,7 +146,7 @@ describe("linked-notes over WS (N1)", () => {
       const n = c.store.records[NOTE_TYPE]?.[noteId] as NoteRecord | undefined;
       expect(n).toMatchObject({ title: "Session 4", deletedAt: null, deletedBy: null });
     }
-    const clash = await answer(p2, p2.intent(N.create, { title: "session-4" }));
+    const clash = await answer(p2, p2.intent(N.create, { title: "session-4", category: "other" }));
     expect(clash).toMatchObject({ type: "reject", code: "conflict", message: NOTE_TITLE_CLASH });
     for (const c of [dm, p1, p2]) {
       expect(leakScan(h.s, c)).toEqual([]);
@@ -153,11 +157,57 @@ describe("linked-notes over WS (N1)", () => {
     for (const c of [dm, p1, p2]) c.close();
   });
 
+  test("FR-NOTES-25 FR-NOTES-30 the fixture's notes carry their categories; a player's category change reaches everyone within 1 s, not logged; a binned note's is not_found", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(as("Player 1"));
+    const p2 = await h.live(as("Player 2"));
+    for (const c of [dm, p1, p2]) await ok(c, c.load(NOTE_TYPE));
+    const byTitle = (c: TestClient) =>
+      Object.fromEntries(notesOf(c).map((n) => [n.title, n.category]));
+    for (const c of [dm, p1, p2])
+      expect(byTitle(c)).toMatchObject({
+        [NOTES_SHARED.ledger]: "item",
+        [NOTES_SHARED.quest]: "quest",
+        [NOTES_SHARED.duke]: "npc",
+        [NOTES_BINNED.title]: "other",
+      });
+    const { noteId } = (await ok(
+      p1,
+      p1.intent(N.create, { title: "Harbour master", category: "session" }),
+    )) as { noteId: string };
+    for (const c of [dm, p2]) {
+      await barrier(c);
+      expect((c.store.records[NOTE_TYPE]?.[noteId] as NoteRecord | undefined)?.category).toBe(
+        "session",
+      );
+    }
+    const logged = db.select().from(eventLog).all().length;
+    const started = performance.now();
+    await ok(p2, p2.intent(N.setCategory, { noteId, category: "npc" }));
+    for (const c of [dm, p1]) {
+      for (;;) {
+        const n = c.store.records[NOTE_TYPE]?.[noteId] as NoteRecord;
+        if (n.category === "npc") break;
+        await c.next(undefined, 1000);
+      }
+    }
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(db.select().from(eventLog).all().length).toBe(logged);
+    const binnedId = notesOf(dm).find((n) => n.title === NOTES_BINNED.title)?.id as string;
+    expect(
+      await answer(p1, p1.intent(N.setCategory, { noteId: binnedId, category: "npc" })),
+    ).toMatchObject({ type: "reject", code: "not_found" });
+    for (const c of [dm, p1, p2]) {
+      expect(leakScan(h.s, c)).toEqual([]);
+      c.close();
+    }
+  });
+
   test("FR-NOTES-10 `ifMissing` create from two clients at once makes one note; both get its id", async () => {
     const p1 = await h.live(as("Player 1"));
     const p2 = await h.live(as("Player 2"));
-    const a = p1.intent(N.create, { title: "The Black Tower", ifMissing: true });
-    const b = p2.intent(N.create, { title: "the black tower", ifMissing: true });
+    const a = p1.intent(N.create, { title: "The Black Tower", ifMissing: true, category: "other" });
+    const b = p2.intent(N.create, { title: "the black tower", ifMissing: true, category: "other" });
     const [ra, rb] = (await Promise.all([ok(p1, a), ok(p2, b)])) as {
       noteId: string;
       created: boolean;
@@ -183,7 +233,10 @@ describe("linked-notes over WS (N1)", () => {
   test("FR-NOTES-04 FR-NOTES-05 two deletes, then two restores, at once: one change each, the second a no-op ack", async () => {
     const p1 = await h.live(as("Player 1"));
     const p2 = await h.live(as("Player 2"));
-    const { noteId } = (await ok(p1, p1.intent(N.create, { title: "Twice" }))) as {
+    const { noteId } = (await ok(
+      p1,
+      p1.intent(N.create, { title: "Twice", category: "other" }),
+    )) as {
       noteId: string;
     };
     await barrier(p2);
@@ -213,7 +266,10 @@ describe("linked-notes over WS (N1)", () => {
     const live = await h.live(as("Player 2"));
     await ok(live, live.load(NOTE_TYPE));
     const p1 = await h.live(as("Player 1"));
-    const { noteId } = (await ok(p1, p1.intent(N.create, { title: "Converge" }))) as {
+    const { noteId } = (await ok(
+      p1,
+      p1.intent(N.create, { title: "Converge", category: "other" }),
+    )) as {
       noteId: string;
     };
     await ok(p1, p1.intent(N.delete, { noteId }));

@@ -27,6 +27,7 @@ test("FR-NOTES-22 search finds titles, bodies and an open note's live text; a cl
 
   // Player 1 types a new word into Quest log (not folded into the stored body yet).
   const p1Win = await openWindow(p1, "notes.main");
+  await p1Win.locator('[data-testid="notes-group"][data-category="quest"]').click(); // N8 fold-out
   await p1Win.getByTestId("notes-list-item").filter({ hasText: "Quest log" }).first().click();
   await expect(p1Win.getByTestId("notes-status")).toHaveText("Saved");
   await p1Win.locator(".cm-line").first().click();
@@ -36,7 +37,7 @@ test("FR-NOTES-22 search finds titles, bodies and an open note's live text; a cl
 
   // The DM's search finds it, with a snippet; the list gives way to the results.
   const dmWin = await openWindow(dm, "notes.main");
-  await expect(dmWin.getByTestId("notes-list-item").first()).toBeVisible();
+  await expect(dmWin.getByTestId("notes-list")).toBeVisible();
   // r1: a plain text box (one ×, the kit's) whose whole placeholder fits.
   const dmBox = dmWin.getByTestId("notes-search");
   await expect(dmBox).toHaveAttribute("type", "text");
@@ -59,7 +60,7 @@ test("FR-NOTES-22 search finds titles, bodies and an open note's live text; a cl
   const snippet = hit.getByTestId("notes-search-snippet");
   await expect(snippet).toContainText("zephyrstone vault");
   await expect(snippet.getByTestId("notes-search-mark")).toHaveText(["zephyrstone"]);
-  await expect(dmWin.getByTestId("notes-list-item").first()).toBeHidden();
+  await expect(dmWin.getByTestId("notes-list")).toBeHidden();
 
   // r1: results on screen follow others' typing, with no re-typing.
   await p1.keyboard.type(" zephyrglass", { delay: 15 });
@@ -71,12 +72,13 @@ test("FR-NOTES-22 search finds titles, bodies and an open note's live text; a cl
   await expect(dmWin.getByTestId("notes-status")).toHaveText("Saved");
   await dmWin.getByTestId("notes-search-clear").click();
   await expect(dmWin.getByTestId("notes-search-results")).toHaveCount(0);
-  await expect(dmWin.getByTestId("notes-list-item").first()).toBeVisible();
+  await expect(dmWin.getByTestId("notes-list")).toBeVisible();
 
   // Player 2 bins a note of their own: it and the other campaign's canary never show.
   const p2Win = await openWindow(p2, "notes.main");
   await p2Win.getByTestId("notes-new").click();
-  await p2.getByTestId("notes-title-input").fill("Zanzibar dossier");
+  await p2.getByTestId("notes-new-title").fill("Zanzibar dossier");
+  await p2.locator('[data-testid="notes-category-pick"][data-category="other"]').click();
   await p2.getByTestId("notes-title-save").click();
   await expect(p2Win.getByTestId("notes-title")).toHaveText("Zanzibar dossier");
   const box = p2Win.getByTestId("notes-search");

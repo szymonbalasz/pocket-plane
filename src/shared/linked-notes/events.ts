@@ -3,10 +3,10 @@
 import { z } from "zod";
 import { defineEvent } from "../events/types";
 
-export const NOTE_CHANGES = ["created", "renamed", "deleted", "restored"] as const;
+export const NOTE_CHANGES = ["created", "renamed", "categorized", "deleted", "restored"] as const;
 
 /**
- * `notes.create` / `rename` / `delete` / `restore`: changes = the `note` record (before null on a
+ * `notes.create` / `rename` / `setCategory` / `delete` / `restore`: changes = the `note` record (before null on a
  * create). Registered by the feature (`r.event`), not in the shared event list.
  */
 export const NoteChanged = defineEvent({

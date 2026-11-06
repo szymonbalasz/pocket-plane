@@ -45,6 +45,7 @@ import {
   type FogBaseState,
 } from "@shared/fog-of-war/schemas";
 import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
+import { NOTE_CATEGORIES } from "@shared/linked-notes/schemas";
 import type { ItemKind, ItemStyle, MiniatureShape } from "@shared/overview-scenes/schemas";
 import type { SharedWith } from "@shared/party-board/schemas";
 import type { ReminderRoll } from "@shared/reminders/schemas";
@@ -1902,6 +1903,8 @@ export const note = sqliteTable(
       .references((): AnySQLiteColumn => campaign.id),
     title: text("title").notNull(),
     titleFold: text("title_fold").notNull(),
+    /** FR-NOTES-25 (#454): added later, so earlier notes are `other`. */
+    category: text("category", { enum: NOTE_CATEGORIES }).notNull().default("other"),
     createdByRole: text("created_by_role", { enum: ["dm", "player"] }).notNull(),
     createdByPlayerId: text("created_by_player_id"),
     createdAt: text("created_at").notNull(),

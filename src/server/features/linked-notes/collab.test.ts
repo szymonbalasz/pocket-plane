@@ -45,7 +45,9 @@ beforeEach(() => {
   p1 = { role: "player", playerId: t.p1.id, campaignId: t.campaignId };
   p2 = { role: "player", playerId: t.p2.id, campaignId: t.campaignId };
   noteId = (
-    s.commands.run(createNote, { title: "Burnt Ledger" }, { actor: p1 }) as { noteId: string }
+    s.commands.run(createNote, { title: "Burnt Ledger", category: "other" }, { actor: p1 }) as {
+      noteId: string;
+    }
   ).noteId;
 });
 
@@ -149,8 +151,11 @@ describe("linked-notes co-writing authority (N2, in-process)", () => {
     const ids = [noteId];
     for (let i = 1; i <= NOTES_OPEN_MAX; i++)
       ids.push(
-        (s.commands.run(createNote, { title: `N${i}` }, { actor: dm }) as { noteId: string })
-          .noteId,
+        (
+          s.commands.run(createNote, { title: `N${i}`, category: "other" }, { actor: dm }) as {
+            noteId: string;
+          }
+        ).noteId,
       );
     for (const id of ids.slice(0, NOTES_OPEN_MAX)) open(p1, "c1", "a", undefined, id);
     open(p1, "c1", "a", 0, ids[0]);

@@ -4588,3 +4588,18 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-11 and [ADR-0078](../arch
 - **`notes.updates`** updates may carry `clientId: "server"` (schema `NoteUpdateOut`; clients still can't bind it).
 - **Client:** a renamed note's old folded title resolves to it for 5 s, so chips stay solid until the rewrite lands.
 - **Search polish (r1, `GET /api/notes/search`):** body matching keeps the shared matcher's tiers but a note's own body rule: the **last** query word (being typed) matches body words as a prefix at any length; another word under 3 letters matches whole body words only; longer words match as prefixes (plural forms too), as before. Snippets drop markdown markers (`#`–`###`, list `-` / `*` / `1.`, `**`) in a window around the first hit. Bench at the caps (1,000 × 32 KiB, Windows, same machine): warm p95 21–33 ms ("the", "dragon", "gold coins", "captain of the guard", "lo"), was 2.8–25 ms; short and last-word queries cost more because they now match bodies.
+
+## 201. Linked notes categories (build/notes-categories)
+
+From [linked-notes](../specs/linked-notes.md) FR-NOTES-25 – -28, -30 (#454). **Built by `build/notes-categories` (slice N8).** One new intent, one column (`note.category`, [data model §154](../data-model/README.md#154-linked-notes-records-buildnotes-core)), the `note` record and `notes.create` gain `category`; no new event, signal or table. The token menu (FR-NOTES-29) is N9's.
+
+| Intent (DM and players) | Payload → result | Rule | FR |
+|---|---|---|---|
+| `notes.create` | `{title, category, ifMissing?}` → `{noteId, created}` | As §196; `category` **required**, one of `session`, `npc`, `quest`, `location`, `item`, `faction`, `player`, `other` (else `invalid`). With `ifMissing` and a live note of that folded title: its id, its own category kept | FR-NOTES-25 |
+| `notes.setCategory` | `{noteId, category}` | Live notes only: binned, missing or another campaign's → `not_found`. Same category → ack, no event. Else `category`, `updatedAt` / `updatedBy` move (like a rename) | FR-NOTES-25, -30 |
+
+- **Record `note`:** wire `{id, campaignId, title, category, createdBy, updatedAt, updatedBy, deletedAt, deletedBy}`. Delete and restore keep `category`.
+- **Event `NoteChanged`:** `change` gains `categorized` (not logged; changes = the `note` record). It refreshes no backlinks.
+- **Client only:** **+ New** asks for a title and one of the eight categories (none picked first; Create stays off until both). The `@` / `[[` picker's Create note, and a click on a missing chip, show the eight categories in the same popup (arrows + Enter, Session highlighted first; Esc closes, the text stays plain), then send `notes.create {title, category, ifMissing: true}`. The editor header's category select sends `notes.setCategory`. The list groups live notes by category in fold-outs (that order, with counts; empty groups hidden; A–Z inside; Session open by default, the others' open state per browser), or with **Recent** one list, last edited first, with the category on each row (per browser); the narrow dropdown follows the same choice. **Linked from** is a titled box with a count, four rows tall, scrolling past that.
+- **Browser storage:** `pp.notes.v1.groups` (JSON: category → open), `pp.notes.v1.sort` (`category` \| `recent`).
+- **Test IDs:** `notes-sort` (`aria-pressed`), `notes-group` (`data-category`, `data-count`, `data-state`), `notes-new-title`, `notes-category-pick` (`data-category`; + New's buttons and the popup's rows), `notes-category` (editor header select), `notes-list-item` gains `data-category`.

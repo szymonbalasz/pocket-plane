@@ -45,7 +45,7 @@ async function load() {
 }
 
 describe("fixtures: notes bundle (N1)", () => {
-  test("FR-NOTES-01 FR-NOTES-04 `notes` from empty: shared notes by their authors, one binned, the second campaign's canary", async () => {
+  test("FR-NOTES-01 FR-NOTES-04 FR-NOTES-25 `notes` from empty: shared notes by their authors, one binned, the second campaign's canary", async () => {
     const { r, camps, players, notes } = await load();
     const main = camps["Fixture Campaign"];
     const second = camps["Second Campaign"];
@@ -54,6 +54,7 @@ describe("fixtures: notes bundle (N1)", () => {
     const view = notes.map((n) => ({
       campaign: n.campaignId === main?.id ? "main" : "second",
       title: n.title,
+      category: n.category,
       by: n.createdByRole === "dm" ? "DM" : players[n.createdByPlayerId as string],
       body: n.body,
       binnedBy:
@@ -69,6 +70,7 @@ describe("fixtures: notes bundle (N1)", () => {
         {
           campaign: "main",
           title: NOTES_SHARED.ledger,
+          category: "item",
           by: "Player 1",
           body: NOTES_SHARED.ledgerBody,
           binnedBy: null,
@@ -77,6 +79,7 @@ describe("fixtures: notes bundle (N1)", () => {
         {
           campaign: "main",
           title: NOTES_SHARED.quest,
+          category: "quest",
           by: "DM",
           body: NOTES_SHARED.questBody,
           binnedBy: null,
@@ -85,6 +88,7 @@ describe("fixtures: notes bundle (N1)", () => {
         {
           campaign: "main",
           title: NOTES_SHARED.duke,
+          category: "npc",
           by: "Player 2",
           body: NOTES_SHARED.dukeBody,
           binnedBy: null,
@@ -93,6 +97,7 @@ describe("fixtures: notes bundle (N1)", () => {
         {
           campaign: "main",
           title: NOTES_BINNED.title,
+          category: "other",
           by: "Player 2",
           body: NOTES_BINNED.body,
           binnedBy: "DM",
@@ -101,6 +106,7 @@ describe("fixtures: notes bundle (N1)", () => {
         {
           campaign: "second",
           title: NOTES_SECOND.title,
+          category: "item",
           by: "DM",
           body: NOTES_SECOND.body,
           binnedBy: null,
