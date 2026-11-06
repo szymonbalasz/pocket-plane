@@ -34,6 +34,8 @@ phase: post-mvp-9
 
 > **Printed sheet (DM, 2026-10-25; [theme-system](post-mvp/theme-system.md) OQ-THEME-06 A; owner spec-charx-print-sheet).** Decided (not open): the Main tab reads like a printed D&D sheet in **every theme**: labelled boxes, a shield-shaped Armor Class, ability blocks with the save inside, a boxed Skills list, a row of passive boxes, and a breakdown Tooltip on every derived number. Actions and Features rows sit in labelled boxes. The tab strip scrolls sideways with the wheel and shows arrows. Layout and markup only: no data, rules, rolls, intents or window sizes change, and every existing test ID keeps its meaning. Gilt & Stone styles it through `data-slot` names (FR-CHARX-119). Look: kit page [gilt-stone.html](../design/art/kit/gilt-stone.html), sheet section (Main and Actions tabs). New **FR-CHARX-105–120** (§6.2); OQ-CHARX-47–50 decided A ([#352](../decisions-log.md)). 0 B.
 
+> **Class resources (2026-11-06, [class-resources](class-resources.md)).** Amends FR-CHARX-17 (`resource` also `{pact: true}`), FR-CHARX-121 / -123 (short and long rests give pact slots back) and the Spells box (a "Pact · 1st" pip row); stat block `spellcasting.pact` and attack rows' `pactWeapon`.
+
 ## 1. Summary
 
 - **Player-owned sheets** (sprint 1, track S, #177): a player creates and fills in their own character by hand (no compendium, no class data). The DM approves it, edits any PC or NPC, and can lock a sheet.

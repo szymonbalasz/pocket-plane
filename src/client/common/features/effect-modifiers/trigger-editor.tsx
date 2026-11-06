@@ -89,6 +89,7 @@ const FILTER_LABEL: Readonly<Record<TriggerFilterKind, string>> = {
   mode: "To-hit mode",
   targetMarked: "Target marked",
   targetHurt: "Target hurt",
+  pactWeapon: "Pact weapon",
   ask: "DM checks",
 };
 

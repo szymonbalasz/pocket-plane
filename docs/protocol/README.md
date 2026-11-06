@@ -275,7 +275,7 @@ Each lists `changes` (before/after per record; create: before null, delete: afte
 | `CharacterApproved` | CHARX | `{characterId}` | `creature-sheet` upsert | yes | no | no | — |
 | `CharacterLockSet` | CHARX | `{characterId, locked}` | `creature-sheet` upsert | yes | no | no | — |
 | `CharacterSheetEdited` | CHARX | `{creatureId, op: set \| putRow \| deleteRow \| moveRow, fields?, list?, rowId?}` (keys and ids, never values) | `entity` and / or `creature-sheet` + hook-changed instances | yes | no | no | — |
-| `CharacterResourceUsed` | CHARX | `{characterId, resource: {slot} \| {hitDie} \| {feature}, before, after}` | `creature-sheet` upsert | yes | no | no | — |
+| `CharacterResourceUsed` | CHARX | `{characterId, resource: {slot} \| {hitDie} \| {feature} \| {pact: true}, before, after}` | `creature-sheet` upsert | yes | no | no | — |
 | `CharacterRested` | CHARX | `{characterId, kind: short \| long, entryId}`, one per changed character ([§183](#183-rest-buttons-fixrest-buttons)) | `creature-sheet` and / or `entity` upsert + `char.rest` `game-log-entry` | yes | no | no | — |
 | `EffectsAdded` | CBTX | `{effectIds}` | `effect` creates; concentration + linked ended by an incapacitating condition | yes | no | no | — |
 | `EffectUpdated` | CBTX | `{effectId}` | `effect` | yes | no | no | — |
@@ -4588,3 +4588,12 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-11 and [ADR-0078](../arch
 - **`notes.updates`** updates may carry `clientId: "server"` (schema `NoteUpdateOut`; clients still can't bind it).
 - **Client:** a renamed note's old folded title resolves to it for 5 s, so chips stay solid until the rewrite lands.
 - **Search polish (r1, `GET /api/notes/search`):** body matching keeps the shared matcher's tiers but a note's own body rule: the **last** query word (being typed) matches body words as a prefix at any length; another word under 3 letters matches whole body words only; longer words match as prefixes (plural forms too), as before. Snippets drop markdown markers (`#`–`###`, list `-` / `*` / `1.`, `**`) in a window around the first hit. Bench at the caps (1,000 × 32 KiB, Windows, same machine): warm p95 21–33 ms ("the", "dragon", "gold coins", "captain of the guard", "lo"), was 2.8–25 ms; short and last-word queries cost more because they now match bodies.
+
+## 201. Class resources: pact slots and pact weapons (build/cres-pact)
+
+From [class-resources](../specs/class-resources.md) FR-CRES-02, -03, -15. **No new intent, event or record type.**
+
+- **`char.useResource`**: `resource` also takes `{pact: true}` (the pact slots): `used = clamp(used + delta, 0, spellcasting.pact.slots)`, `reset` → 0; no pact slots → max 0, no change, no event. Same roles as slots (DM; owner, locked ok). `CharacterResourceUsed` carries the same resource.
+- **`char.rest`**: short and long both write `pactUsed: 0` (in the `creature-sheet` change, only when it was above 0). The short-rest confirm reads "Resets short-rest feature uses and pact slots. Spend hit dice on the sheet."
+- **`char.edit`** `set.spellcasting` and **`char.putRow`** attacks accept `pact` / `pactWeapon` (the stat-block zod); the content tools (`character_edit`, `character_put_row`) take them through the same schemas.
+- **`mod.putTrigger`** filters: + `{if: "pactWeapon"}` on `hit` / `roll` (`turnStart` → `invalid`). The roll hook and the tray preview set the fire fact from the owner's stat block: a weapon roll whose `row` name matches a `pactWeapon` attack row. Words: "with a pact weapon".
