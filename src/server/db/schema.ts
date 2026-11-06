@@ -14,6 +14,7 @@ import {
   HP_MODES,
   type HpDamagePart,
   type HpTriggerPart,
+  type MoveStep,
   SIDES,
 } from "@shared/combat-tracker/schemas";
 import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
@@ -799,6 +800,11 @@ export const combatant = sqliteTable(
      * Nullable, no default: push-safe on old dev DBs.
      */
     tieOrder: integer("tie_order"),
+    /**
+     * FR-CBT-179 (#457): JSON leaf, the undoable counted moves, oldest first (≤ 20); null = none.
+     * Cleared with `movedFt`'s reset and by a teleport. DM only. Nullable, no default: push-safe.
+     */
+    moveSteps: text("move_steps", { mode: "json" }).$type<MoveStep[]>(),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );
@@ -1695,7 +1701,7 @@ export const compendiumEntry = sqliteTable(
 );
 
 /**
- * Entry present (compendium, `entry-present`, FR-CMP-78; DM #457): a compendium entry open on one
+ * Entry present (compendium, `entry-present`, FR-CMP-78; DM #458): a compendium entry open on one
  * player's screen until closed, like `handout_present`. At most one row per player (unique
  * `(campaignId, playerId)`); a row exists only while its player may read the entry (FR-CMP-82,
  * kept by the commands; the cascade is the backstop for a homebrew delete).

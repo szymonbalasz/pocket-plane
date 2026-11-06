@@ -1,7 +1,7 @@
 // **Add to party** (FR-CMP-40–42, CMP §7), DM only, on item entry views: Popover with a qty Input
 // (default 1) + **Add** → party-board's `party.addItem`. FR-CMP-57: on ack the Popover reads
 // "Added: ‹name› ×‹qty›" (the row's name after a merge) for 1.5 s, then closes; reject → inline,
-// qty kept; lost intent → Toast. Disabled while not live. *(#457)* FR-CMP-80: "Show it on players'
+// qty kept; lost intent → Toast. Disabled while not live. *(#458)* FR-CMP-80: "Show it on players'
 // screens" (ticked on every open; off and disabled for unshared homebrew) → after the item's ack,
 // `cmp.presentEntry` opens the entry on every player's screen; a failure there is a Toast (the
 // item is in).

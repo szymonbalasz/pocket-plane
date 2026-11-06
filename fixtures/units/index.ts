@@ -367,6 +367,6 @@ export const units: readonly Fixture[] = [
   charVex,
   // Spell FX template anchor: Black Tentacles (build/vfx-tentacles)
   tentaclesRow,
-  // Compendium entry on players' screens (build/item-present, #457)
+  // Compendium entry on players' screens (build/item-present, #458)
   entryPresent1,
 ];

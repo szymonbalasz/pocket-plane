@@ -204,7 +204,7 @@ export function PresentContent({
 }
 
 /**
- * Images one at a time, fit inside 90 vw × 75 vh; > 1 → Prev / Next + "‹n› / ‹N›". *(#457)* Also
+ * Images one at a time, fit inside 90 vw × 75 vh; > 1 → Prev / Next + "‹n› / ‹N›". *(#458)* Also
  * the entry popup's (FR-CMP-80).
  */
 export function Images({

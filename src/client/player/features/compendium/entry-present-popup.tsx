@@ -1,4 +1,4 @@
-// Player entry popup (FR-CMP-80, -83; DM #457): while the store holds the viewer's own
+// Player entry popup (FR-CMP-80, -83; DM #458): while the store holds the viewer's own
 // `entry-present` row (live event or snapshot), a modal Dialog over every window and toast (the
 // handout popup's layer, PRESENT_POPUP_Z) shows that compendium entry: its images large (Prev /
 // Next), then the entry's view (no actions row). Close, Esc, a click outside or "Open in

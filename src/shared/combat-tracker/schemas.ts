@@ -59,6 +59,8 @@ export const INITIATIVE_MIN = -10;
 export const INITIATIVE_MAX = 50;
 /** FR-CBT-39: `movedFt` cap. */
 export const MOVED_FT_MAX = 9999;
+/** FR-CBT-179: the most undoable moves kept per combatant (the oldest drops). */
+export const MOVE_STEPS_MAX = 20;
 
 /** WS intents (CBT §9). */
 export const CBT_INTENTS = {
@@ -90,6 +92,8 @@ export const CBT_INTENTS = {
   useRoll: "cbt.useRoll",
   /** FR-CBT-178 (#428): the DM takes a card's damage off so a new roll can fill it. */
   clearDamage: "cbt.clearDamage",
+  /** FR-CBT-180 (#457): the DM takes a combatant's last counted move back. */
+  undoMove: "cbt.undoMove",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -218,6 +222,20 @@ const companionFields = {
   summoned: z.boolean().default(false),
 };
 
+/**
+ * FR-CBT-179 (#457): one counted move of a combatant's token (`ft` = what it added to `movedFt`).
+ * DM only: no player view carries it (it names cells a hidden token walked).
+ */
+export const MoveStep = z.object({
+  id: z.string(),
+  tokenId: z.string(),
+  sceneId: z.string(),
+  from: z.object({ col: z.int(), row: z.int() }),
+  to: z.object({ col: z.int(), row: z.int() }),
+  ft: z.int().min(1).max(MOVED_FT_MAX),
+});
+export type MoveStep = z.infer<typeof MoveStep>;
+
 export const CombatantRecord = z.object({
   id: z.string(),
   campaignId: z.string(),
@@ -240,6 +258,8 @@ export const CombatantRecord = z.object({
   hpMax: z.int().nullable(),
   /** Movement used this turn, ft (FR-CBT-39). */
   movedFt: z.int().min(0).max(MOVED_FT_MAX),
+  /** FR-CBT-179 (#457): the undoable moves, oldest first; absent = none. DM only. */
+  moveSteps: z.array(MoveStep).max(MOVE_STEPS_MAX).optional(),
   /** Monsters' temp HP (FR-CBTX-14). DM only: no player view below carries it (FR-CBTX-32). */
   tempHp: TempHp,
   /**
@@ -731,6 +751,8 @@ export const TurnInput = z.strictObject({
 });
 export type TurnInput = z.input<typeof TurnInput>;
 export const SetRemovedInput = z.strictObject({ combatantId: Id, removed: z.boolean() });
+/** FR-CBT-180 (#457): `expectedStepId` = the step the DM's menu showed. */
+export const UndoMoveInput = z.strictObject({ combatantId: Id, expectedStepId: Id });
 /** FR-CBT-70: what `cbt.attack` rolls. */
 export const AttackRolls = z.enum(["both", "toHit"]);
 export type AttackRolls = z.infer<typeof AttackRolls>;

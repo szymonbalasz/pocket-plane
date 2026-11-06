@@ -1,4 +1,4 @@
-// Entry present (CMP §6.2, FR-CMP-78–83; DM #457): a compendium entry open on players' screens
+// Entry present (CMP §6.2, FR-CMP-78–83; DM #458): a compendium entry open on players' screens
 // until each closes it, like a presented handout (FR-PARTY-31–37). The DM sends it after an award
 // ("Show on players' screens" in Add to party). Boundary shapes, the record and its visibility
 // rule. zod is the source of truth.

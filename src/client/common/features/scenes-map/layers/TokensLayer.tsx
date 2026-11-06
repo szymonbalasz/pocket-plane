@@ -558,7 +558,10 @@ export function TokenNode({ t }: { t: TokenView }) {
       onClick={(e) => {
         if (e.evt.button === 0) c.token.click(t, e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey);
       }}
-      onDblClick={() => c.token.dblClick(t)}
+      onDblClick={(e) => {
+        // #457: Konva counts any two presses; two quick right-clicks (menu, menu) aren't one.
+        if (e.evt.button === 0) c.token.dblClick(t);
+      }}
       onMouseEnter={setCursor(draggable ? "grab" : "")}
       onMouseLeave={setCursor("")}
     >

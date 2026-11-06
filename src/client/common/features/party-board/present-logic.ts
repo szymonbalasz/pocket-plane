@@ -19,7 +19,7 @@ export const PRESENT_TICK = "Also open it on the screens of players who newly ge
 
 // ---- Player popup (FR-PARTY-36, -37) ----
 
-/** A present row of either kind: `handout-present` or *(#457)* compendium `entry-present`. */
+/** A present row of either kind: `handout-present` or *(#458)* compendium `entry-present`. */
 type PresentRow = Pick<HandoutPresentRecord, "id" | "playerId" | "presentedAt">;
 
 /** The viewer's own row; the store holds at most one (one per player), newest wins anyway. */

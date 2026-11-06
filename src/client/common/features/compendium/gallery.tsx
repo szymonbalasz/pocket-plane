@@ -69,7 +69,7 @@ export function LightboxView({
 }
 
 /**
- * *(#457)* Off inside the player's entry popup (FR-CMP-80), which shows the images large itself
+ * *(#458)* Off inside the player's entry popup (FR-CMP-80), which shows the images large itself
  * (a lightbox would open under the popup's layer).
  */
 export const EntryGalleryOff = createContext(false);

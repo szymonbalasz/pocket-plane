@@ -161,6 +161,7 @@ import tokenArtUpdate from "./token-art-update";
 import tokenMirrors from "./token-mirrors";
 import tplMenu from "./tpl-menu";
 import trayAttacks from "./tray-attacks";
+import undoMoveE2e from "./undo-move-e2e";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
@@ -423,6 +424,8 @@ export const bundles: readonly Bundle[] = [
   sessionSim18,
   // Class resources (build/cres-pact): pact slots, pact weapon
   classResources,
-  // Compendium entry on players' screens (build/item-present, #457)
+  // Undo a counted move (build/undo-move): late-damage's moves in their own server
+  undoMoveE2e,
+  // Compendium entry on players' screens (build/item-present, #458)
   itemPresent,
 ];
