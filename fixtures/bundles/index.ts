@@ -90,6 +90,7 @@ import lootSubtractE2e from "./loot-subtract-e2e";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notes from "./notes";
+import notesToken from "./notes-token";
 import notifications from "./notifications";
 import overviewCrowd from "./overview-crowd";
 import overviewScenes from "./overview-scenes";
@@ -428,4 +429,6 @@ export const bundles: readonly Bundle[] = [
   undoMoveE2e,
   // Compendium entry on players' screens (build/item-present, #458)
   itemPresent,
+  // Linked notes N9 token notes (build/notes-token)
+  notesToken,
 ];

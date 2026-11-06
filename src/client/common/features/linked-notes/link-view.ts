@@ -20,13 +20,22 @@ import {
   keymap,
   showTooltip,
   type Tooltip,
+  tooltips,
   WidgetType,
 } from "@codemirror/view";
 import { findNotation } from "@shared/dice-extras/notation";
 import type { NoteLink } from "@shared/linked-notes/links";
 import {
+  NOTE_CATEGORIES,
+  NOTE_CATEGORY_LABEL,
+  type NoteCategory,
+} from "@shared/linked-notes/schemas";
+import { POPOVER_Z } from "../../components/ui/layers";
+import {
   arrowIntoChip,
   backspaceChip,
+  type CategoryAsk,
+  categoryField,
   chipsOf,
   deleteChip,
   type PickerRow,
@@ -38,6 +47,7 @@ import {
   resolveLink,
   revealAt,
   revealField,
+  setCategoryAsk,
   setPicker,
 } from "./link-state";
 
@@ -47,10 +57,12 @@ export interface LinkHost {
   titles(): readonly PickTitle[];
   /** Live titles by folded title (kept with `titles`). */
   byFold(): ReadonlyMap<string, PickTitle>;
-  /** Open the linked note, creating it first when it's missing (FR-NOTES-10). */
-  follow(link: Pick<NoteLink, "target" | "fold">): void;
-  /** Create a note (`ifMissing`); true when it exists afterwards (FR-NOTES-08's last row). */
-  create(title: string): Promise<boolean>;
+  /** Open the linked note; false when it's missing (the chip then asks its category). */
+  follow(link: Pick<NoteLink, "target" | "fold">): boolean;
+  /** Create a note (`ifMissing`); true when it exists afterwards (FR-NOTES-08's last row, -25). */
+  create(title: string, category: NoteCategory): Promise<boolean>;
+  /** FR-NOTES-10, -25: create a missing chip's note (`ifMissing`) of `category` and open it. */
+  createAndOpen(title: string, category: NoteCategory): void;
   /** A die button's click (FR-NOTES-13, -23: labelled "Note"). */
   roll(expression: string, e: MouseEvent): void;
 }
@@ -64,6 +76,8 @@ export const HINT_DELAY_MS = 400;
 export const LONG_PRESS_MS = 500;
 export const CHIP_HINT = "Open · Alt+click to edit";
 export const MISSING_HINT = "No note yet · click to create";
+/** N8: the category step's first line. */
+export const categoryPrompt = (title: string) => `Category for "${title}"`;
 export const dieHint = (expression: string) => `Roll ${expression}`;
 
 // ---------- hover hints (the kit Tooltip's bubble on editor parts) ----------
@@ -169,10 +183,22 @@ class Chip extends WidgetType {
         edit();
       }, LONG_PRESS_MS);
     });
+    // FR-NOTES-10, -25: a live note opens; a missing one asks its category first.
+    const follow = () => {
+      const link = current();
+      if (this.host.follow(link)) return;
+      view.dispatch({
+        effects: [
+          setPicker.of(null),
+          setCategoryAsk.of({ title: link.target, pos: link.from, after: "open", index: 0 }),
+        ],
+      });
+      view.focus();
+    };
     el.addEventListener("pointerup", (e) => {
       if (e.pointerType !== "touch" || !press) return;
       cancel();
-      this.host.follow(current());
+      follow();
     });
     el.addEventListener("pointercancel", cancel);
     el.addEventListener("contextmenu", (e) => {
@@ -185,7 +211,7 @@ class Chip extends WidgetType {
       e.stopPropagation();
       if (pointer === "touch") return;
       if (e.altKey) edit();
-      else this.host.follow(current());
+      else follow();
     });
     hoverHint(view, el, () => (this.missing ? MISSING_HINT : CHIP_HINT));
     return el;
@@ -359,7 +385,7 @@ export function buildDecorations(state: EditorState, host: LinkHost): Decoration
 
 function pickerTooltip(state: EditorState, host: LinkHost): Tooltip | null {
   const p = state.field(pickerField, false);
-  if (!p) return null;
+  if (!p || state.field(categoryField, false)) return null;
   const query = pickerQuery(state, p);
   if (query === null) return null;
   return {
@@ -372,12 +398,26 @@ function pickerTooltip(state: EditorState, host: LinkHost): Tooltip | null {
       dom.className = "cm-note-picker";
       dom.dataset.testid = "notes-picker";
       dom.setAttribute("role", "listbox");
+      let drawn = "";
       const draw = () => {
         const cur = view.state.field(pickerField, false);
         const q = cur ? pickerQuery(view.state, cur) : null;
-        dom.replaceChildren();
-        if (!cur || q === null) return;
+        if (!cur || q === null) {
+          dom.replaceChildren();
+          drawn = "";
+          return;
+        }
         const rows = pickerRows(q, host.titles());
+        // r2: the same rows → only the highlight moves (the row under the pointer stays put).
+        const key = rows
+          .map((r) => `${r.kind}:${r.kind === "note" ? r.id : ""}:${r.title}`)
+          .join("|");
+        if (key === drawn) {
+          highlight(dom, Math.min(cur.index, rows.length - 1));
+          return;
+        }
+        drawn = key;
+        dom.replaceChildren();
         rows.forEach((row, i) => {
           const item = document.createElement("div");
           item.setAttribute("role", "option");
@@ -388,10 +428,16 @@ function pickerTooltip(state: EditorState, host: LinkHost): Tooltip | null {
           item.textContent = row.kind === "create" ? `Create note "${row.title}"` : row.title;
           item.addEventListener("mousedown", (e) => {
             e.preventDefault();
-            void choose(view, host, row);
+            choose(view, row);
+          });
+          // r2: the pointer highlights a row as the arrows do; Enter then takes it.
+          item.addEventListener("mousemove", () => {
+            const p = view.state.field(pickerField, false);
+            if (p && p.index !== i) view.dispatch({ effects: setPicker.of({ ...p, index: i }) });
           });
           dom.appendChild(item);
         });
+        showHighlighted(dom);
       };
       draw();
       return { dom, update: () => draw() };
@@ -399,18 +445,143 @@ function pickerTooltip(state: EditorState, host: LinkHost): Tooltip | null {
   };
 }
 
-/** A pick: a note → `[[Title]]`; Create note → the note first, then `[[Title]]`. */
-async function choose(view: EditorView, host: LinkHost, row: PickerRow): Promise<void> {
+/** r2: marks row `index` of `dom`'s options highlighted, in place, and keeps it in view. */
+function highlight(dom: HTMLElement, index: number): void {
+  dom.querySelectorAll('[role="option"]').forEach((el, i) => {
+    el.setAttribute("aria-selected", String(i === index));
+  });
+  showHighlighted(dom);
+}
+
+/** r1: the highlighted row stays in view when the list scrolls (a short viewport). */
+function showHighlighted(dom: HTMLElement): void {
+  dom.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest" });
+}
+
+/** A pick: a note → `[[Title]]`; Create note → its category first (N8, FR-NOTES-25). */
+function choose(view: EditorView, row: PickerRow): void {
   const p = view.state.field(pickerField, false);
   if (!p) return;
-  if (row.kind === "create" && !(await host.create(row.title))) return;
+  if (row.kind === "create") {
+    const pos = view.state.selection.main.head;
+    view.dispatch({
+      effects: setCategoryAsk.of({ title: row.title, pos, after: "link", index: 0 }),
+    });
+    return;
+  }
+  view.dispatch(pickInsert(view.state, p, row.title));
+}
+
+/**
+ * The category step's pick: `link` → the note (`ifMissing`), then `[[Title]]` in place of the
+ * picker's text, if the picker is still there; `open` → create and open it.
+ */
+async function chooseCategory(
+  view: EditorView,
+  host: LinkHost,
+  ask: CategoryAsk,
+  category: NoteCategory,
+): Promise<void> {
+  if (ask.after === "open") {
+    view.dispatch({ effects: setCategoryAsk.of(null) });
+    host.createAndOpen(ask.title, category);
+    return;
+  }
+  const p = view.state.field(pickerField, false);
+  if (!p) return;
+  const made = await host.create(ask.title, category);
   const now = view.state.field(pickerField, false);
-  if (!now || now.from !== p.from) return;
-  view.dispatch(pickInsert(view.state, now, row.title));
+  if (!made || !now || now.from !== p.from) {
+    if (view.state.field(categoryField, false)) view.dispatch({ effects: setCategoryAsk.of(null) });
+    return;
+  }
+  view.dispatch(pickInsert(view.state, now, ask.title));
+}
+
+/** N8: the eight categories in the picker's popup, Session first and highlighted. */
+function categoryTooltip(state: EditorState, host: LinkHost): Tooltip | null {
+  const ask = state.field(categoryField, false);
+  if (!ask) return null;
+  return {
+    pos: Math.min(ask.pos, state.doc.length),
+    above: false,
+    strictSide: false,
+    arrow: false,
+    create(view) {
+      const dom = document.createElement("div");
+      dom.className = "cm-note-picker";
+      dom.dataset.testid = "notes-picker";
+      dom.dataset.step = "category";
+      const head = document.createElement("div");
+      head.className = "cm-note-picker-head";
+      dom.appendChild(head);
+      const list = document.createElement("div");
+      list.setAttribute("role", "listbox");
+      dom.appendChild(list);
+      let drawn: string | null = null;
+      const draw = () => {
+        const cur = view.state.field(categoryField, false);
+        if (!cur) {
+          list.replaceChildren();
+          drawn = null;
+          return;
+        }
+        // r2: the same note → only the highlight moves (the row under the pointer stays put).
+        if (cur.title === drawn) {
+          highlight(list, cur.index);
+          return;
+        }
+        drawn = cur.title;
+        list.replaceChildren();
+        head.textContent = categoryPrompt(cur.title);
+        list.setAttribute("aria-label", categoryPrompt(cur.title));
+        NOTE_CATEGORIES.forEach((category, i) => {
+          const item = document.createElement("div");
+          item.setAttribute("role", "option");
+          item.setAttribute("aria-selected", String(i === cur.index));
+          item.className = "cm-note-picker-row";
+          item.dataset.testid = "notes-category-pick";
+          item.dataset.category = category;
+          item.textContent = NOTE_CATEGORY_LABEL[category];
+          item.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            const now = view.state.field(categoryField, false);
+            if (now) void chooseCategory(view, host, now, category);
+          });
+          // r2: the pointer highlights a row as the arrows do; Enter then takes it.
+          item.addEventListener("mousemove", () => {
+            const a = view.state.field(categoryField, false);
+            if (a && a.index !== i)
+              view.dispatch({ effects: setCategoryAsk.of({ ...a, index: i }) });
+          });
+          list.appendChild(item);
+        });
+        showHighlighted(dom);
+      };
+      draw();
+      return { dom, update: () => draw() };
+    },
+  };
 }
 
 function pickerKeys(host: LinkHost) {
+  // N8: while the category step shows, the keys are its own.
+  const ask = (view: EditorView) => view.state.field(categoryField, false);
+  const moveCategory = (view: EditorView, d: 1 | -1) => {
+    const a = ask(view);
+    if (!a) return false;
+    const n = NOTE_CATEGORIES.length;
+    view.dispatch({ effects: setCategoryAsk.of({ ...a, index: (a.index + d + n) % n }) });
+    return true;
+  };
+  const acceptCategory = (view: EditorView) => {
+    const a = ask(view);
+    if (!a) return false;
+    void chooseCategory(view, host, a, NOTE_CATEGORIES[a.index] ?? "session");
+    return true;
+  };
   const move = (d: 1 | -1) => (view: EditorView) => {
+    if (moveCategory(view, d)) return true;
     const p = view.state.field(pickerField, false);
     if (!p) return false;
     const q = pickerQuery(view.state, p) ?? "";
@@ -420,6 +591,7 @@ function pickerKeys(host: LinkHost) {
     return true;
   };
   const accept = (view: EditorView) => {
+    if (acceptCategory(view)) return true;
     const p = view.state.field(pickerField, false);
     if (!p) return false;
     const q = pickerQuery(view.state, p);
@@ -427,7 +599,7 @@ function pickerKeys(host: LinkHost) {
     const rows = pickerRows(q, host.titles());
     const row = rows[Math.min(p.index, rows.length - 1)];
     if (!row) return false;
-    void choose(view, host, row);
+    choose(view, row);
     return true;
   };
   return keymap.of([
@@ -438,8 +610,8 @@ function pickerKeys(host: LinkHost) {
     {
       key: "Escape",
       run: (view) => {
-        if (!view.state.field(pickerField, false)) return false;
-        view.dispatch({ effects: setPicker.of(null) });
+        if (!view.state.field(pickerField, false) && !ask(view)) return false;
+        view.dispatch({ effects: [setPicker.of(null), setCategoryAsk.of(null)] });
         return true;
       },
     },
@@ -501,7 +673,12 @@ const theme = EditorView.baseTheme({
     color: "var(--primary)",
   },
   ".cm-note-bullet-dot": { fontSize: "1.25em", fontWeight: "700", lineHeight: "1" },
+  // r1: drawn in the page's popover layer (not clipped by the editor's box); scrolls in a short
+  // viewport, its highlighted row kept in view.
   ".cm-tooltip.cm-note-picker, .cm-note-picker": {
+    zIndex: String(POPOVER_Z),
+    maxHeight: "min(70vh, 360px)",
+    overflowY: "auto",
     minWidth: "200px",
     maxWidth: "320px",
     padding: "4px",
@@ -512,8 +689,16 @@ const theme = EditorView.baseTheme({
     fontSize: "0.875rem",
   },
   ".cm-note-picker-row": { padding: "3px 8px", borderRadius: "4px", cursor: "pointer" },
+  ".cm-note-picker-head": {
+    padding: "2px 8px 4px",
+    fontSize: "0.75rem",
+    color: "var(--muted-foreground)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
   ".cm-note-picker-row[aria-selected=true]": { backgroundColor: "var(--accent)" },
-  ".cm-tooltip.cm-note-hint": { border: "none" },
+  ".cm-tooltip.cm-note-hint": { border: "none", zIndex: String(POPOVER_Z) },
 });
 
 const linesKey = (state: EditorState) => [...caretLines(state)].join(",");
@@ -549,15 +734,32 @@ export function noteLinks(host: LinkHost): Extension {
     },
     provide: (f) => showTooltip.from(f),
   });
+  // N8: one tooltip per open step; a highlight move only redraws it.
+  const category = StateField.define<Tooltip | null>({
+    create: (state) => categoryTooltip(state, host),
+    update(value, tr) {
+      const before = tr.startState.field(categoryField, false);
+      const after = tr.state.field(categoryField, false);
+      if (before === after) return value;
+      if (before && after && before.title === after.title && before.pos === after.pos) return value;
+      return categoryTooltip(tr.state, host);
+    },
+    provide: (f) => showTooltip.from(f),
+  });
   return [
     revealField,
     pickerField,
+    categoryField,
     focusField,
     EditorView.focusChangeEffect.of((_state, focusing) => setFocused.of(focusing)),
     hintField,
     decorations,
     picker,
+    category,
     Prec.highest(pickerKeys(host)),
+    // r1: the picker, the category step and hints sit in the page (fixed), above the windows, so
+    // the editor's framed box never clips them; CodeMirror flips them above when there's no room.
+    typeof document === "undefined" ? [] : tooltips({ parent: document.body, position: "fixed" }),
     Prec.high(
       keymap.of([
         { key: "Backspace", run: backspaceChip },

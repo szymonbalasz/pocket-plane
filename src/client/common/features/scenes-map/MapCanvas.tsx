@@ -94,6 +94,7 @@ import {
   type MenuPoint,
   stageLayers,
 } from "./layers";
+import { LONG_PRESS_SLOP, LongPress } from "./long-press";
 import { selfOf } from "./mark-colors";
 import { createMiddlePan, type MiddlePan } from "./middle-pan";
 import {
@@ -143,8 +144,10 @@ export interface MapCanvasProps {
   onEmptyClick?(): void;
   /** DM: Ctrl/Shift + left-drag on empty canvas; the ids whose footprint centre is inside. */
   onBoxSelect?(tokenIds: string[]): void;
-  /** DM: right-click on a token (FR-MAP-18). */
+  /** Right-click (long-press on touch) on a token: DM FR-MAP-18; player FR-NOTES-29. */
   onTokenMenu?(t: TokenView, at: { x: number; y: number }): void;
+  /** Player: the token has a menu (FR-NOTES-29); absent → none. The DM's tokens always do. */
+  hasTokenMenu?(t: TokenView): boolean;
   onTokenDoubleClick?(t: TokenView): void;
   /** DM: a Creatures row dropped on the canvas (FR-MAP-13); the pointer cell = top-left. */
   onDropDefinition?(definitionId: string, cell: { col: number; row: number }): void;
@@ -813,10 +816,57 @@ export function MapCanvas(props: MapCanvasProps) {
     },
   );
 
+  // ---- FR-NOTES-29 / FR-MAP-18: a long-press on a token (touch) opens its token menu ----
+  const onTokenMenuRef = useRef(props.onTokenMenu);
+  onTokenMenuRef.current = props.onTokenMenu;
+  /** The token node under the current touch press (its drag waits past the slop meanwhile). */
+  const pressNode = useRef<Konva.Node | null>(null);
+  const longPress = useMemo(
+    () =>
+      new LongPress((at) => {
+        const node = pressNode.current;
+        const t = tokensRef.current.find((x) => x.id === at.tokenId);
+        if (!t || !liveRef.current || node?.isDragging()) return;
+        // This press is the menu's now: it never becomes a drag.
+        node?.dragDistance(Number.MAX_SAFE_INTEGER);
+        onTokenMenuRef.current?.(t, { x: at.x, y: at.y });
+      }),
+    [],
+  );
+  const endPress = useCallback(() => {
+    longPress.end();
+    const n = pressNode.current;
+    pressNode.current = null;
+    n?.setAttr("dragDistance", undefined);
+  }, [longPress]);
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      if (e.pointerType === "touch") longPress.move(e.clientX, e.clientY);
+    };
+    // After the canvas's own pointerup (a token's click / tap reads `fired` first).
+    const up = (e: PointerEvent) => {
+      if (e.pointerType === "touch") endPress();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      endPress();
+    };
+  }, [longPress, endPress]);
+  useEffect(() => {
+    if (!live) endPress();
+  }, [live, endPress]);
+
   const { onTokenClick, onTokenDoubleClick } = props;
   const tokenHandlers = useMemo<CanvasContextValue["token"]>(
     () => ({
       dragStart(t, node) {
+        // A drag is no long-press (FR-NOTES-29).
+        longPress.cancel();
         lastOwn.current = t.id;
         const n = footprint(t.size);
         pointers.setState({
@@ -869,6 +919,8 @@ export function MapCanvas(props: MapCanvasProps) {
       },
       click(t, toggle) {
         if (!tokenTakesLeftPress(toolDefRef.current)) return;
+        // The release of a long-press that opened the menu is no click.
+        if (longPress.fired) return;
         if (t.ownerPlayerId === myPlayerId) lastOwn.current = t.id;
         onTokenClick?.(t, toggle);
       },
@@ -887,6 +939,7 @@ export function MapCanvas(props: MapCanvasProps) {
       onTokenDoubleClick,
       move,
       sendSignal,
+      longPress,
     ],
   );
 
@@ -1136,10 +1189,18 @@ export function MapCanvas(props: MapCanvasProps) {
     return (id && tokensRef.current.find((t) => t.id === id)) || null;
   };
 
+  /** FR-MAP-18 / FR-NOTES-29: whether a right press on this token is the token menu's. */
+  const tokenHasMenu = (id: string): boolean => {
+    if (client === "dm") return true;
+    const t = props.onTokenMenu && tokensRef.current.find((x) => x.id === id);
+    return t ? (props.hasTokenMenu?.(t) ?? false) : false;
+  };
+
   const onMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const p = mapPoint();
     if (!p) return;
-    const onToken = tokenNodeOf(e.target) !== null;
+    const tokenNode = tokenNodeOf(e.target);
+    const onToken = tokenNode !== null;
     if (e.evt.button === 2) {
       // FR-MAP-71: doors' and props' menus never get here (`cancelBubble`).
       rightRef.current = null;
@@ -1150,10 +1211,11 @@ export function MapCanvas(props: MapCanvasProps) {
       const toolMenu = tp !== null && menuTool?.pointer?.menu?.(tp) === true;
       const menuCtx: LayerMenuContext = { ...ctx, off: useLayerToggles.getState().off };
       const found = isLive && !toolMenu ? layerMenuAt(canvasLayers, p, menuCtx) : null;
-      // The DM's token menu goes first, unless the layer's menu asks to go ahead (FR-SCN-58).
-      const dmToken = onToken && client === "dm";
-      const ahead = dmToken && found?.contextMenu?.first?.(menuCtx) === true;
-      const hit = dmToken && !ahead ? null : found;
+      // The token menu goes first, unless the layer's menu asks to go ahead (FR-SCN-58); a
+      // player's only on a token with a menu (FR-NOTES-29).
+      const menuToken = tokenNode !== null && tokenHasMenu(tokenNode.id());
+      const ahead = menuToken && found?.contextMenu?.first?.(menuCtx) === true;
+      const hit = menuToken && !ahead ? null : found;
       skipTokenMenu.current = ahead;
       const action = rightPress({
         client,
@@ -1249,6 +1311,22 @@ export function MapCanvas(props: MapCanvasProps) {
     }
   };
 
+  /** FR-NOTES-29: a touch press on a token with a menu, Select tool, live: time the hold. */
+  const onPointerDown = (e: Konva.KonvaEventObject<PointerEvent>) => {
+    if (e.evt.pointerType !== "touch") return;
+    // A second finger (pinch) ends any long-press.
+    const second = longPress.waiting;
+    endPress();
+    if (second) return;
+    const node = tokenNodeOf(e.target);
+    if (!node || !liveRef.current || !props.onTokenMenu || tool !== "select") return;
+    if (drawingRef.current || !tokenHasMenu(node.id())) return;
+    pressNode.current = node;
+    // A drag waits past the slop, so a still finger's wobble doesn't start one.
+    node.dragDistance(LONG_PRESS_SLOP);
+    longPress.start(node.id(), e.evt.clientX, e.evt.clientY);
+  };
+
   const onContextMenu = (e: Konva.KonvaEventObject<PointerEvent>) => {
     e.evt.preventDefault();
     // FR-SCN-58: this right press went to a layer's menu ahead of the token's.
@@ -1256,7 +1334,7 @@ export function MapCanvas(props: MapCanvasProps) {
     skipTokenMenu.current = false;
     if (skip) return;
     const node = tokenNodeOf(e.target);
-    if (!node || client !== "dm" || !props.onTokenMenu || !liveRef.current) return;
+    if (!node || !props.onTokenMenu || !liveRef.current || !tokenHasMenu(node.id())) return;
     const t = tokens.find((x) => x.id === node.id());
     if (t) props.onTokenMenu(t, { x: e.evt.clientX, y: e.evt.clientY });
   };
@@ -1398,6 +1476,7 @@ export function MapCanvas(props: MapCanvasProps) {
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onContextMenu={onContextMenu}
+          onPointerDown={onPointerDown}
         >
           <SyncContext.Provider value={syncStore}>
             <CanvasContext.Provider value={ctx}>

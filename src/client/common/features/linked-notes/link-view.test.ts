@@ -22,8 +22,9 @@ const NOTES = [{ id: "n1", title: "Duke Varen" }];
 const host: LinkHost = {
   titles: () => NOTES,
   byFold: () => titlesByFold(NOTES),
-  follow: () => {},
+  follow: () => true,
   create: async () => true,
+  createAndOpen: () => {},
   roll: () => {},
 };
 

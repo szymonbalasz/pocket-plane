@@ -2,7 +2,10 @@
 // Thin flows of the Notes window (NOTES N3, FR-NOTES-13 – -18, -20, -04 – -05): the DM and two
 // players type into Burnt Ledger at once and end with the same text, with carets and who-is-here
 // chips; undo takes back only your own typing; a player typing offline catches up on reconnect;
-// delete → the other reader's banner → Recycle bin → Restore. Rules and limits: bun test.
+// delete → the other reader's banner → Recycle bin → Restore. N8: a note made with a category
+// shows in that fold-out for everyone, live; a category change moves it for everyone; Recent puts
+// the last edited first and is remembered; the @ picker's Create note asks the category in the
+// same popup; Linked from keeps its height. Rules and limits: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import sharp from "sharp";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -26,9 +29,34 @@ async function setup(browser: Parameters<typeof rolePage>[0]) {
   return { dm, p1, p2 };
 }
 
+/** N8: opens every closed category fold-out of the list (their state is per browser). */
+async function expandGroups(win: Locator) {
+  // The list has loaded: a fold-out, a Recent row or "No notes yet".
+  await expect(
+    win
+      .locator(
+        '[data-testid="notes-group"], [data-testid="notes-list"] [data-testid="notes-list-item"], [data-testid="notes-empty"]',
+      )
+      .first(),
+  ).toBeVisible();
+  const closed = win.locator('[data-testid="notes-group"][data-state="closed"]');
+  while ((await closed.count()) > 0) await closed.first().click();
+}
+
+/** N8: + New with a title and a category; the new note opens. */
+async function newNote(page: Page, win: Locator, title: string, category = "other") {
+  await win.getByTestId("notes-new").click();
+  const dialog = page.getByTestId("notes-new-dialog");
+  await dialog.getByTestId("notes-new-title").fill(title);
+  await dialog.locator(`[data-testid="notes-category-pick"][data-category="${category}"]`).click();
+  await dialog.getByTestId("notes-title-save").click();
+  await expect(win.getByTestId("notes-title")).toHaveText(title);
+}
+
 /** Opens Notes and the note titled `title`; returns the window. */
 async function openNote(page: Page, title: string): Promise<Locator> {
   const win = await openWindow(page, "notes.main");
+  await expandGroups(win);
   await win.getByTestId("notes-list-item").filter({ hasText: title }).first().click();
   await expect(win.getByTestId("notes-title")).toHaveText(title);
   await expect(win.getByTestId("notes-status")).toHaveText("Saved");
@@ -162,6 +190,7 @@ test("FR-NOTES-04 FR-NOTES-05 FR-NOTES-20 delete while another reads it: their b
   expect(await who.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await row.getByTestId("notes-restore").click();
   await expect(bin).toHaveAttribute("data-count", String(before));
+  await expandGroups(p2Win);
   await expect(p2Win.getByTestId("notes-list-item").filter({ hasText: "Duke Varen" })).toHaveCount(
     1,
   );
@@ -329,11 +358,11 @@ test("N5 FR-NOTES-07 – -12 FR-NOTES-23 the @ picker links for everyone; chips 
   // @ picker: "@Du" + Enter inserts a Duke Varen chip, for everyone.
   await newLine(p2, p2Win);
   await p2.keyboard.type("Ask @Du", { delay: 20 });
-  await expect(p2Win.getByTestId("notes-picker")).toBeVisible();
-  await expect(p2Win.getByTestId("notes-picker-item").first()).toHaveText("Duke Varen");
-  await expect(p2Win.getByTestId("notes-picker-create")).toHaveText('Create note "Du"');
+  await expect(p2.getByTestId("notes-picker")).toBeVisible();
+  await expect(p2.getByTestId("notes-picker-item").first()).toHaveText("Duke Varen");
+  await expect(p2.getByTestId("notes-picker-create")).toHaveText('Create note "Du"');
   await p2.keyboard.press("Enter");
-  await expect(p2Win.getByTestId("notes-picker")).toHaveCount(0);
+  await expect(p2.getByTestId("notes-picker")).toHaveCount(0);
   for (const w of [p2Win, p1Win])
     await expect(w.locator('[data-testid="notes-link"][data-title="Duke Varen"]')).toHaveCount(1);
   // r1: live preview (caret elsewhere): "# Quest log" shows no "#", "- Recover" a bullet.
@@ -358,9 +387,9 @@ test("N5 FR-NOTES-07 – -12 FR-NOTES-23 the @ picker links for everyone; chips 
   // "@Nobody" then Esc: plain text, no link.
   await newLine(p1, p1Win);
   await p1.keyboard.type("@Nobody", { delay: 20 });
-  await expect(p1Win.getByTestId("notes-picker")).toBeVisible();
+  await expect(p1.getByTestId("notes-picker")).toBeVisible();
   await p1.keyboard.press("Escape");
-  await expect(p1Win.getByTestId("notes-picker")).toHaveCount(0);
+  await expect(p1.getByTestId("notes-picker")).toHaveCount(0);
   await expect.poll(async () => (await lineTexts(p2Win)).at(-1)).toBe("@Nobody");
 
   // Backspace just after a chip removes it whole (Quest log already links Burnt Ledger once).
@@ -387,12 +416,20 @@ test("N5 FR-NOTES-07 – -12 FR-NOTES-23 the @ picker links for everyone; chips 
     p2.getByTestId("ui-tooltip").filter({ hasText: "No note yet · click to create" }),
   ).toBeVisible();
   await missing.click();
+  // N8, FR-NOTES-25: the category first, in the picker's popup; a click picks one.
+  const step = p2.locator('[data-testid="notes-picker"][data-step="category"]');
+  await expect(step.getByTestId("notes-category-pick")).toHaveCount(8);
+  await step.locator('[data-testid="notes-category-pick"][data-category="location"]').click();
   await expect(p2Win.getByTestId("notes-title")).toHaveText("Lost tomb");
+  await expect(p2Win.getByTestId("notes-category")).toHaveAttribute("data-category", "location");
   // r1: an empty note says how to link.
   await expect(p2Win.locator(".cm-placeholder")).toContainText("Type @ to link a note");
-  await expect(p1Win.getByTestId("notes-list-item").filter({ hasText: "Lost tomb" })).toHaveCount(
-    1,
-  );
+  await expandGroups(p1Win);
+  await expect(
+    p1Win.locator('[data-testid="notes-list-item"][data-category="location"]', {
+      hasText: "Lost tomb",
+    }),
+  ).toHaveCount(1);
   await expect(p1Win.locator('[data-testid="notes-link"][data-title="Lost tomb"]')).toHaveAttribute(
     "data-missing",
     "false",
@@ -429,10 +466,7 @@ test("N5 FR-NOTES-07 – -12 FR-NOTES-23 the @ picker links for everyone; chips 
 
   // r1: a note nothing links to says so.
   const fresh = await openWindow(dm, "notes.main");
-  await fresh.getByTestId("notes-new").click();
-  await dm.getByTestId("notes-title-input").fill("Empty page");
-  await dm.getByTestId("notes-title-save").click();
-  await expect(fresh.getByTestId("notes-title")).toHaveText("Empty page");
+  await newNote(dm, fresh, "Empty page");
   await expect(fresh.getByTestId("notes-backlinks")).toContainText("No links here yet");
 });
 
@@ -475,6 +509,7 @@ test("N6 FR-NOTES-11 the DM renames a note while P1 types in a note linking to i
   expect(await docText(p2Win)).toBe(await docText(p1Win));
 
   // Back to "Quest log" (other specs on this bundle's server use it): the chips follow back.
+  await expandGroups(dmWin);
   await dmWin.getByTestId("notes-list-item").filter({ hasText: "Quest journal" }).first().click();
   await dmWin.getByTestId("notes-rename").click();
   await dm.getByTestId("notes-title-input").fill("Quest log");
@@ -563,17 +598,23 @@ test("polish r1 (Gilt & Stone and Simple Dark): unfocused preview, redo, list te
         same++;
     return same >= (data.length / info.channels) * 0.8;
   };
-  await expect.poll(() => onTop(p2, p2Win), { timeout: 5_000 }).toBe(true);
+  // The tag shows for 2 s after its typist's last change (FR-NOTES-15). Under CI load those 2 s can
+  // pass before a look, so with no tag shown the typist types one more character.
+  const tagOnTop = async (page: Page, win: Locator, typist: Page) => {
+    if ((await win.locator(".cm-remote-caret[data-tag=shown]").count()) === 0) {
+      await typist.keyboard.type(".");
+      return false;
+    }
+    return onTop(page, win);
+  };
+  await expect.poll(() => tagOnTop(p2, p2Win, p1), { timeout: 10_000 }).toBe(true);
   await p2.keyboard.press("End");
   await p2.keyboard.type(" P2", { delay: 15 });
-  await expect.poll(() => onTop(p1, p1Win), { timeout: 5_000 }).toBe(true);
+  await expect.poll(() => tagOnTop(p1, p1Win, p2), { timeout: 10_000 }).toBe(true);
   await expect(p1Win.getByTestId("notes-status")).toHaveText("Saved");
 
   // The bin row names who deleted a note in full, in both themes, at the default width.
-  await p1Win.getByTestId("notes-new").click();
-  await p1.getByTestId("notes-title-input").fill("Throwaway");
-  await p1.getByTestId("notes-title-save").click();
-  await expect(p1Win.getByTestId("notes-title")).toHaveText("Throwaway");
+  await newNote(p1, p1Win, "Throwaway");
   await p1Win.getByTestId("notes-delete").click();
   await p1.getByTestId("notes-delete-confirm").click();
   for (const [page, w] of [
@@ -610,3 +651,229 @@ test("polish r1 (Gilt & Stone and Simple Dark): unfocused preview, redo, list te
   await box.fill("line of");
   await expect(results.filter({ hasText: "Quest log" })).toHaveCount(1);
 });
+
+test("N8 FR-NOTES-25 FR-NOTES-26 FR-NOTES-27 FR-NOTES-28 FR-NOTES-30 categories: @ Create note asks one in the popup; + New needs one; groups update live for everyone; a change moves the note for all; Recent is last edited first and remembered; Linked from holds its height", async ({
+  browser,
+}) => {
+  const { dm, p1, p2 } = await setup(browser);
+  const group = (w: Locator, c: string) =>
+    w.locator(`[data-testid="notes-group"][data-category="${c}"]`);
+  const count = async (w: Locator, c: string) =>
+    (await group(w, c).count()) === 0 ? 0 : Number(await group(w, c).getAttribute("data-count"));
+  const row = (w: Locator, title: string) =>
+    w.getByTestId("notes-list-item").filter({ hasText: title });
+
+  // A fresh browser: Session starts open, every other fold-out closed.
+  const dmWin = await openWindow(dm, "notes.main");
+  await expect(group(dmWin, "item")).toBeVisible();
+  for (const c of ["npc", "quest", "item"])
+    await expect(group(dmWin, c)).toHaveAttribute("data-state", "closed");
+  const npcBefore = await count(dmWin, "npc");
+
+  // P1: "@Tidewatch" → Create note → the categories in the same popup, Session highlighted;
+  // the keyboard picks Faction (Enter takes the highlighted one).
+  const p1Win = await openNote(p1, "Burnt Ledger");
+  await newLine(p1, p1Win);
+  // r2: in the title list, the pointer highlights a row as the arrows do.
+  await p1.keyboard.type("Ask @", { delay: 20 });
+  const titleRows = p1.getByTestId("notes-picker-item");
+  await titleRows.nth(1).hover();
+  await expect(titleRows.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(titleRows.first()).toHaveAttribute("aria-selected", "false");
+  await p1.mouse.move(0, 0);
+  await p1.keyboard.type("Tidewatch", { delay: 20 });
+  await expect(p1.getByTestId("notes-picker-create")).toHaveText('Create note "Tidewatch"');
+  await p1.keyboard.press("Enter");
+  const step = p1.locator('[data-testid="notes-picker"][data-step="category"]');
+  const picks = step.getByTestId("notes-category-pick");
+  await expect(picks).toHaveText([
+    "Session",
+    "NPC",
+    "Quest",
+    "Location",
+    "Item",
+    "Faction",
+    "Player",
+    "Other",
+  ]);
+  await expect(picks.first()).toHaveAttribute("aria-selected", "true");
+  // r1: all eight are on screen, nothing over them (not clipped by the editor's box).
+  await allReachable(picks);
+  await expect(p1Win.locator('[data-testid="notes-picker"]')).toHaveCount(0); // in the page layer
+  await p1.keyboard.press("ArrowUp"); // wraps to Other
+  await p1.keyboard.press("ArrowUp"); // Player
+  await p1.keyboard.press("ArrowUp"); // Faction
+  await expect(step.locator('[data-category="faction"]')).toHaveAttribute("aria-selected", "true");
+  // r2: the pointer moves the highlight too, and the arrows carry on from it.
+  await step.locator('[data-category="player"]').hover();
+  await expect(step.locator('[data-category="player"]')).toHaveAttribute("aria-selected", "true");
+  await expect(step.locator('[data-category="faction"]')).toHaveAttribute("aria-selected", "false");
+  await p1.keyboard.press("ArrowUp");
+  await expect(step.locator('[data-category="faction"]')).toHaveAttribute("aria-selected", "true");
+  await p1.keyboard.press("Enter");
+  await expect(step).toHaveCount(0);
+  const chip = p1Win.locator('[data-testid="notes-link"][data-title="Tidewatch"]');
+  await expect(chip).toHaveAttribute("data-missing", "false");
+  // The DM sees the new Faction fold-out live (closed: it was never opened in this browser).
+  await expect(group(dmWin, "faction")).toBeVisible();
+  await group(dmWin, "faction").click();
+  await expect(row(dmWin, "Tidewatch")).toHaveAttribute("data-category", "faction");
+
+  // P2: + New needs a title and a category; none is picked first.
+  const p2Win = await openWindow(p2, "notes.main");
+  await p2Win.getByTestId("notes-new").click();
+  const dialog = p2.getByTestId("notes-new-dialog");
+  const title = dialog.getByTestId("notes-new-title");
+  await title.fill("Harbour master");
+  const pick = (c: string) =>
+    dialog.locator(`[data-testid="notes-category-pick"][data-category="${c}"]`);
+  await expect(
+    dialog.locator('[data-testid="notes-category-pick"][aria-checked="true"]'),
+  ).toHaveCount(0);
+  const save = dialog.getByTestId("notes-title-save");
+  await expect(save).toBeDisabled();
+  // r1: Enter with no category says so.
+  await title.press("Enter");
+  await expect(dialog.getByTestId("notes-category-hint")).toHaveText("Pick a category");
+  // r1: one Tab stop for the eight; the arrows move between them; Space picks.
+  await title.press("Tab");
+  await expect(pick("session")).toBeFocused();
+  await p2.keyboard.press("ArrowRight");
+  await expect(pick("npc")).toBeFocused();
+  const look = (l: Locator) =>
+    l.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return `${cs.color}|${cs.backgroundColor}|${cs.backgroundImage}`;
+    });
+  const offLook = await look(pick("npc"));
+  const createOff = await look(save);
+  await p2.keyboard.press("Space");
+  await expect(pick("npc")).toHaveAttribute("aria-checked", "true");
+  await expect(dialog.getByTestId("notes-category-hint")).toHaveCount(0);
+  await p2.keyboard.press("Tab");
+  await expect(dialog.locator('[data-testid="notes-category-pick"]:focus')).toHaveCount(0);
+  // r1: picked and enabled read differently from not picked and disabled (Gilt here).
+  await expect(save).toBeEnabled();
+  await p2.mouse.move(0, 0);
+  expect(await look(pick("npc"))).not.toBe(offLook);
+  expect(await look(save)).not.toBe(createOff);
+  await save.click();
+  await expect(p2Win.getByTestId("notes-title")).toHaveText("Harbour master");
+  await expect(p2Win.getByTestId("notes-category")).toHaveAttribute("data-category", "npc");
+
+  // The DM's NPC count moves live; opened, the group lists it A–Z with who and when.
+  await expect.poll(() => count(dmWin, "npc")).toBe(npcBefore + 1);
+  await group(dmWin, "npc").click();
+  await expect(row(dmWin, "Harbour master")).toContainText("Player 2 ·");
+  const npcTitles = await dmWin
+    .locator('[data-testid="notes-list-item"][data-category="npc"] span:first-child')
+    .allTextContents();
+  expect(npcTitles).toEqual(
+    [...npcTitles].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })),
+  );
+
+  // The DM moves it to Location from the editor's header: it moves for P1 and P2.
+  await row(dmWin, "Harbour master").click();
+  await expect(dmWin.getByTestId("notes-title")).toHaveText("Harbour master");
+  await dmWin.getByTestId("notes-category").click();
+  await dm.locator('[data-testid="notes-category-option"][data-category="location"]').click();
+  // r1: the DM's own list follows the open note into Location, unfolded, the row selected.
+  await expect(group(dmWin, "location")).toHaveAttribute("data-state", "open");
+  await expect(row(dmWin, "Harbour master")).toHaveAttribute("aria-current", "true");
+  await expect(row(dmWin, "Harbour master")).toBeInViewport();
+  await expect(p2Win.getByTestId("notes-category")).toHaveAttribute("data-category", "location");
+  await expect.poll(() => count(p1Win, "npc")).toBe(npcBefore);
+  await expandGroups(p1Win);
+  await expect(row(p1Win, "Harbour master")).toHaveAttribute("data-category", "location");
+
+  // Recent (P2): one list, last edited first, the category on each row; kept after a reload.
+  await p2Win.getByTestId("notes-sort").click();
+  await expect(p2Win.getByTestId("notes-sort")).toHaveAttribute("aria-pressed", "true");
+  await expect(p2Win.getByTestId("notes-group")).toHaveCount(0);
+  const first = p2Win.getByTestId("notes-list-item").first();
+  await expect(first).toContainText("Harbour master");
+  await expect(first).toContainText("Location · DM ·");
+  await p2.reload();
+  await live(p2);
+  const again = await openWindow(p2, "notes.main");
+  await expect(again.getByTestId("notes-sort")).toHaveAttribute("aria-pressed", "true");
+  await expect(again.getByTestId("notes-list-item").first()).toContainText("Harbour master");
+
+  // Linked from: titled with its count, four rows tall, the same height with no links.
+  const box = (w: Locator) => w.getByTestId("notes-backlinks-list");
+  await expect(p1Win.getByTestId("notes-backlinks")).toContainText("Linked from (");
+  const withLinks = (await box(p1Win).boundingBox())?.height ?? 0;
+  await expect(dmWin.getByTestId("notes-backlinks")).toContainText("No links here yet");
+  const empty = (await box(dmWin).boundingBox())?.height ?? 0;
+  expect(withLinks).toBeGreaterThanOrEqual(4 * 24);
+  expect(Math.abs(withLinks - empty)).toBeLessThanOrEqual(1);
+  // r1: the heading is the kit's section label; counts use lining figures (Gilt: no "(ı)").
+  await expect(dmWin.getByTestId("notes-backlinks-title")).toHaveAttribute(
+    "data-slot",
+    "section-label",
+  );
+  for (const count of [
+    group(dmWin, "item").locator('[data-slot="notes-count"]'),
+    dmWin.getByTestId("notes-backlinks-title").locator('[data-slot="notes-count"]'),
+  ])
+    expect(await count.evaluate((el) => getComputedStyle(el).fontVariantNumeric)).toContain(
+      "lining-nums",
+    );
+
+  // r1: down to the window's minimum the editor keeps ~3 lines; the box gives way first
+  // (title + one row), and grows back to four rows when there is room.
+  const editorBox = dmWin.getByTestId("notes-editor-box");
+  await resizeTo(dm, dmWin, 320, 280);
+  expect((await editorBox.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(66);
+  const small = (await box(dmWin).boundingBox())?.height ?? 0;
+  expect(small).toBeGreaterThanOrEqual(23);
+  expect(small).toBeLessThan(4 * 24);
+  await resizeTo(dm, dmWin, 760, 560);
+  await expect
+    .poll(async () => (await box(dmWin).boundingBox())?.height ?? 0)
+    .toBeGreaterThanOrEqual(4 * 24);
+
+  // r1: at 1280 × 720 the category step still shows all eight, reachable.
+  await p1.setViewportSize({ width: 1280, height: 720 });
+  await p1Win.locator(".cm-content").click();
+  await p1.keyboard.press("Control+End");
+  await p1.keyboard.type(" @Keelhaul", { delay: 20 });
+  await expect(p1.getByTestId("notes-picker-create")).toHaveText('Create note "Keelhaul"');
+  await p1.keyboard.press("Enter");
+  await allReachable(picks);
+  await p1.keyboard.press("ArrowUp"); // Other, the last: still in view
+  await expect(step.locator('[data-category="other"]')).toBeInViewport({ ratio: 1 });
+  // r2: hovering a category highlights it; Enter takes the hovered one.
+  await step.locator('[data-category="location"]').hover();
+  await expect(step.locator('[data-category="location"]')).toHaveAttribute("aria-selected", "true");
+  await expect(step.locator('[data-category="other"]')).toHaveAttribute("aria-selected", "false");
+  await p1.keyboard.press("Enter");
+  await expect(step).toHaveCount(0);
+  await expect(p1Win.locator('[data-testid="notes-link"][data-title="Keelhaul"]')).toHaveAttribute(
+    "data-missing",
+    "false",
+  );
+  await expect(
+    dmWin.locator('[data-testid="notes-group"][data-category="location"]'),
+  ).toHaveAttribute("data-count", /\d+/);
+  await expandGroups(dmWin);
+  await expect(
+    dmWin.locator('[data-testid="notes-list-item"][data-category="location"]', {
+      hasText: "Keelhaul",
+    }),
+  ).toHaveCount(1);
+});
+
+/** r1: each row fully on screen and the topmost element at its centre (nothing over it). */
+async function allReachable(rows: Locator) {
+  await expect(rows).toHaveCount(8);
+  for (const r of await rows.all()) {
+    await expect(r).toBeInViewport({ ratio: 1 });
+    const hit = await r.evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      const top = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+      return top === el || el.contains(top);
+    });
+    expect(hit).toBe(true);
+  }
+}

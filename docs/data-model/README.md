@@ -2923,6 +2923,7 @@ From [linked-notes §8](../specs/linked-notes.md#8-data-model) ([ADR-0078](../ar
 |---|---|---|---|---|
 | `id`, `campaign_id` | ID, ID → Campaign | — | `ctx.ids` | FR-NOTES-01 |
 | `title`, `title_fold` | text 1–100, text | — | Trimmed; no `[[`, `]]`, `\|` or line break. `title_fold` = the shared matcher's `fold`; unique among the campaign's live notes, kept by the commands | FR-NOTES-02 |
+| `category` *(N8, #454)* | `session` \| `npc` \| `quest` \| `location` \| `item` \| `faction` \| `player` \| `other` | `other` | Not null. Added later: a column add only, so notes from before are `other`. Set on create, changed by `notes.setCategory` (live notes), kept by delete and restore | FR-NOTES-25 |
 | `created_by_role`, `created_by_player_id` | `dm` \| `player`, ID \| null | — | Player id null for the DM | |
 | `created_at`, `updated_at` | ISO | — | `ctx.clock`. Rename and restore bump `updated_*` | |
 | `updated_by_role`, `updated_by_player_id` | as `created_by_*` | — | | |
@@ -2943,7 +2944,8 @@ Index: `note_campaign_title` (`campaign_id`, `title_fold`).
 - **Visibility-relevant:** only `campaign_id` (every note is the whole table's, FR-NOTES-01).
 - **Not stored:** subscriptions, who is here, cursors (N2, memory only).
 - **Fixtures:** `notes-shared`, `notes-binned`, `notes-second-campaign`; bundle `notes`. Bodies are set by `notes.seedBody`, a fixtures-only command (not an intent) until co-writing exists.
-- **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap.
+- **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap. *(N8: `category` adds ≈ 20 B a row: 1,553 B for the fixture's 4 rows, 1,012,612 B at both caps, ≈ 506 B a row.)*
+- **Fixture categories** *(N8)*: Burnt Ledger `item`, Quest log `quest`, Duke Varen `npc`, Old rumours `other`; the second campaign's Burnt Ledger `item`.
 
 ## 155. Class resources: pact slots, pact weapons, sorcery points, uses with a cost (build/cres-pact)
 

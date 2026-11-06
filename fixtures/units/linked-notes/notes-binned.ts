@@ -15,7 +15,7 @@ export default defineFixture({
   requires: ["player-2"],
   ownerSpec: "linked-notes",
   steps: [
-    step(createNote, { title: NOTES_BINNED.title }, { as: "player-2" }),
+    step(createNote, { title: NOTES_BINNED.title, category: "other" }, { as: "player-2" }),
     step(
       seedNoteBody,
       (r) => ({ noteId: r.id("notes-binned", NOTE_TYPE), body: NOTES_BINNED.body }),

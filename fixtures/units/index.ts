@@ -110,6 +110,7 @@ import gemsRolls from "./gems/gems-rolls";
 import notesBinned from "./linked-notes/notes-binned";
 import notesSecondCampaign from "./linked-notes/notes-second-campaign";
 import notesShared from "./linked-notes/notes-shared";
+import notesTokens from "./linked-notes/notes-tokens";
 import syncProbes from "./live-sync/sync-probes";
 import shareMiraRows from "./log-share/share-mira-rows";
 import kitNotices from "./notifications/kit-notices";
@@ -369,4 +370,6 @@ export const units: readonly Fixture[] = [
   tentaclesRow,
   // Compendium entry on players' screens (build/item-present, #458)
   entryPresent1,
+  // Linked notes N9 token notes (build/notes-token)
+  notesTokens,
 ];

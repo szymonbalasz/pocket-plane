@@ -1,4 +1,5 @@
-// NOTES N1 commands in-process (NOTES §6, §9, build §1.2): create / rename / delete / restore by
+// NOTES N1 + N8 commands in-process (NOTES §6, §9, build §1.2): create / rename / setCategory /
+// delete / restore by
 // the DM and players, folded title clashes, both caps, the Recycle bin and its "(restored)" names,
 // `ifMissing`, no-op acks, another campaign's note → `not_found`, nothing in the event log.
 import { beforeEach, describe, expect, test } from "bun:test";
@@ -6,6 +7,7 @@ import { NoteChanged } from "@shared/linked-notes/events";
 import {
   NOTE_BIN_FULL,
   NOTE_BIN_MAX,
+  NOTE_CATEGORIES,
   NOTE_LIMIT_MESSAGE,
   NOTE_LIVE_MAX,
   NOTE_TITLE_CLASH,
@@ -22,7 +24,14 @@ import type { Actor, DispatchedEvent } from "../../events/types";
 import type { Services } from "../../services";
 import { seedSyncProbe } from "../../testing/seed";
 import { createTestServices } from "../../testing/services";
-import { createNote, deleteNote, renameNote, restoreNote, seedNoteBody } from "./commands";
+import {
+  createNote,
+  deleteNote,
+  renameNote,
+  restoreNote,
+  seedNoteBody,
+  setNoteCategory,
+} from "./commands";
 
 type Seed = ReturnType<typeof seedSyncProbe>;
 
@@ -65,7 +74,7 @@ function refusal(fn: () => unknown): { code: string; message: string } {
 const row = (id: string) => s.db.select().from(note).where(eq(note.id, id)).get();
 const lastAfter = () => events.at(-1)?.event.changes[0]?.after as NoteRecord;
 const create = (title: string, actor: Actor = dm) =>
-  run(createNote, { title }, actor) as { noteId: string; created: boolean };
+  run(createNote, { title, category: "other" }, actor) as { noteId: string; created: boolean };
 
 /** Rows straight into the table (cap tests): `n` live or binned notes titled `<prefix> i`. */
 function fill(cid: string, n: number, binned: boolean, prefix = "Filler") {
@@ -98,6 +107,7 @@ describe("linked-notes commands (N1)", () => {
       id: noteId,
       campaignId: t.campaignId,
       title: "Burnt Ledger",
+      category: "other",
       createdBy: { role: "player", playerId: t.p1.id },
       updatedAt: "2026-03-01T00:00:00.000Z",
       updatedBy: { role: "player", playerId: t.p1.id },
@@ -265,13 +275,13 @@ describe("linked-notes commands (N1)", () => {
   });
 
   test("FR-NOTES-10 ifMissing answers with the live note of that folded title, no write", () => {
-    const a = run(createNote, { title: "Duke Varen", ifMissing: true }, p1) as {
+    const a = run(createNote, { title: "Duke Varen", ifMissing: true, category: "other" }, p1) as {
       noteId: string;
       created: boolean;
     };
     expect(a.created).toBe(true);
     const n = events.length;
-    const b = run(createNote, { title: "duke  varen", ifMissing: true }, p2) as {
+    const b = run(createNote, { title: "duke  varen", ifMissing: true, category: "other" }, p2) as {
       noteId: string;
       created: boolean;
     };
@@ -279,7 +289,7 @@ describe("linked-notes commands (N1)", () => {
     expect(events.length).toBe(n);
     // A binned note of that title doesn't count: a new one is made.
     run(deleteNote, { noteId: a.noteId }, dm);
-    const c = run(createNote, { title: "Duke Varen", ifMissing: true }, p2) as {
+    const c = run(createNote, { title: "Duke Varen", ifMissing: true, category: "other" }, p2) as {
       noteId: string;
       created: boolean;
     };
@@ -296,7 +306,15 @@ describe("linked-notes commands (N1)", () => {
     run(restoreNote, { noteId }, dm);
     expect(logged()).toBe(n);
     expect(s.intents.has("notes.seedBody")).toBe(false);
-    for (const name of ["notes.create", "notes.rename", "notes.delete", "notes.restore"])
+    run(setNoteCategory, { noteId, category: "npc" }, p1);
+    expect(logged()).toBe(n);
+    for (const name of [
+      "notes.create",
+      "notes.rename",
+      "notes.setCategory",
+      "notes.delete",
+      "notes.restore",
+    ])
       expect(s.intents.has(name)).toBe(true);
     expect(refusal(() => run(seedNoteBody, { noteId, body: "x" }, dm)).code).toBe("forbidden");
     expect(
@@ -308,5 +326,95 @@ describe("linked-notes commands (N1)", () => {
         ),
       ).code,
     ).toBe("invalid");
+  });
+});
+
+describe("linked-notes categories (N8)", () => {
+  test("FR-NOTES-25 create needs one of the eight categories; the record carries it", () => {
+    const missing = refusal(() => run(createNote, { title: "No category" }, p1));
+    expect(missing.code).toBe("invalid");
+    expect(refusal(() => run(createNote, { title: "Bad", category: "tag" }, p1)).code).toBe(
+      "invalid",
+    );
+    for (const category of NOTE_CATEGORIES) {
+      const { noteId } = run(createNote, { title: `A ${category}`, category }, p1) as {
+        noteId: string;
+      };
+      expect(row(noteId)?.category).toBe(category);
+      expect(lastAfter().category).toBe(category);
+    }
+    expect(NOTE_CATEGORIES).toEqual([
+      "session",
+      "npc",
+      "quest",
+      "location",
+      "item",
+      "faction",
+      "player",
+      "other",
+    ]);
+  });
+
+  test("FR-NOTES-25 ifMissing on an existing title keeps that note's category", () => {
+    const { noteId } = run(createNote, { title: "Duke Varen", category: "npc" }, p1) as {
+      noteId: string;
+    };
+    const again = run(createNote, { title: "duke varen", category: "quest", ifMissing: true }, p2);
+    expect(again).toEqual({ noteId, created: false });
+    expect(row(noteId)?.category).toBe("npc");
+  });
+
+  test("FR-NOTES-25 FR-NOTES-30 anyone changes a live note's category: one record change, who and when move, nothing logged", () => {
+    const { noteId } = run(createNote, { title: "Burnt Ledger", category: "other" }, p1) as {
+      noteId: string;
+    };
+    const logged = s.db.select().from(eventLog).all().length;
+    for (const [actor, category] of [
+      [p2, "item"],
+      [dm, "quest"],
+    ] as const) {
+      const before = events.length;
+      run(setNoteCategory, { noteId, category }, actor);
+      expect(events.length).toBe(before + 1);
+      const e = events.at(-1);
+      expect(e?.event.payload).toEqual({ noteId, change: "categorized" });
+      expect(e?.event.changes).toHaveLength(1);
+      expect(lastAfter().category).toBe(category);
+      expect(lastAfter().updatedBy).toEqual(
+        actor.role === "dm"
+          ? { role: "dm", playerId: null }
+          : { role: "player", playerId: actor.playerId },
+      );
+    }
+    // The same category again: an ack, no write.
+    const n = events.length;
+    run(setNoteCategory, { noteId, category: "quest" }, p1);
+    expect(events.length).toBe(n);
+    expect(s.db.select().from(eventLog).all().length).toBe(logged);
+    expect(refusal(() => run(setNoteCategory, { noteId, category: "x" }, p1)).code).toBe("invalid");
+  });
+
+  test("FR-NOTES-25 a binned note's category can't change (not_found); Restore keeps it", () => {
+    const { noteId } = run(createNote, { title: "Old rumours", category: "faction" }, p2) as {
+      noteId: string;
+    };
+    run(deleteNote, { noteId }, dm);
+    expect(refusal(() => run(setNoteCategory, { noteId, category: "npc" }, p1)).code).toBe(
+      "not_found",
+    );
+    expect(row(noteId)?.category).toBe("faction");
+    run(restoreNote, { noteId }, p1);
+    expect(row(noteId)?.category).toBe("faction");
+    expect(lastAfter().category).toBe("faction");
+  });
+
+  test("FR-NOTES-25 another campaign's note is not_found for setCategory", () => {
+    const { noteId } = run(createNote, { title: "Canary", category: "item" }, other) as {
+      noteId: string;
+    };
+    expect(refusal(() => run(setNoteCategory, { noteId, category: "npc" }, p1)).code).toBe(
+      "not_found",
+    );
+    expect(row(noteId)?.category).toBe("item");
   });
 });

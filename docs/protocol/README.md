@@ -4640,3 +4640,18 @@ From [compendium §6.2](../specs/compendium.md#62-entry-present-an-awarded-item-
 | `cmp.addToSheet` | `feat` and `option` → a `features` row; `race`, `background` → `400 invalid` |
 | `GET /api/compendium/sources` | `fiveEtools.books[].counts` + `feat`, `race`, `background`, `option` |
 | Share (FR-SHARE-04) | feat / option: Prerequisite fact + text; race: Ability Scores, Size, Speed facts + text; background: text |
+
+## 204. Linked notes categories (build/notes-categories)
+
+From [linked-notes](../specs/linked-notes.md) FR-NOTES-25 – -28, -30 (#454). **Built by `build/notes-categories` (slice N8).** One new intent, one column (`note.category`, [data model §154](../data-model/README.md#154-linked-notes-records-buildnotes-core)), the `note` record and `notes.create` gain `category`; no new event, signal or table. The token menu (FR-NOTES-29) is N9's.
+
+| Intent (DM and players) | Payload → result | Rule | FR |
+|---|---|---|---|
+| `notes.create` | `{title, category, ifMissing?}` → `{noteId, created}` | As §196; `category` **required**, one of `session`, `npc`, `quest`, `location`, `item`, `faction`, `player`, `other` (else `invalid`). With `ifMissing` and a live note of that folded title: its id, its own category kept | FR-NOTES-25 |
+| `notes.setCategory` | `{noteId, category}` | Live notes only: binned, missing or another campaign's → `not_found`. Same category → ack, no event. Else `category`, `updatedAt` / `updatedBy` move (like a rename) | FR-NOTES-25, -30 |
+
+- **Record `note`:** wire `{id, campaignId, title, category, createdBy, updatedAt, updatedBy, deletedAt, deletedBy}`. Delete and restore keep `category`.
+- **Event `NoteChanged`:** `change` gains `categorized` (not logged; changes = the `note` record). It refreshes no backlinks.
+- **Client only:** **+ New** asks for a title and one of the eight categories (none picked first; Create stays off until both). The `@` / `[[` picker's Create note, and a click on a missing chip, show the eight categories in the same popup (arrows + Enter, Session highlighted first; Esc closes, the text stays plain), then send `notes.create {title, category, ifMissing: true}`. The editor header's category select sends `notes.setCategory`. The list groups live notes by category in fold-outs (that order, with counts; empty groups hidden; A–Z inside; Session open by default, the others' open state per browser), or with **Recent** one list, last edited first, with the category on each row (per browser); the narrow dropdown follows the same choice. **Linked from** is a titled box with a count, four rows tall, scrolling past that.
+- **Browser storage:** `pp.notes.v1.groups` (JSON: category → open), `pp.notes.v1.sort` (`category` \| `recent`).
+- **Test IDs:** `notes-sort` (`aria-pressed`), `notes-group` (`data-category`, `data-count`, `data-state`), `notes-new-title`, `notes-category-pick` (`data-category`; + New's buttons and the popup's rows), `notes-category` (editor header select), `notes-list-item` gains `data-category`.

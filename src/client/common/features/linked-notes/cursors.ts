@@ -109,6 +109,9 @@ const theme = EditorView.baseTheme({
     fontSize: "0.75rem", // r2: the kit's smallest text (`text-xs`, 12 px)
     lineHeight: "1rem",
     whiteSpace: "nowrap",
+    // A list line's hanging indent (negative `text-indent`) would pull the name out of its own
+    // background on the left (the tag narrower than its name): none here.
+    textIndent: "0",
     color: "var(--background)",
     pointerEvents: "none",
     userSelect: "none",

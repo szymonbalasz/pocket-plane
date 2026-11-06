@@ -214,7 +214,10 @@ describe("FR-NOTES-22 note search", () => {
   test("FR-NOTES-22 at most 50 results, `more` set when there are others", async () => {
     const dm = await h.live(DM);
     for (let i = 0; i < NOTE_SEARCH_LIMIT + 5; i++)
-      await ok(dm, dm.intent(N.create, { title: `Bulk ${String(i).padStart(2, "0")}` }));
+      await ok(
+        dm,
+        dm.intent(N.create, { title: `Bulk ${String(i).padStart(2, "0")}`, category: "other" }),
+      );
     const r = await search("bulk");
     expect(r.results).toHaveLength(NOTE_SEARCH_LIMIT);
     expect(r.more).toBe(true);
