@@ -2,12 +2,15 @@
 
 /** Dice rest within this (the 150-step budget at 60 Hz); a throw not at rest by then snaps. */
 export const SETTLE_MAX_MS = 2500;
-/** At rest this long, then the hand-off to the popup (popups on). */
-export const REST_MS = 1000;
+/**
+ * At rest this long, then the hand-off to the popup (popups on). DM, 2026-11-06: 1 → 1.5 s, so
+ * the slower damage landing (LAND_S 1.4 s, FR-DICEX-106) plays out before it.
+ */
+export const REST_MS = 1500;
 /** Rested dice shrink into their popup's PiP (D7; until then they fade over this). */
 export const HANDOFF_MS = 400;
-/** Popups off: at rest this long, then the fade (FR-DICEX-17). */
-export const REST_NO_POPUP_MS = 1500;
+/** Popups off: at rest this long, then the fade (FR-DICEX-17; DM, 2026-11-06: 1.5 → 2 s). */
+export const REST_NO_POPUP_MS = 2000;
 /** The fade with popups off. */
 export const FADE_MS = 300;
 /** Flat dice: faces fade in within this (FR-DICEX-41 c). */

@@ -1,8 +1,9 @@
 // FR-DICEX-106: the full effect of a damage die, a particle simulation with no three.js in it
 // (tested headless). Each die sheds particles while it flies and bursts once when it lands; every
-// particle moves with its own die (no trail behind it); the burst is over within LAND_S of rest,
-// before the hand-off copies the dice (FR-DICEX-35). Big rolls share one budget: fewer particles
-// per die as the dice add up, and never more than MAX_PARTICLES live per kind. The kinds' looks
+// particle moves with its own die (no trail behind it); the burst is over within LAND_S of rest
+// (played slowed, on the landing clock), before the hand-off copies the dice (FR-DICEX-35). Big
+// rolls share one budget: fewer particles per die as the dice add up, and never more than
+// MAX_PARTICLES live per kind. The kinds' looks
 // (presets, sprites, auras) live in fx-kinds/<kind>.ts.
 
 /** A colour stop over a particle's life: at (0–1), r, g, b, a (0–1). */
@@ -65,11 +66,24 @@ export interface RichPreset {
 
 /** Live particles of one kind in one throw, all its dice together. */
 export const MAX_PARTICLES = 1400;
-/** The landing is over this long after rest (well before the 1 s hand-off, FR-DICEX-35). */
-export const LAND_S = 0.9;
-/** Particles start fading this long after rest. */
+/**
+ * The landing clock: the kinds' landing timelines (and landFade, landGlow, LAND_GLOW_S) are in
+ * these seconds after rest, the pace they were drawn at; all of it is over by LAND_CLOCK_S on it.
+ */
+export const LAND_CLOCK_S = 0.9;
+/**
+ * The landing is over this long after rest, real seconds, before the hand-off at rest + 1.5 s
+ * (FR-DICEX-35). DM, 2026-11-06: 0.9 → 1.4 s so the hits and pops read; the whole landing plays
+ * slower (LAND_PACE), no dead time added at the end.
+ */
+export const LAND_S = 1.4;
+/** Landing-clock seconds per real second after rest (< 1: slower). */
+export const LAND_PACE = LAND_CLOCK_S / LAND_S;
+/** Real seconds since rest → the landing clock. */
+export const landClock = (sinceRest: number): number => sinceRest * LAND_PACE;
+/** Particles start fading this long after rest (landing clock). */
 const LAND_FADE_FROM = 0.45;
-/** The aura and the die's glow are gone this long after rest, so the value reads clean. */
+/** The aura and the die's glow are gone this long after rest (landing clock), so the value reads clean. */
 export const LAND_GLOW_S = 0.4;
 
 /** Per-die share of the full effect for `n` dice: 1 up to two dice, then thinner. */
@@ -299,13 +313,13 @@ export function richSim(
   };
 }
 
-/** How far into the landing (seconds since rest) the particles still show (1 → 0). */
+/** How far into the landing (landing clock) the particles still show (1 → 0). */
 export function landFade(sinceRest: number): number {
   if (sinceRest <= LAND_FADE_FROM) return 1;
-  return Math.max(0, 1 - (sinceRest - LAND_FADE_FROM) / (LAND_S - LAND_FADE_FROM));
+  return Math.max(0, 1 - (sinceRest - LAND_FADE_FROM) / (LAND_CLOCK_S - LAND_FADE_FROM));
 }
 
-/** The aura and the die's glow over the landing: a flare at the impact, then gone. */
+/** The aura and the die's glow over the landing (landing clock): a flare at the impact, then gone. */
 export function landGlow(sinceRest: number): number {
   if (sinceRest >= LAND_GLOW_S) return 0;
   const u = sinceRest / LAND_GLOW_S;

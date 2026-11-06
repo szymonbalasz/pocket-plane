@@ -3,7 +3,9 @@
 // one additive and one covering particle draw, an aura quad per die, the die's glow, extras), in
 // the throw's loop and for the landing only. Rules for every kind:
 // - The landing is over by LAND_S after rest (fx-sim.ts), before the hand-off (FR-DICEX-35): the
-//   layer clears and hides everything then, extras included.
+//   layer clears and hides everything then, extras included. A kind times its landing on the
+//   landing clock (LAND_CLOCK_S long; fx-rich plays it slowed to fill LAND_S, DM 2026-11-06), so
+//   its own landing times (a hammer gone by 0.35) stretch with it.
 // - Particles share the kind's budget (`budgetScale`, MAX_PARTICLES); extras stay cheap (built once
 //   per throw, a handful of objects per die, no new geometry per frame).
 // - Deterministic: randomness only from the `seed` given (fx-sim.ts `prng`), never Math.random.
@@ -34,8 +36,8 @@ export interface RichExtra {
   object: Object3D;
   /**
    * Each frame: `t` seconds since the throw started, `progress` (0–1, 1 after rest), `unit` CSS px
-   * per world unit, `sinceRest` seconds since the landing (null in flight). With `whileRolling`
-   * false it is called from the landing on only.
+   * per world unit, `sinceRest` seconds since the landing on the landing clock (null in flight;
+   * after rest `t` runs on it too). With `whileRolling` false it is called from the landing on.
    */
   update(t: number, progress: number, unit: number, sinceRest: number | null): void;
   /** The dice rest (once): start the landing; the next update has `sinceRest` 0. */

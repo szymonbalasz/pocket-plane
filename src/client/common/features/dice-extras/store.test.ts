@@ -128,7 +128,7 @@ const phases = (s: DiceExtrasStore) => ({
 });
 
 describe("FR-DICEX-35 timing", () => {
-  test("FR-DICEX-35 timing: rest ≤ 2.5 s, hand-off at rest + 1 s, 0.4 s later the layer is clear", () => {
+  test("FR-DICEX-35 timing: rest ≤ 2.5 s, hand-off at rest + 1.5 s, 0.4 s later the layer is clear", () => {
     const t = fakeTimers();
     const s = createDiceExtrasStore(t);
     s.play(aThrow("a"), screen3d);
@@ -154,10 +154,10 @@ describe("FR-DICEX-35 timing", () => {
     expect(phases(s).current).toBe("moving");
     t.advance(1);
     expect(phases(s).current).toBe("rest");
-    // ≤ 3.9 s on screen in all.
+    // ≤ 4.4 s on screen in all.
     t.advance(REST_MS + HANDOFF_MS);
     expect(s.api.getState().current).toBeNull();
-    expect(t.now()).toBe(3900);
+    expect(t.now()).toBe(4400);
   });
 
   test("FR-DICEX-35 timing: a second throw at 1.2 s → the first snaps to rest and hands off at once", () => {
@@ -172,7 +172,7 @@ describe("FR-DICEX-35 timing", () => {
     expect(s.api.getState().current?.t.id).toBe("b");
   });
 
-  test("FR-DICEX-35 timing: popups off → rest 1.5 s + fade, no hand-off", () => {
+  test("FR-DICEX-35 timing: popups off → rest 2 s + fade, no hand-off", () => {
     const t = fakeTimers();
     const s = createDiceExtrasStore(t);
     s.play(aThrow("a"), { ...screen3d, handoff: false });

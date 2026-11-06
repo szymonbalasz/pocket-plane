@@ -100,7 +100,7 @@ test("FR-DICEX-33 FR-DICEX-34 FR-DICEX-37 full screen: chunk preloaded, first th
   // FR-DICEX-34: every die rests on the server's face (2 d20 + 1 d6), within the budget.
   expect(await restsOnServerFaces(p2, "screen")).toBe(3);
   expect(await restsOnServerFaces(p1, "screen")).toBe(3);
-  // FR-DICEX-35: rest 1 s, hand-off 0.4 s, then the layer is clear again (or gone: software GL
+  // FR-DICEX-35: rest 1.5 s, hand-off 0.4 s, then the layer is clear again (or gone: software GL
   // in headless Chromium is slow, so auto-flat may turn this device flat after the throw).
   await expect(thrown).toHaveCount(0, { timeout: 4_000 });
   await expect(

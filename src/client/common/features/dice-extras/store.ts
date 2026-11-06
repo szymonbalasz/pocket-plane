@@ -81,7 +81,7 @@ export interface DiceExtrasState {
 }
 
 /**
- * FR-DICEX-35 timeline: `moving` (≤ 2.5 s) → `rest` (1 s; popups off 1.5 s) → `handoff` (0.4 s;
+ * FR-DICEX-35 timeline: `moving` (≤ 2.5 s) → `rest` (1.5 s; popups off 2 s) → `handoff` (0.4 s;
  * popups off: `fading`, 0.3 s) → gone. A new throw sends the running one to its hand-off at once.
  */
 export type RunPhase = "moving" | "rest" | "handoff" | "fading";

@@ -1,12 +1,16 @@
 // FR-DICEX-106: the full effect's particle simulation (pure), run on fire's and cold's presets.
 // Each kind's own tests: fx-kinds/<kind>.test.ts; the registry's: fx-kinds/index.test.ts.
 import { describe, expect, test } from "bun:test";
+import { REST_MS } from "../timing";
 import { fire } from "./fx-kinds/fire";
 import { frost } from "./fx-kinds/frost";
 import {
   budgetScale,
+  LAND_CLOCK_S,
   LAND_GLOW_S,
+  LAND_PACE,
   LAND_S,
+  landClock,
   landFade,
   landGlow,
   MAX_PARTICLES,
@@ -56,13 +60,23 @@ describe("FR-DICEX-106 fire and cold dice", () => {
       const before = sim.count;
       sim.burst(dice);
       expect(sim.count).toBeGreaterThan(before + 40);
-      // Rested: no more shedding; everything has faded or died by LAND_S.
-      for (let t = 0; t < LAND_S; t += DT) sim.step(DT, dice, false);
-      expect(landFade(LAND_S)).toBe(0);
+      // Rested: no more shedding; everything has faded or died by LAND_S (the landing clock's end).
+      for (let t = 0; t < LAND_S; t += DT) sim.step(DT * LAND_PACE, dice, false);
+      expect(landFade(LAND_CLOCK_S)).toBe(0);
       expect(landGlow(LAND_GLOW_S)).toBe(0);
       expect(landGlow(0)).toBeGreaterThan(1);
-      expect(LAND_S).toBeLessThan(1); // before the 1 s hand-off (FR-DICEX-35)
+      expect(LAND_S * 1000).toBeLessThan(REST_MS); // before the hand-off (FR-DICEX-35)
     }
+  });
+
+  test("FR-DICEX-106 the landing lasts 1.4 s, slowed as a whole, before the hand-off at rest + 1.5 s (DM 2026-11-06)", () => {
+    expect(LAND_S).toBeCloseTo(1.4, 6);
+    expect(REST_MS).toBe(1500);
+    expect(landClock(LAND_S)).toBeCloseTo(LAND_CLOCK_S, 9);
+    expect(LAND_PACE).toBeLessThan(1);
+    // Still showing past the old 0.9 s end; gone at the new one.
+    expect(landFade(landClock(0.9))).toBeGreaterThan(0.2);
+    expect(landFade(landClock(LAND_S))).toBeCloseTo(0, 6);
   });
 
   test("FR-DICEX-106 big rolls share one particle budget", () => {
