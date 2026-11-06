@@ -1,7 +1,9 @@
 // DICEX §13 E2E `FR-DICEX-52 compressed build output` (ADR-0052): runs on the output of
 // `bun run e2e`'s own build (the unit bundle test builds with `write: false`, so the hook never
 // runs there). Every JS / CSS ≥ 1 KB has `.br` + `.gz` siblings that decompress to the same
-// bytes; `dice3d` brotli ≤ 140 KB; the e2e server answers the `dice3d` request with them.
+// bytes; `dice3d` brotli ≤ 160 KB (the DM raised it from 140 on 2026-11-06 with the 3D chunk cap:
+// the per-type damage dice effects, FR-DICEX-106, grew it); the e2e server answers the `dice3d`
+// request with them.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
@@ -33,7 +35,7 @@ test("FR-DICEX-52 compressed build output", async ({ request }) => {
 
   const dice3d = big.find((f) => /^dice3d-.+\.js$/.test(f));
   if (!dice3d) throw new Error("No dice3d chunk in dist/client/assets");
-  expect(statSync(path.join(ASSETS, `${dice3d}.br`)).size).toBeLessThanOrEqual(140 * KB);
+  expect(statSync(path.join(ASSETS, `${dice3d}.br`)).size).toBeLessThanOrEqual(160 * KB);
 
   const r = await request.get(`/assets/${dice3d}`, {
     headers: { "Accept-Encoding": "gzip, deflate, br, zstd" },
