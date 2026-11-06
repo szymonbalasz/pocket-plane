@@ -17,12 +17,18 @@ export function fly(sim: RichSim, n: number, s: number, flying = true): SimDie[]
   return dice;
 }
 
-/** bun test has no DOM: a canvas whose 2D context is missing (the atlas stays blank). */
-export function stubCanvas(): void {
+/**
+ * bun test has no DOM: a canvas whose 2D context is missing (the atlas stays blank). Returns the
+ * undo: a stub left on globalThis breaks later files in the same process (sonner's CSS insert).
+ */
+export function stubCanvas(): () => void {
   const g = globalThis as { document?: unknown };
-  if (g.document) return;
+  if (g.document) return () => {};
   g.document = {
     createElement: () => ({ width: 0, height: 0, getContext: () => null }),
+  };
+  return () => {
+    delete g.document;
   };
 }
 
@@ -39,12 +45,13 @@ export function runLayer(
   def: RichKindDef,
   o: { n?: number; rollS?: number; afterS?: number; seed?: number } = {},
 ): { layer: RichLayer; meshes: Mesh[] } {
-  stubCanvas();
+  const unstub = stubCanvas();
   const meshes = Array.from({ length: o.n ?? 1 }, dieMesh);
   const layer = richLayer(
     meshes.map((mesh) => ({ mesh, kind, def, radius: 0.65 })),
     o.seed ?? 1,
   );
+  unstub();
   if (!layer) throw new Error("no layer");
   const rollS = o.rollS ?? 0.5;
   let t = 0;
