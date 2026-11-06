@@ -307,6 +307,8 @@ export const creatureSheet = sqliteTable(
     slotsUsed: text("slots_used", { mode: "json" }).notNull(),
     /** `{d6…d12: int}` */
     hitDiceUsed: text("hit_dice_used", { mode: "json" }).notNull(),
+    /** FR-CRES-02 (class-resources): pact slots used. Added column, default 0. */
+    pactUsed: integer("pact_used").notNull().default(0),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -799,7 +801,7 @@ export const combatant = sqliteTable(
      */
     tieOrder: integer("tie_order"),
     /**
-     * FR-CBT-179 (#455): JSON leaf, the undoable counted moves, oldest first (≤ 20); null = none.
+     * FR-CBT-179 (#456): JSON leaf, the undoable counted moves, oldest first (≤ 20); null = none.
      * Cleared with `movedFt`'s reset and by a teleport. DM only. Nullable, no default: push-safe.
      */
     moveSteps: text("move_steps", { mode: "json" }).$type<MoveStep[]>(),

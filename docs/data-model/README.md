@@ -781,7 +781,7 @@ An instance ([ADR-0009](../architecture/adr/0009-entity-content-model.md)); crea
 | hpCurrent, hpMax | int \| null ×2 | **Monsters only**: `effectiveStats.hpMax` at start; clamped 0…hpMax; definition edit: new max, current follows if it equalled the old max, else clamped. PC HP lives on the character | FR-CBT-08, FR-CBT-06, [FR-CBT-22](../specs/combat-tracker.md#6-functional-requirements), #92, gate I10 |
 | tempHp *(sprint 1, built, fix/cbtx-core)* | int 0–999 | Column `temp_hp` int not null default 0. Monsters only (PCs' lives on the character, §11); never in a player redaction ([FR-CBTX-14/32](../specs/combat-extras.md#6-functional-requirements)). Absorbs damage first via `hpRules` (built, build/combat-extras) | [CBTX §8](../specs/combat-extras.md#8-data-model) |
 | movedFt *(feedback pass, built)* | int 0–9,999 | Column `moved_ft` int not null default 0. Movement used this turn: + each move's 5/10/5 distance via the token-changed hook on `map.moveToken` ([ADR-0031](../architecture/adr/0031-token-move-hooks.md)), any mover, active non-removed only; 0 on `cbt.nextTurn` for the new turn combatant, and for every combatant on Start round 1 (round-0 movement never counts; BL-03, built in fix/combat-glitches); `prevTurn` keeps it | [FR-CBT-39](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-40](../specs/combat-tracker.md#6-functional-requirements), #154 |
-| moveSteps *(#455, built)* | JSON leaf \| null | Column `move_steps` text (JSON) null, no default (push-safe). The undoable counted moves, oldest first, ≤ 20: `{id, tokenId, sceneId, from {col, row}, to {col, row}, ft}` (`ft` = feet added after the cap). Pushed by the token-changed hook with each counted move; popped by `cbt.undoMove`; null on every `movedFt` reset and on a teleport. Record field absent when null. DM only: no player redaction carries it | [FR-CBT-179](../specs/combat-tracker.md#69-undo-move-455) |
+| moveSteps *(#456, built)* | JSON leaf \| null | Column `move_steps` text (JSON) null, no default (push-safe). The undoable counted moves, oldest first, ≤ 20: `{id, tokenId, sceneId, from {col, row}, to {col, row}, ft}` (`ft` = feet added after the cap). Pushed by the token-changed hook with each counted move; popped by `cbt.undoMove`; null on every `movedFt` reset and on a teleport. Record field absent when null. DM only: no player redaction carries it | [FR-CBT-179](../specs/combat-tracker.md#69-undo-move-456) |
 
 ### Combat log entry (`hp_change`, record type `hp-change`) — owner combat-tracker
 
@@ -855,7 +855,7 @@ One applied HP change to one target: the stats unit (#54, gate I9). Written by `
 | Effective public settings | settings row, else all false | FR-DICE-12 |
 | Difficulty rating, base / adjusted XP, thresholds, total CR | `difficultyMethods` (`dmg-2014`): party levels + monster CRs (XP table, CR 0 = 10) | FR-CBT-03, #136, gate I27 |
 | Party | `partyCharacterIds`, `null` = all characters at read time (*(sprint 1, built, fix/charx-combat-routes)* but drafts, a `creature-sheet` with `status: draft`) | FR-CBT-02 |
-| Health band | `down` if hp = 0; `bloodied` if 2 × hp ≤ hpMax; else `healthy`; computed in the visibility fn | [FR-CBT-26](../specs/combat-tracker.md#6-functional-requirements), #139 P9 |
+| Health band | `down` if hp = 0; `critical` if 20 × hp < 3 × hpMax (under 15 %); `bloodied` if 2 × hp ≤ hpMax; else `healthy`; computed in the visibility fn | [FR-CBT-26](../specs/combat-tracker.md#6-functional-requirements), #139 P9 |
 | Eligible turns; hit hint | not removed and not a monster at 0 HP; nat 20 hit, nat 1 miss, else total ≥ AC (per target) | FR-CBT-14, [FR-CBT-33](../specs/combat-tracker.md#6-functional-requirements) |
 | Sheet values | signed bonuses, "Down", roll specs `characterRolls(statBlock, kind, ability?)` (`@shared/character-sheet`; `check` / `save` kinds and `char.roll` built, #149) | [FR-CHAR-05](../specs/character-sheet.md#6-functional-requirements), CHAR §8 |
 | Pending for me, unread count | notifications × seen marker | FR-NOTE-18 |
@@ -938,6 +938,7 @@ From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`
 | items | **JSON leaf** 0–80 rows `{id, name, qty 0–9999, equipped, notes ≤ 120}` | No weight | CHARX §8.2 |
 | notes | text ≤ 4000, default "" | Rendered as text | CHARX §8.2 |
 | slotsUsed, hitDiceUsed | **JSON leaf** `{1…9: int}`, `{d6…d12: int}` | ≤ slot max / levels with that die; lowering a max clamps `used` in the same tx | [FR-CHARX-17](../specs/character-sheet-full.md#6-functional-requirements) |
+| pactUsed | int 0–4, default 0 | ≤ `spellcasting.pact.slots`; back on a short or long rest ([§155](#155-class-resources-pact-slots-and-pact-weapons-buildcres-pact)) | [FR-CRES-02](../specs/class-resources.md#6-functional-requirements) |
 | createdAt, updatedAt | timestamp | `ctx.clock` | CHARX §8.2 |
 
 - **Caps:** row ≤ 48 KB, stat block ≤ 12 KB, else `invalid` "Sheet is full" ([FR-CHARX-03](../specs/character-sheet-full.md#6-functional-requirements)). Typical 5–15 KB.
@@ -2942,3 +2943,18 @@ Index: `note_campaign_title` (`campaign_id`, `title_fold`).
 - **Not stored:** subscriptions, who is here, cursors (N2, memory only).
 - **Fixtures:** `notes-shared`, `notes-binned`, `notes-second-campaign`; bundle `notes`. Bodies are set by `notes.seedBody`, a fixtures-only command (not an intent) until co-writing exists.
 - **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap.
+
+## 155. Class resources: pact slots and pact weapons (build/cres-pact)
+
+From [class-resources](../specs/class-resources.md) FR-CRES-01–04, -14, -15. **One new column on an existing table; no new table or record type.**
+
+| Field | Type | Default | Rule | Source |
+|---|---|---|---|---|
+| `creature_sheet.pact_used` (`pactUsed`) | int 0–4 | 0 | ≤ `spellcasting.pact.slots`; lowering it (or removing `pact`) clamps in the same tx (CHARX definition hook). `char.rest` short **and** long set it to 0 | FR-CRES-02, -03 |
+| `entity.statBlock.spellcasting.pact` (JSON leaf, zod) | `{level 1–5, slots 1–4}` optional | absent | The pact slots' level and count, beside `slots`; both kinds | FR-CRES-01 |
+| `entity.statBlock.attacks[].pactWeapon` (JSON leaf, zod) | bool optional | absent (= false) | Any number of rows | FR-CRES-14 |
+| `rule_trigger.rule.when[]` (JSON leaf, zod) | + `{if: "pactWeapon"}` | — | `hit` and `roll` triggers only; holds when the roll's row (by name, as `row`) is one of the owner's `pactWeapon` attack rows; never a spell row | FR-CRES-15 |
+
+- **Upgrade:** the column is added by push with its default; existing sheets read 0. No boot copy.
+- **Visibility:** as the sheet (DM + owner) and the stat block.
+- **Fixtures:** `char-vex` (Sorcerer 5 / Warlock 2, pact `{1, 2}`, "Pact blade" pact weapon, "Smite" trigger); bundle `class-resources`.

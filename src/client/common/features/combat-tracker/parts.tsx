@@ -46,16 +46,18 @@ export function Portrait({ name, imageAssetId }: { name: string; imageAssetId: s
 const BAND_LABEL: Record<HealthBand, string> = {
   healthy: "Healthy",
   bloodied: "Bloodied",
+  critical: "Critical",
   down: "Down",
 };
 
 const BAND_CLASS: Record<HealthBand, string> = {
   healthy: "border-hp-full/40 text-hp-full",
   bloodied: "border-hp-bloodied/50 text-hp-bloodied",
+  critical: "border-hp-down/50 text-hp-down",
   down: "border-hp-down/50 text-hp-down",
 };
 
-/** `hp.full` / `hp.bloodied` / `hp.down` tokens (visual-direction). */
+/** `hp.full` / `hp.bloodied` / `hp.down` tokens (visual-direction); critical uses `hp.down`. */
 export function BandBadge({ band, testId }: { band: HealthBand; testId: string }) {
   return (
     <Badge

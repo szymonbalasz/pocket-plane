@@ -38,7 +38,13 @@ import {
   ROLL_ROW_MAX,
   type RollSubject,
 } from "./schemas";
-import { type FireFacts, formulaOwnerOf, ownerFiltersPass, requiresMet } from "./trigger-fire";
+import {
+  type FireFacts,
+  formulaOwnerOf,
+  ownerFiltersPass,
+  pactWeaponRoll,
+  requiresMet,
+} from "./trigger-fire";
 import { RULE_TRIGGER_TYPE } from "./trigger-records";
 import { TRIGGER_STATE_TYPE, type TriggerStateRecord } from "./trigger-state";
 import { doublesOnCrit, type PlayerTriggerRule, type TriggerRule } from "./triggers";
@@ -132,14 +138,20 @@ const ownsTrigger = (t: PreviewTrigger, o: Owner): boolean =>
   o !== null &&
   ("characterId" in o ? t.characterId === o.characterId : t.definitionId === o.definitionId);
 
-/** FR-MOD-35: the owner's formula values from the stat block this client holds (none → 0s). */
-function ownerValues(store: RecordStore, o: Owner): FormulaOwner {
-  if (o === null) return {};
+/** The owner's stat block as this client holds it (none → undefined). */
+function ownerStats(store: RecordStore, o: Owner): StatBlock | undefined {
+  if (o === null) return undefined;
   const id = "characterId" in o ? o.characterId : o.definitionId;
   const rec = (store.records[ENTITY_TYPE]?.[id] ?? store.records[IMPORTED_ENTITY_TYPE]?.[id]) as
     | { statBlock?: StatBlock }
     | undefined;
-  return rec?.statBlock ? formulaOwnerOf(rec.statBlock) : {};
+  return rec?.statBlock;
+}
+
+/** FR-MOD-35: the owner's formula values from the stat block this client holds (none → 0s). */
+function ownerValues(store: RecordStore, o: Owner): FormulaOwner {
+  const stats = ownerStats(store, o);
+  return stats ? formulaOwnerOf(stats) : {};
 }
 
 /**
@@ -239,6 +251,7 @@ function firingTriggers(
     subject,
     ownTurn: isOwnTurn(store, own),
     mode: subject.toHitMode ?? "normal",
+    pactWeapon: pactWeaponRoll(ownerStats(store, owner)?.attacks, subject),
   };
   return [...triggers]
     .filter((t) => t.enabled && ownsTrigger(t, owner))

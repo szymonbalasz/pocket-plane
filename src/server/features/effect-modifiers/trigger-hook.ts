@@ -22,6 +22,7 @@ import {
   type FireFacts,
   formulaOwnerOf,
   ownerFiltersPass,
+  pactWeaponRoll,
   requiresMet,
   settleFacts,
   windowed,
@@ -231,6 +232,7 @@ function factsOf(o: TriggerOwner, subject: RollSubject): FireFacts {
     subject,
     ownTurn: !!o.combatant && o.enc?.turnCombatantId === o.combatant.id,
     mode: subject.toHitMode ?? "normal",
+    pactWeapon: pactWeaponRoll(o.stats.attacks, subject),
   };
 }
 

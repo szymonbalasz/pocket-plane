@@ -1,5 +1,5 @@
 // Combat's token menu entries (FR-CBT-30, FR-MAP-29): "Damage / heal…", "Undo move" (FR-CBT-181,
-// #455: only while it has a step), "Set as ally / enemy" (FR-CBT-104, #252), "Companion ▸"
+// #456: only while it has a step), "Set as ally / enemy" (FR-CBT-104, #252), "Companion ▸"
 // (FR-CBT-118, sprint 6: monsters) and "Remove from combat" on a token bound to an active,
 // non-removed combatant. Items render nothing otherwise.
 import { CBT_INTENTS, COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";

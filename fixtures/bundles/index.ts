@@ -13,6 +13,7 @@ import cbReorderE2e from "./cb-reorder-e2e";
 import cbTurnRingE2e from "./cb-turn-ring-e2e";
 import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
+import classResources from "./class-resources";
 import cmpImages from "./cmp-images";
 import cmpx5etools from "./cmpx-5etools";
 import cmpxArt from "./cmpx-art";
@@ -420,6 +421,8 @@ export const bundles: readonly Bundle[] = [
   notes,
   // Linked notes N7 (fix/notes-sim): the full session simulation with notes
   sessionSim18,
+  // Class resources (build/cres-pact): pact slots, pact weapon
+  classResources,
   // Undo a counted move (build/undo-move): late-damage's moves in their own server
   undoMoveE2e,
 ];

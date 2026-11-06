@@ -92,7 +92,7 @@ export const CBT_INTENTS = {
   useRoll: "cbt.useRoll",
   /** FR-CBT-178 (#428): the DM takes a card's damage off so a new roll can fill it. */
   clearDamage: "cbt.clearDamage",
-  /** FR-CBT-180 (#455): the DM takes a combatant's last counted move back. */
+  /** FR-CBT-180 (#456): the DM takes a combatant's last counted move back. */
   undoMove: "cbt.undoMove",
 } as const;
 
@@ -223,7 +223,7 @@ const companionFields = {
 };
 
 /**
- * FR-CBT-179 (#455): one counted move of a combatant's token (`ft` = what it added to `movedFt`).
+ * FR-CBT-179 (#456): one counted move of a combatant's token (`ft` = what it added to `movedFt`).
  * DM only: no player view carries it (it names cells a hidden token walked).
  */
 export const MoveStep = z.object({
@@ -258,7 +258,7 @@ export const CombatantRecord = z.object({
   hpMax: z.int().nullable(),
   /** Movement used this turn, ft (FR-CBT-39). */
   movedFt: z.int().min(0).max(MOVED_FT_MAX),
-  /** FR-CBT-179 (#455): the undoable moves, oldest first; absent = none. DM only. */
+  /** FR-CBT-179 (#456): the undoable moves, oldest first; absent = none. DM only. */
   moveSteps: z.array(MoveStep).max(MOVE_STEPS_MAX).optional(),
   /** Monsters' temp HP (FR-CBTX-14). DM only: no player view below carries it (FR-CBTX-32). */
   tempHp: TempHp,
@@ -751,7 +751,7 @@ export const TurnInput = z.strictObject({
 });
 export type TurnInput = z.input<typeof TurnInput>;
 export const SetRemovedInput = z.strictObject({ combatantId: Id, removed: z.boolean() });
-/** FR-CBT-180 (#455): `expectedStepId` = the step the DM's menu showed. */
+/** FR-CBT-180 (#456): `expectedStepId` = the step the DM's menu showed. */
 export const UndoMoveInput = z.strictObject({ combatantId: Id, expectedStepId: Id });
 /** FR-CBT-70: what `cbt.attack` rolls. */
 export const AttackRolls = z.enum(["both", "toHit"]);

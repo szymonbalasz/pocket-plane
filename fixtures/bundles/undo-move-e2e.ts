@@ -1,7 +1,7 @@
 import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
 
 /**
- * CBT §13.1 e2e alias for undo-move.e2e.ts (FR-CBT-179–181, #455): = `late-damage`, whose
+ * CBT §13.1 e2e alias for undo-move.e2e.ts (FR-CBT-179–181, #456): = `late-damage`, whose
  * `trail-moves` leave this turn's move steps (state-changing specs never share a server).
  */
 export default defineBundle({

@@ -3,6 +3,7 @@
 // the `requires` origin match. The server's roll hook, apply hook and reminders read these.
 import {
   ABILITIES,
+  type Attack,
   abilityMod,
   type ClassRow,
   proficiencyBonus,
@@ -106,6 +107,20 @@ export interface FireFacts {
   ownTurn: boolean;
   /** `hit`: the card's to-hit mode (damage-only card: normal); `roll`: the subject's. */
   mode: ToHitMode;
+  /** FR-CRES-15: the roll was made with an attack row marked `pactWeapon` ({@link pactWeaponRoll}). */
+  pactWeapon?: boolean;
+}
+
+/**
+ * FR-CRES-15: a weapon roll whose row (by name, as the `row` filter matches) is one of the
+ * owner's attack rows marked `pactWeapon`. Spell rows never count.
+ */
+export function pactWeaponRoll(
+  attacks: readonly Pick<Attack, "name" | "pactWeapon">[] | undefined,
+  subject: Pick<RollSubject, "via" | "row">,
+): boolean {
+  if (subject.via !== "weapon" || subject.row === undefined) return false;
+  return (attacks ?? []).some((a) => a.pactWeapon === true && rowMatches([a.name], subject.row));
 }
 
 const isSoft = (f: TriggerFilter): boolean => f.if === "ask" || (f.if === "mode" && !!f.soft);
@@ -125,6 +140,8 @@ function holds(f: TriggerFilter, x: FireFacts): boolean {
       return !!x.subject.crit;
     case "mode":
       return f.modes.includes(x.mode);
+    case "pactWeapon":
+      return x.pactWeapon === true;
     default:
       return true;
   }

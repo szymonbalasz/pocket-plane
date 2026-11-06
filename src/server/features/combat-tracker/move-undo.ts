@@ -1,4 +1,4 @@
-// FR-CBT-179 / -180 (#455): the DM takes a combatant's last counted move back. Combat's token
+// FR-CBT-179 / -180 (#456): the DM takes a combatant's last counted move back. Combat's token
 // hook keeps the steps (`moveSteps`, hooks.ts); this command moves the token back through the
 // map's own move path (guards, derive, hooks, one unlogged `TokenMoved`), passing `undoStep`, so
 // the hook pops the step and its feet and the trail drops the step's cell.
