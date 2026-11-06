@@ -1,11 +1,15 @@
 // **Add to party** (FR-CMP-40–42, CMP §7), DM only, on item entry views: Popover with a qty Input
 // (default 1) + **Add** → party-board's `party.addItem`. FR-CMP-57: on ack the Popover reads
 // "Added: ‹name› ×‹qty›" (the row's name after a merge) for 1.5 s, then closes; reject → inline,
-// qty kept; lost intent → Toast. Disabled while not live.
+// qty kept; lost intent → Toast. Disabled while not live. *(#455)* FR-CMP-80: "Show it on players'
+// screens" (ticked on every open; off and disabled for unshared homebrew) → after the item's ack,
+// `cmp.presentEntry` opens the entry on every player's screen; a failure there is a Toast (the
+// item is in).
+import { ENTRY_PRESENT_INTENTS } from "@shared/compendium/present";
 import type { CompendiumEntry } from "@shared/compendium/schemas";
 import { AddItemResult, PARTY_ITEM_TYPE, type PartyItemRecord } from "@shared/party-board/schemas";
 import { Button } from "@ui/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@ui/components/ui/controls";
+import { Checkbox, Popover, PopoverContent, PopoverTrigger } from "@ui/components/ui/controls";
 import { Input, Label } from "@ui/components/ui/primitives";
 import { useLive } from "@ui/features/combat-tracker/store";
 import { ITEM_INTENTS, LOST_ITEM_ADD } from "@ui/features/party-board/inventory-logic";
@@ -22,7 +26,10 @@ import {
   CLOSED,
   DONE_MS,
   type SendOutcome,
+  SHOW_TICK,
   settle,
+  showBlocked,
+  showFailed,
 } from "./add-to-party";
 
 type Entry = Pick<CompendiumEntry, "kind" | "name" | "source" | "shared">;
@@ -35,19 +42,25 @@ export function AddToPartyPanel({
   done,
   live,
   busy,
+  show = true,
   onQty,
+  onShow = () => {},
   onSubmit,
 }: {
   entry: Entry;
   qty: string;
   error: string | null;
+  /** FR-CMP-80: the tick (counts only when the entry can be shown). */
+  show?: boolean;
   /** FR-CMP-57: the confirmation after an ack (the form gives way to it). */
   done?: string;
   live: boolean;
   busy: boolean;
   onQty(v: string): void;
+  onShow?(v: boolean): void;
   onSubmit(): void;
 }) {
+  const blocked = showBlocked(entry);
   const parsed = addToPartyPayload(entry.name, qty);
   const enabled = submitEnabled({ valid: parsed.ok, live, busy });
   const hint = addToPartyHint(entry);
@@ -90,6 +103,23 @@ export function AddToPartyPanel({
           Add
         </Button>
       </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="cmp-add-to-party-show"
+          data-testid="cmp-add-to-party-show"
+          disabled={blocked !== null}
+          checked={show && blocked === null}
+          onCheckedChange={(c) => onShow(c === true)}
+        />
+        <Label htmlFor="cmp-add-to-party-show" className="text-xs font-normal">
+          {SHOW_TICK}
+        </Label>
+      </div>
+      {blocked && (
+        <p data-testid="cmp-add-to-party-show-hint" className="text-xs text-muted-foreground">
+          {blocked}
+        </p>
+      )}
       {hint && (
         <p data-testid="cmp-add-to-party-hint" className="text-xs text-muted-foreground">
           {hint}
@@ -104,7 +134,7 @@ export function AddToPartyPanel({
   );
 }
 
-export function AddToParty({ entry }: { entry: Entry }) {
+export function AddToParty({ entry }: { entry: Entry & Pick<CompendiumEntry, "id"> }) {
   const live = useLive();
   const connection = useSync((s) => s.connection);
   const sync = useContext(SyncContext);
@@ -124,6 +154,7 @@ export function AddToParty({ entry }: { entry: Entry }) {
       );
       const name = result.success ? await rowName(result.data.itemId) : null;
       outcome = { kind: "ack", name: name ?? parsed.value.name, qty: parsed.value.qty };
+      if (state.show && showBlocked(entry) === null) void show();
     } catch (err) {
       outcome = intentFailure(err, LOST_ITEM_ADD);
       if (outcome.kind === "toast") toast.error(outcome.message);
@@ -132,6 +163,16 @@ export function AddToParty({ entry }: { entry: Entry }) {
       setBusy(false);
     }
     setState((s) => settle(s, outcome));
+  };
+
+  // FR-CMP-80: the entry on every player's screen; the item is in whatever happens here.
+  const show = async () => {
+    try {
+      await connection.sendIntent(ENTRY_PRESENT_INTENTS.present, { entryId: entry.id });
+    } catch (err) {
+      const o = intentFailure(err, LOST_ITEM_ADD);
+      toast.error(showFailed(o.kind === "inline" ? o.message : "connection lost"));
+    }
   };
 
   // FR-CMP-57: the merged row's name ("Potion of healing"): from the store, else one-id load of the
@@ -177,7 +218,9 @@ export function AddToParty({ entry }: { entry: Entry }) {
           done={state.done}
           live={live}
           busy={busy}
+          show={state.show}
           onQty={(qty) => setState((s) => ({ ...s, qty, error: null }))}
+          onShow={(show) => setState((s) => ({ ...s, show }))}
           onSubmit={() => void add()}
         />
       </PopoverContent>

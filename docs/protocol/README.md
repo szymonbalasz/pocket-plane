@@ -4588,3 +4588,19 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-11 and [ADR-0078](../arch
 - **`notes.updates`** updates may carry `clientId: "server"` (schema `NoteUpdateOut`; clients still can't bind it).
 - **Client:** a renamed note's old folded title resolves to it for 5 s, so chips stay solid until the rewrite lands.
 - **Search polish (r1, `GET /api/notes/search`):** body matching keeps the shared matcher's tiers but a note's own body rule: the **last** query word (being typed) matches body words as a prefix at any length; another word under 3 letters matches whole body words only; longer words match as prefixes (plural forms too), as before. Snippets drop markdown markers (`#`–`###`, list `-` / `*` / `1.`, `**`) in a window around the first hit. Bench at the caps (1,000 × 32 KiB, Windows, same machine): warm p95 21–33 ms ("the", "dragon", "gold coins", "captain of the guard", "lo"), was 2.8–25 ms; short and last-word queries cost more because they now match bodies.
+
+## 201. Entry present (build/item-present, DM #455)
+
+From [compendium §6.2](../specs/compendium.md#62-entry-present-an-awarded-item-pops-up-dm-455-2026-11-06) FR-CMP-78–83. A compendium entry open on players' screens, as `handout-present` (§86–87).
+
+| Item | Shape / rule |
+|---|---|
+| Record type `entry-present` (`src/server/features/compendium/present.ts`) | `{id, campaignId, entryId, playerId, presentedAt}`; campaign scope, **not lazy**; DM every row, a player only their own (`entryPresentVisibility`, `@shared/compendium/present`) |
+| `cmp.presentEntry {entryId}` (DM) | Every player of the campaign; `not_found` (not visible to the DM), `invalid` (monster), `conflict` "Share it to show it on players' screens" (unshared homebrew) or "No players to show it to". Result `{presentIds}` |
+| `cmp.closeEntryPresent {presentId}` (DM any; player own) | Another player's row → `not_found`; gone → `ack`, no event |
+| `EntryPresented {entryId, playerIds}` | Logged. Changes per target: old row delete, new row upsert. A target receives only their own rows |
+| `EntryPresentClosed {entryId, playerIds, by: dm \| player}` | Logged. Changes: the row → null |
+| `cmp.putEntry` (`shared: false`), `cmp.deleteEntry` | Delete the entry's `entry-present` rows; the changes ride on `CompendiumEntrySaved` / `CompendiumEntryDeleted` |
+| `cmp.presentEntryByName {kind, name}` | Fixtures only (not an intent): the campaign's homebrew entry by name, then as `cmp.presentEntry` |
+| Client | DM: Add to party's tick "Show it on players' screens" sends `cmp.presentEntry` after the `party.addItem` ack. Player: `player/features/compendium/entry-present-popup.tsx`, mounted next to the handout popup in `PlayerPlayPage.tsx`, same layer (`PRESENT_POPUP_Z`); a shown handout present goes first. Entry body over REST (`GET /api/compendium/entries/:id`) |
+| Snapshot | ≤ 1 row (~250 B) per player; DM ≤ players rows |

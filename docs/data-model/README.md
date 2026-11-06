@@ -2940,3 +2940,17 @@ Index: `note_campaign_title` (`campaign_id`, `title_fold`).
 - **Not stored:** subscriptions, who is here, cursors (N2, memory only).
 - **Fixtures:** `notes-shared`, `notes-binned`, `notes-second-campaign`; bundle `notes`. Bodies are set by `notes.seedBody`, a fixtures-only command (not an intent) until co-writing exists.
 - **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap.
+
+## 155. Entry present (build/item-present, DM #455)
+
+### Entry present (`entry_present`, record type `entry-present`, **in the snapshot**) — owner [compendium](../specs/compendium.md#62-entry-present-an-awarded-item-pops-up-dm-455-2026-11-06)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id | ID | `env.ctx.ids`, new per present | FR-CMP-79 |
+| campaignId | ID → Campaign | the presenting DM's campaign | FR-CMP-78 |
+| entryId | ID → Compendium entry, **cascade delete** | an entry the player may read (FR-CMP-14; kept by the commands, FR-CMP-82; cascade = backstop) | FR-CMP-82 |
+| playerId | ID → Player | **unique `(campaignId, playerId)`**: one open entry present per player | FR-CMP-78 |
+| presentedAt | timestamp | `env.ctx.clock` | FR-CMP-79 |
+
+Indexes unique `entry_present_campaign_player` (`campaign_id`, `player_id`), `entry_present_entry` (`entry_id`). Record = every column. Visibility: DM every row; a player only their own, else hidden. New table only (additive); no existing column changes. Fixtures: `entry-present-1` (Moonlit Lantern for every player); bundle `item-present`.

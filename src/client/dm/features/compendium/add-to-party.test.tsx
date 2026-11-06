@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { clip } from "@shared/compendium/homebrew";
+import { SHARE_ENTRY_FIRST } from "@shared/compendium/present";
 import type { EntryResponse } from "@shared/compendium/rest";
 import type { CompendiumEntry } from "@shared/compendium/schemas";
 import { PARTY_FULL_MESSAGE } from "@shared/party-board/schemas";
@@ -27,7 +28,10 @@ import {
   DONE_MS,
   hasAddToParty,
   partyItemName,
+  SHOW_TICK,
   settle,
+  showBlocked,
+  showFailed,
 } from "./add-to-party";
 import { EntryActions } from "./EntryActions";
 
@@ -178,7 +182,7 @@ describe("CMP §7 Add to party (FR-CMP-40–42)", () => {
     expect(disabled(panel(POTION, { busy: true }), "cmp-add-to-party-submit")).toBe(true);
 
     // ack → the confirmation (FR-CMP-57), qty back to the default; reject → inline, qty kept.
-    const open = { open: true, qty: "3", error: null };
+    const open = { open: true, qty: "3", error: null, show: true };
     expect(settle(open, { kind: "ack", name: "Potion", qty: 3 })).toEqual({
       ...CLOSED,
       open: true,
@@ -187,7 +191,7 @@ describe("CMP §7 Add to party (FR-CMP-40–42)", () => {
     const full = intentFailure(new IntentRejected("conflict", PARTY_FULL_MESSAGE), LOST_ITEM_ADD);
     expect(full).toEqual({ kind: "inline", message: "Party inventory is full (60)" });
     const rejected = settle(open, full);
-    expect(rejected).toEqual({ open: true, qty: "3", error: PARTY_FULL_MESSAGE });
+    expect(rejected).toEqual({ open: true, qty: "3", error: PARTY_FULL_MESSAGE, show: true });
     expect(panel(POTION, { qty: rejected.qty, error: rejected.error })).toContain(
       PARTY_FULL_MESSAGE,
     );
@@ -203,12 +207,13 @@ describe("CMP §7 Add to party (FR-CMP-40–42)", () => {
   });
 
   test("FR-CMP-57 add to party confirmed: ack → Added: ‹row name› ×‹qty› in the Popover, closed after 1.5 s", () => {
-    const sent = { open: true, qty: "2", error: null };
+    const sent = { open: true, qty: "2", error: null, show: true };
     const done = settle(sent, { kind: "ack", name: "Potion of healing", qty: 2 });
     expect(done).toEqual({
       open: true,
       qty: "1",
       error: null,
+      show: true,
       done: "Added: Potion of healing ×2",
     });
     expect(addedText("Potion of healing", 2)).toBe("Added: Potion of healing ×2");
@@ -231,5 +236,26 @@ describe("CMP §7 Add to party (FR-CMP-40–42)", () => {
     expect(panel({ ...SHARD, shared: true })).not.toContain("cmp-add-to-party-hint");
     expect(addToPartyHint(POTION)).toBeNull();
     expect(panel(POTION)).not.toContain("cmp-add-to-party-hint");
+  });
+
+  test("FR-CMP-80 Show it on players' screens: ticked by default for imported and shared homebrew; unshared homebrew → off, disabled, with why", () => {
+    expect(CLOSED.show).toBe(true);
+    const tick = (html: string) => tag(html, "cmp-add-to-party-show");
+    const esc = (t: string) => t.replaceAll("'", "&#x27;");
+    expect(panel(POTION)).toContain(esc(SHOW_TICK));
+    expect(tick(panel(POTION))).toContain('data-state="checked"');
+    expect(tick(panel(POTION))).not.toContain('disabled=""');
+    expect(tick(panel({ ...SHARD, shared: true }))).toContain('data-state="checked"');
+    expect(showBlocked(POTION)).toBeNull();
+    expect(showBlocked({ ...SHARD, shared: true })).toBeNull();
+    expect(showBlocked(SHARD)).toBe(SHARE_ENTRY_FIRST);
+    expect(tick(panel(SHARD))).toContain('data-state="unchecked"');
+    expect(tick(panel(SHARD))).toContain('disabled=""');
+    expect(panel(SHARD)).toContain(esc(SHARE_ENTRY_FIRST));
+    expect(panel(POTION)).not.toContain("cmp-add-to-party-show-hint");
+    // Unticked by the DM: settle keeps the choice after an ack (the next award in this Popover).
+    const sent = { ...CLOSED, open: true, qty: "1", show: false };
+    expect(settle(sent, { kind: "ack", name: "Potion", qty: 1 }).show).toBe(false);
+    expect(showFailed("Share it first")).toBe("Added, but not shown on screens: Share it first");
   });
 });

@@ -4,6 +4,7 @@
 // send (FR-CMP-57: "Added: ‹name› ×‹qty›" for 1.5 s on ack). The server decides everything else
 // (merge, caps, log row, `loot-received`).
 import { clip } from "@shared/compendium/homebrew";
+import { SHARE_ENTRY_FIRST } from "@shared/compendium/present";
 import { type CompendiumEntry, isReadOnlyEntry } from "@shared/compendium/schemas";
 import { type AddItemIntent, ITEM_NAME_MAX } from "@shared/party-board/schemas";
 import { addPayload } from "@ui/features/party-board/inventory-logic";
@@ -27,14 +28,29 @@ export function addToPartyHint(e: EntryLike): string | null {
   return `Players will see ${partyItemName(e.name)} in the party inventory`;
 }
 
+/** FR-CMP-80 (#455): the tick's label. */
+export const SHOW_TICK = "Show it on players' screens";
+
+/**
+ * FR-CMP-80: players may read imported items and shared homebrew (FR-CMP-14), so those can be
+ * shown; an unshared homebrew item can't (the tick is off and disabled, with why).
+ */
+export const showBlocked = (e: EntryLike): string | null =>
+  isReadOnlyEntry(e) || e.shared ? null : SHARE_ENTRY_FIRST;
+
+/** FR-CMP-80: lost or refused `cmp.presentEntry` after the item went in. */
+export const showFailed = (why: string) => `Added, but not shown on screens: ${why}`;
+
 export interface AddToPartyState {
   open: boolean;
   qty: string;
   error: string | null;
+  /** FR-CMP-80: "Show it on players' screens", ticked on every open. */
+  show: boolean;
   /** FR-CMP-57: the confirmation shown after an ack, until the Popover closes. */
   done?: string;
 }
-export const CLOSED: AddToPartyState = { open: false, qty: "1", error: null };
+export const CLOSED: AddToPartyState = { open: false, qty: "1", error: null, show: true };
 
 /** FR-CMP-57: how long the confirmation shows before the Popover closes. */
 export const DONE_MS = 1500;
@@ -51,6 +67,8 @@ export type SendOutcome =
  * reject → inline, qty kept; lost → toast, qty kept.
  */
 export function settle(s: AddToPartyState, o: SendOutcome): AddToPartyState {
-  if (o.kind === "ack") return { ...CLOSED, open: true, done: addedText(o.name, o.qty) };
+  if (o.kind === "ack") {
+    return { ...CLOSED, open: true, show: s.show, done: addedText(o.name, o.qty) };
+  }
   return { ...s, error: o.kind === "inline" ? o.message : null };
 }
