@@ -1,0 +1,481 @@
+// FR-DICEX-106: the full effect of fire and cold dice, a particle simulation with no
+// three.js in it (tested headless). Each die sheds particles while it flies (left where they
+// were born, so they trail behind it) and bursts once when it lands; the burst is over within
+// LAND_S of rest, before the hand-off copies the dice (FR-DICEX-35). Big rolls share one budget:
+// fewer particles per die as the dice add up, and never more than MAX_PARTICLES live.
+
+export type RichKind = "fire" | "frost";
+
+/** Sprite tiles of the particle atlas (fx-rich.ts draws them). */
+export const TILE = { dot: 0, flame: 1, flake: 2, star: 3 } as const;
+
+/** A colour stop over a particle's life: at (0–1), r, g, b, a (0–1). */
+type Stop = readonly [number, number, number, number, number];
+
+export interface Species {
+  tile: number;
+  /** Adds light (fire, glitter) or covers what is under it (smoke, mist, flakes). */
+  additive: boolean;
+  /** Seconds, min and max. */
+  life: readonly [number, number];
+  /** Diameter in die radii at birth and at death. */
+  size: readonly [number, number];
+  /** Speed outward at birth, die radii per second, min and max. */
+  speed: readonly [number, number];
+  /** Share of the die's velocity a particle keeps at birth (0: stays where born, a trail). */
+  inherit: number;
+  /** Velocity lost per second. */
+  drag: number;
+  /** Steady drift, die radii per second, screen x and y (+y = down). */
+  drift: readonly [number, number];
+  /** Spin, radians per second, either way up to this. */
+  spin: number;
+  /** Born this far from the die's centre, die radii, min and max. */
+  from: readonly [number, number];
+  /** Height above the die's centre in die radii (> 1: over the die), or null: on the floor. */
+  lift: number | null;
+  ramp: readonly Stop[];
+  /** Flicker per second (0: none). */
+  twinkle: number;
+}
+
+export interface Emitter {
+  species: number;
+  /** Per second per die while it flies (before the budget). */
+  rate: number;
+  /** At landing, per die (before the budget). */
+  burst: number;
+  /** The burst's speed, × the species' speed. */
+  burstSpeed: number;
+}
+
+export interface RichPreset {
+  species: readonly Species[];
+  emitters: readonly Emitter[];
+  /** The die's own glow while it flies. */
+  emissive: number;
+  glow: readonly [number, number];
+  hz: number;
+  /** The die's body tinted toward this colour by `amount` while it flies (frost). */
+  tint?: { color: number; amount: number };
+  /** The shader aura around the die: its half size in die radii. */
+  aura: number;
+}
+
+const FIRE: RichPreset = {
+  species: [
+    {
+      // Flames: licking off the die, left behind as a burning trail.
+      tile: TILE.flame,
+      additive: true,
+      life: [0.3, 0.55],
+      size: [1.1, 1.9],
+      speed: [0.4, 1.4],
+      inherit: 0.08,
+      drag: 2.5,
+      drift: [0, -1.4],
+      spin: 3,
+      from: [0.4, 0.95],
+      lift: 0,
+      ramp: [
+        [0, 1, 0.95, 0.75, 0],
+        [0.12, 1, 0.82, 0.4, 0.95],
+        [0.45, 1, 0.45, 0.08, 0.75],
+        [0.8, 0.7, 0.12, 0.02, 0.3],
+        [1, 0.4, 0.05, 0, 0],
+      ],
+      twinkle: 0,
+    },
+    {
+      // Embers: hot sparks thrown off, rising and cooling.
+      tile: TILE.dot,
+      additive: true,
+      life: [0.6, 1.3],
+      size: [0.24, 0.08],
+      speed: [1.2, 3.8],
+      inherit: 0.2,
+      drag: 1.3,
+      drift: [0, -1.8],
+      spin: 0,
+      from: [0.5, 1],
+      lift: 1.5,
+      ramp: [
+        [0, 1, 1, 0.85, 1],
+        [0.3, 1, 0.72, 0.25, 1],
+        [0.75, 1, 0.35, 0.05, 0.8],
+        [1, 0.6, 0.1, 0, 0],
+      ],
+      twinkle: 11,
+    },
+    {
+      // Smoke: on the floor, under the dice.
+      tile: TILE.flame,
+      additive: false,
+      life: [0.9, 1.4],
+      size: [1, 2.8],
+      speed: [0.2, 0.6],
+      inherit: 0.05,
+      drag: 1,
+      drift: [0, -0.7],
+      spin: 1,
+      from: [0.3, 0.8],
+      lift: null,
+      ramp: [
+        [0, 0.24, 0.2, 0.18, 0],
+        [0.25, 0.22, 0.19, 0.17, 0.3],
+        [1, 0.2, 0.18, 0.17, 0],
+      ],
+      twinkle: 0,
+    },
+  ],
+  emitters: [
+    { species: 0, rate: 95, burst: 44, burstSpeed: 3 },
+    { species: 1, rate: 26, burst: 38, burstSpeed: 2 },
+    { species: 2, rate: 10, burst: 10, burstSpeed: 2.5 },
+  ],
+  emissive: 0xff5a10,
+  glow: [0.35, 0.75],
+  hz: 9,
+  aura: 3.2,
+};
+
+const FROST: RichPreset = {
+  species: [
+    {
+      // Cold mist rolling along the floor.
+      tile: TILE.dot,
+      additive: false,
+      life: [0.9, 1.5],
+      size: [1.2, 3.2],
+      speed: [0.2, 0.6],
+      inherit: 0.05,
+      drag: 1,
+      drift: [0, 0.25],
+      spin: 0,
+      from: [0.3, 0.9],
+      lift: null,
+      ramp: [
+        [0, 0.62, 0.84, 1, 0],
+        [0.25, 0.66, 0.86, 1, 0.3],
+        [1, 0.75, 0.9, 1, 0],
+      ],
+      twinkle: 0,
+    },
+    {
+      // Snowflakes, slowly turning and drifting down.
+      tile: TILE.flake,
+      additive: false,
+      life: [1, 1.7],
+      size: [0.5, 0.32],
+      speed: [0.4, 1.2],
+      inherit: 0.1,
+      drag: 1.2,
+      drift: [0, 0.5],
+      spin: 2.5,
+      from: [0.7, 1.2],
+      lift: 1.4,
+      ramp: [
+        [0, 0.85, 0.95, 1, 0],
+        [0.15, 0.85, 0.95, 1, 0.95],
+        [0.7, 0.75, 0.9, 1, 0.8],
+        [1, 0.7, 0.88, 1, 0],
+      ],
+      twinkle: 0,
+    },
+    {
+      // Ice glitter: tiny twinkling stars.
+      tile: TILE.star,
+      additive: true,
+      life: [0.4, 0.9],
+      size: [0.4, 0.12],
+      speed: [0.3, 1.5],
+      inherit: 0.15,
+      drag: 2,
+      drift: [0, 0.2],
+      spin: 1,
+      from: [0.6, 1.1],
+      lift: 1.5,
+      ramp: [
+        [0, 1, 1, 1, 1],
+        [0.5, 0.7, 0.92, 1, 0.9],
+        [1, 0.45, 0.75, 1, 0],
+      ],
+      twinkle: 10,
+    },
+    {
+      // Ice shards: only when the die lands, flung out fast.
+      tile: TILE.star,
+      additive: true,
+      life: [0.3, 0.6],
+      size: [0.55, 0.15],
+      speed: [2, 4],
+      inherit: 0,
+      drag: 3,
+      drift: [0, 0],
+      spin: 4,
+      from: [0.8, 1],
+      lift: 1.2,
+      ramp: [
+        [0, 1, 1, 1, 1],
+        [1, 0.5, 0.8, 1, 0],
+      ],
+      twinkle: 0,
+    },
+  ],
+  emitters: [
+    { species: 0, rate: 14, burst: 14, burstSpeed: 4 },
+    { species: 1, rate: 16, burst: 14, burstSpeed: 1.8 },
+    { species: 2, rate: 40, burst: 30, burstSpeed: 2.5 },
+    { species: 3, rate: 0, burst: 26, burstSpeed: 1 },
+  ],
+  emissive: 0x7fd4ff,
+  glow: [0.25, 0.45],
+  hz: 1.5,
+  tint: { color: 0x9ed8ff, amount: 0.45 },
+  aura: 2.8,
+};
+
+export const RICH: Record<RichKind, RichPreset> = { fire: FIRE, frost: FROST };
+
+/** Live particles of one throw, all dice together. */
+export const MAX_PARTICLES = 1400;
+/** The landing is over this long after rest (well before the 1 s hand-off, FR-DICEX-35). */
+export const LAND_S = 0.9;
+/** Particles start fading this long after rest. */
+const LAND_FADE_FROM = 0.45;
+/** The aura and the die's glow are gone this long after rest, so the value reads clean. */
+export const LAND_GLOW_S = 0.4;
+
+/** Per-die share of the full effect for `n` dice: 1 up to two dice, then thinner. */
+export const budgetScale = (n: number): number => (n <= 2 ? 1 : Math.sqrt(2 / n));
+
+/** A small seeded PRNG (mulberry32): the same throw sheds the same particles on every client. */
+export function prng(seed: number): () => number {
+  let a = seed >>> 0 || 0x9e3779b9;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A die as the simulation sees it (world units; the camera looks straight down: x, z). */
+export interface SimDie {
+  x: number;
+  y: number;
+  z: number;
+  r: number;
+}
+
+/** A particle ready to draw. */
+export interface Drawn {
+  x: number;
+  y: number;
+  z: number;
+  /** Diameter, world units. */
+  size: number;
+  rot: number;
+  tile: number;
+  additive: boolean;
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
+
+export interface RichSim {
+  preset: RichPreset;
+  /** Advance by `dt` seconds; the dice shed particles while `flying`. */
+  step(dt: number, dice: readonly SimDie[], flying: boolean): void;
+  /** Each die bursts once (landing). */
+  burst(dice: readonly SimDie[]): void;
+  /** Live particles. */
+  readonly count: number;
+  /** Particle `i` (0 ≤ i < count), its colour × `fade`. */
+  drawn(i: number, fade: number): Drawn;
+  clear(): void;
+}
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/** The ramp's colour at `t` (0–1). */
+export function rampAt(ramp: readonly Stop[], t: number): [number, number, number, number] {
+  const first = ramp[0] as Stop;
+  if (t <= first[0]) return [first[1], first[2], first[3], first[4]];
+  for (let k = 1; k < ramp.length; k++) {
+    const b = ramp[k] as Stop;
+    if (t <= b[0]) {
+      const a = ramp[k - 1] as Stop;
+      const u = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
+      return [lerp(a[1], b[1], u), lerp(a[2], b[2], u), lerp(a[3], b[3], u), lerp(a[4], b[4], u)];
+    }
+  }
+  const last = ramp[ramp.length - 1] as Stop;
+  return [last[1], last[2], last[3], last[4]];
+}
+
+/** Height of the floor particles: above the shadow floor and the old halo, below any die. */
+const FLOOR_Y = 0.06;
+
+/** The simulation for `dieCount` dice of `kind`. */
+export function richSim(kind: RichKind, dieCount: number, seed: number): RichSim {
+  const preset = RICH[kind];
+  const rand = prng(seed);
+  const scale = budgetScale(dieCount);
+  const cap = MAX_PARTICLES;
+  const f = () => new Float32Array(cap);
+  const px = f();
+  const py = f();
+  const pz = f();
+  const vx = f();
+  const vz = f();
+  const age = f();
+  const life = f();
+  const rad = f();
+  const rot = f();
+  const spin = f();
+  const phase = f();
+  const sp = new Uint8Array(cap);
+  let n = 0;
+  /** Per die: fractional particles owed per emitter, and its last position (velocity). */
+  const owed: number[][] = [];
+  const prev: ({ x: number; z: number } | null)[] = [];
+
+  const spawn = (s: number, d: SimDie, dvx: number, dvz: number, speedMul: number) => {
+    if (n >= cap) return;
+    const spec = preset.species[s] as Species;
+    const a = rand() * Math.PI * 2;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    const from = d.r * lerp(spec.from[0], spec.from[1], rand());
+    const speed = d.r * lerp(spec.speed[0], spec.speed[1], rand()) * speedMul;
+    px[n] = d.x + ca * from;
+    pz[n] = d.z + sa * from;
+    py[n] = spec.lift === null ? FLOOR_Y : d.y + spec.lift * d.r;
+    vx[n] = ca * speed + dvx * spec.inherit;
+    vz[n] = sa * speed + dvz * spec.inherit;
+    age[n] = 0;
+    life[n] = lerp(spec.life[0], spec.life[1], rand());
+    rad[n] = d.r * lerp(0.75, 1.25, rand());
+    rot[n] = rand() * Math.PI * 2;
+    spin[n] = (rand() * 2 - 1) * spec.spin;
+    phase[n] = rand() * Math.PI * 2;
+    sp[n] = s;
+    n++;
+  };
+
+  const kill = (i: number) => {
+    const j = --n;
+    if (i === j) return;
+    px[i] = px[j] as number;
+    py[i] = py[j] as number;
+    pz[i] = pz[j] as number;
+    vx[i] = vx[j] as number;
+    vz[i] = vz[j] as number;
+    age[i] = age[j] as number;
+    life[i] = life[j] as number;
+    rad[i] = rad[j] as number;
+    rot[i] = rot[j] as number;
+    spin[i] = spin[j] as number;
+    phase[i] = phase[j] as number;
+    sp[i] = sp[j] as number;
+  };
+
+  return {
+    preset,
+    get count() {
+      return n;
+    },
+    step(dt, dice, flying) {
+      if (dt <= 0) return;
+      // Move and age.
+      for (let i = n - 1; i >= 0; i--) {
+        const a = (age[i] as number) + dt;
+        if (a >= (life[i] as number)) {
+          kill(i);
+          continue;
+        }
+        age[i] = a;
+        const spec = preset.species[sp[i] as number] as Species;
+        const keep = Math.exp(-spec.drag * dt);
+        vx[i] = (vx[i] as number) * keep;
+        vz[i] = (vz[i] as number) * keep;
+        const r = rad[i] as number;
+        px[i] = (px[i] as number) + ((vx[i] as number) + spec.drift[0] * r) * dt;
+        pz[i] = (pz[i] as number) + ((vz[i] as number) + spec.drift[1] * r) * dt;
+        rot[i] = (rot[i] as number) + (spin[i] as number) * dt;
+      }
+      // Shed.
+      dice.forEach((d, k) => {
+        const last = prev[k];
+        const dvx = last ? (d.x - last.x) / dt : 0;
+        const dvz = last ? (d.z - last.z) / dt : 0;
+        prev[k] = { x: d.x, z: d.z };
+        if (!flying) return;
+        const debt = owed[k] ?? preset.emitters.map(() => rand());
+        owed[k] = debt;
+        preset.emitters.forEach((e, j) => {
+          let due = (debt[j] as number) + e.rate * scale * dt;
+          while (due >= 1) {
+            spawn(e.species, d, dvx, dvz, 1);
+            due -= 1;
+          }
+          debt[j] = due;
+        });
+      });
+    },
+    burst(dice) {
+      for (const d of dice) {
+        for (const e of preset.emitters) {
+          const count = Math.round(e.burst * scale);
+          for (let i = 0; i < count; i++) spawn(e.species, d, 0, 0, e.burstSpeed);
+        }
+      }
+    },
+    drawn(i, fade) {
+      const spec = preset.species[sp[i] as number] as Species;
+      const t = (age[i] as number) / (life[i] as number);
+      const [r, g, b, a0] = rampAt(spec.ramp, t);
+      const tw =
+        spec.twinkle > 0
+          ? 0.55 + 0.45 * Math.sin((age[i] as number) * spec.twinkle * 6.283 + (phase[i] as number))
+          : 1;
+      return {
+        x: px[i] as number,
+        y: py[i] as number,
+        z: pz[i] as number,
+        size: (rad[i] as number) * lerp(spec.size[0], spec.size[1], t),
+        rot: rot[i] as number,
+        tile: spec.tile,
+        additive: spec.additive,
+        r,
+        g,
+        b,
+        a: a0 * tw * fade,
+      };
+    },
+    clear() {
+      n = 0;
+    },
+  };
+}
+
+/** How far into the landing (seconds since rest) the particles still show (1 → 0). */
+export function landFade(sinceRest: number): number {
+  if (sinceRest <= LAND_FADE_FROM) return 1;
+  return Math.max(0, 1 - (sinceRest - LAND_FADE_FROM) / (LAND_S - LAND_FADE_FROM));
+}
+
+/** The aura and the die's glow over the landing: a flare at the impact, then gone. */
+export function landGlow(sinceRest: number): number {
+  if (sinceRest >= LAND_GLOW_S) return 0;
+  const u = sinceRest / LAND_GLOW_S;
+  return 1.25 * (1 - u) * (1 - u);
+}
+
+/** The die's glow level (0–1) `t` seconds in. */
+export function richFlicker(p: RichPreset, t: number, seed: number): number {
+  return 0.5 + 0.3 * Math.sin(t * p.hz * 2.1 + seed) + 0.2 * Math.sin(t * p.hz * 5.3 + seed * 2);
+}

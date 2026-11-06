@@ -4173,7 +4173,9 @@ From [spell-fx](../specs/spell-fx.md) (VFX, in-review, DM direction #372) and [A
 |---|---|---|---|---|---|
 | `EffectFxSet` | VFX | `{effectId}` | `effect` upsert (+ effect-hook rows) | yes | no |
 
-**Record change:** `effect` (DM) gains `fx: {preset, params, spellId?} | null`; the player redaction (`redactEffect`, FR-CBTX-31) gains `fx` on every effect players receive (not secret, not hidden, not ended). The stored / wire shape accepts any kebab-case preset key (a newer server's preset parses on an older client, which draws nothing); writes accept catalogue presets only.
+*(#456, build/vfx-tentacles, FR-VFX-41)* `vfx.cast` gains `place?: {sceneId, x, y, angle, hidden?}` (`CastPlace`): required for a template preset (else `conflict` "Place ‹spell› on the map"), refused for any other (`invalid`); player: active scene only, no `hidden` (`invalid`). Events: `TemplatePlaced` (the kept cube, FR-SCN-25 limits and fog copies; placer = the player, or for the DM the character's owner, a monster's none) then the effect's own; the effect's `fx.templateId` = the template. FR-VFX-43: an effect ending by any path removes its template in the causing event's changes (effect-changed hook `spell-fx.cast-template`; no event of its own); `vfx.setEffectFx` clearing / replacing such a map effect does too, and refuses a template preset (`conflict`; the same preset again → no-op).
+
+**Record change:** `effect` (DM) gains `fx: {preset, params, spellId?} | null` *(#456: `templateId?`)*; the player redaction (`redactEffect`, FR-CBTX-31) gains `fx` on every effect players receive (not secret, not hidden, not ended). The stored / wire shape accepts any kebab-case preset key (a newer server's preset parses on an older client, which draws nothing); writes accept catalogue presets only.
 
 **Server signal `vfx.hit`** (server-originated, transient: no event of its own, DB row, log, snapshot or `seq`): `signal {name: "vfx.hit", data: HitCue, from}`, `from` = the applying actor.
 
