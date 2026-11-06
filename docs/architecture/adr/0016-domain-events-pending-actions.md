@@ -44,7 +44,7 @@ graph LR
 
 **Event log and combat undo** (tier S, so the log is **MVP**)
 - Domain events are appended to a persisted **event log** (decided). Same transaction as the state change. **Exception: token moves are not logged** (broadcast only; DM doesn't need a move history). Other high-frequency, low-value events may be marked non-logged by their spec.
-- **Undo is basic and combat-only (decided):** the DM can undo combat log entries such as "Player X did 4 damage to creature Y". Not rolls (an Animal Handling roll is just a fact), not token moves, not scene edits.
+- **Undo is basic and combat-only (decided):** the DM can undo combat log entries such as "Player X did 4 damage to creature Y". Not rolls (an Animal Handling roll is just a fact), not token moves, not scene edits. *Amended:* scene edits since #196 (fog, structure, props); a combatant's counted moves since #455 (DM, [FR-CBT-180](../../specs/combat-tracker.md#69-undo-move-455); still unlogged).
 - Undoable events carry what's needed to reverse them (e.g. `DamageApplied {target, amount, hpBefore, hpAfter}`).
 - **Undo = append a compensating event** that reverses an earlier one and marks it `undone`. The log stays append-only; state tables stay the truth for play.
 - Stats ([stats](../../specs/stats.md)) ignore undone events.

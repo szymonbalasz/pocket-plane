@@ -17,6 +17,7 @@ import { applyHitCommand } from "./hit";
 import { applyCardWith, applyHp, undoCommandWith } from "./hp";
 import { rollInitiative, setInitiative, setRemoved } from "./initiative";
 import { endCommandWith, startCommandWith } from "./lifecycle";
+import { undoMoveCommand } from "./move-undo";
 import { combatRecordTypes } from "./records";
 import { bindCombatRuleHooks, CombatRuleHooks, combatRuleHooks } from "./rule-hooks";
 import { setSideCommand } from "./sides";
@@ -57,6 +58,8 @@ export const combatTracker: Feature = {
       // Sprint 15 (FR-CBT-173, #385): a logged roll used as an attack / damage card.
       useRollCommand,
       clearDamageCommand,
+      // FR-CBT-180 (#455): the DM takes a counted move back.
+      undoMoveCommand,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
     for (const t of combatRecordTypes) r.recordType(t);

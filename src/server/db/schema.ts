@@ -14,6 +14,7 @@ import {
   HP_MODES,
   type HpDamagePart,
   type HpTriggerPart,
+  type MoveStep,
   SIDES,
 } from "@shared/combat-tracker/schemas";
 import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
@@ -797,6 +798,11 @@ export const combatant = sqliteTable(
      * Nullable, no default: push-safe on old dev DBs.
      */
     tieOrder: integer("tie_order"),
+    /**
+     * FR-CBT-179 (#455): JSON leaf, the undoable counted moves, oldest first (≤ 20); null = none.
+     * Cleared with `movedFt`'s reset and by a teleport. DM only. Nullable, no default: push-safe.
+     */
+    moveSteps: text("move_steps", { mode: "json" }).$type<MoveStep[]>(),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );

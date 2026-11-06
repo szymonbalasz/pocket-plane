@@ -42,6 +42,25 @@ export function appendTrail(env: Env, t: TokenRecord, from: Cell, to: Cell): voi
     .run();
 }
 
+/**
+ * FR-CBT-180 (#455): the move `from → to` is taken back: the trail drops its last cell when it
+ * ends with that move (a lone start cell left → no trail). Else (cleared by a turn change, or
+ * hidden at the time) nothing changes.
+ */
+export function popTrail(env: Env, t: TokenRecord, from: Cell, to: Cell): void {
+  const now = readToken(env.tx, t.id);
+  const cells = now.trail?.cells ?? [];
+  const last = cells.at(-1);
+  const prev = cells.at(-2);
+  if (!last || !prev || !same(last, [to.col, to.row]) || !same(prev, [from.col, from.row])) return;
+  const kept = cells.slice(0, -1);
+  env.tx
+    .update(token)
+    .set({ trail: kept.length > 1 ? { cells: kept } : null })
+    .where(eq(token.id, t.id))
+    .run();
+}
+
 /** FR-MAP-66 (review B5): a reveal starts the trail afresh, so hidden moves never show. */
 export function resetTrail(env: Env, t: TokenRecord): void {
   env.tx.update(token).set({ trail: null }).where(eq(token.id, t.id)).run();

@@ -37,9 +37,14 @@ export const toEntryRecord = (
   campaignId: string,
 ): EncounterEntryRecord => ({ ...r, campaignId });
 /** FR-CBT-107 (sprint 6): stored `position` 0 = no rank (an in-owner-turn companion) → null. */
-export const toCombatantRecord = (r: typeof combatant.$inferSelect): CombatantRecord => ({
+export const toCombatantRecord = ({
+  moveSteps,
+  ...r
+}: typeof combatant.$inferSelect): CombatantRecord => ({
   ...r,
   position: r.position === 0 ? null : r.position,
+  // FR-CBT-179: absent when empty, so records without moves keep their shape.
+  ...(moveSteps && moveSteps.length > 0 ? { moveSteps } : {}),
 });
 export const toHpChangeRecord = (r: typeof hpChange.$inferSelect): HpChangeRecord => ({
   ...r,

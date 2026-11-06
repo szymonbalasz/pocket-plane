@@ -159,6 +159,7 @@ import tokenArtUpdate from "./token-art-update";
 import tokenMirrors from "./token-mirrors";
 import tplMenu from "./tpl-menu";
 import trayAttacks from "./tray-attacks";
+import undoMoveE2e from "./undo-move-e2e";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
@@ -419,4 +420,6 @@ export const bundles: readonly Bundle[] = [
   notes,
   // Linked notes N7 (fix/notes-sim): the full session simulation with notes
   sessionSim18,
+  // Undo a counted move (build/undo-move): late-damage's moves in their own server
+  undoMoveE2e,
 ];

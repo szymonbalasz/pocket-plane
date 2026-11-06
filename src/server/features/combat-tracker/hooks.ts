@@ -2,7 +2,12 @@
 // FR-CBT-39, ADR-0031) and definition-changed (FR-CBT-06, FR-ENT-19). Both return the rows they
 // changed for the caller's event and never emit.
 
-import { MOVED_FT_MAX } from "@shared/combat-tracker/schemas";
+import {
+  type CombatantRecord,
+  MOVE_STEPS_MAX,
+  MOVED_FT_MAX,
+  type MoveStep,
+} from "@shared/combat-tracker/schemas";
 import { companionCard, type EntityRecord } from "@shared/entities/schemas";
 import { distanceFt } from "@shared/scene-tools/geometry";
 import type { TokenRecord } from "@shared/scenes-map/schemas";
@@ -13,7 +18,7 @@ import type { RecordChange } from "../../events/types";
 import type { HookEnv } from "../entities/definition-hooks";
 import { diagonalRuleOf } from "../scene-tools/rows";
 import type { TokenHookEnv } from "../scenes-map/token-hooks";
-import { appendTrail, resetTrail } from "../scenes-map/trail";
+import { appendTrail, popTrail, resetTrail } from "../scenes-map/trail";
 import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { combatantDiff, encounterDiff, rerank, syncPlayerTurn } from "./ranks";
 import {
@@ -68,20 +73,17 @@ export function combatantTokenHook(
   // FR-SCN-30: the campaign's diagonal rule (`map-settings`, no row = 5/10/5). A move refused by a
   // move guard (FR-SCN-11) never reaches the hooks, so it adds nothing.
   // FR-MAP-123: a teleport isn't walked, and leaves no line (`trailHook`).
-  const ft = env.teleport
-    ? 0
-    : distanceFt(before, after, diagonalRuleOf(env.tx, before.campaignId));
+  const moved = before.col !== after.col || before.row !== after.row;
+  const ft =
+    !moved || env.teleport || env.undoStep
+      ? 0
+      : distanceFt(before, after, diagonalRuleOf(env.tx, before.campaignId));
   const hidden = tokenHiddenForPlayers(after);
   for (const c of bound) {
     // FR-CBT-39: before the copy check (which skips on a move); removed combatants gain nothing.
-    if (ft > 0 && !c.removed) {
-      env.tx
-        .update(combatant)
-        .set({ movedFt: Math.min(MOVED_FT_MAX, c.movedFt + ft) })
-        .where(eq(combatant.id, c.id))
-        .run();
-      const now = readCombatant(env.tx, c.id);
-      if (now.movedFt !== c.movedFt) out.push(combatantChange(c, now));
+    if (moved && !c.removed) {
+      const now = countMove(env, c, before, after, ft);
+      if (now) out.push(combatantChange(c, now));
     }
     if (c.name === after.name && c.imageAssetId === after.imageAssetId && c.hidden === hidden) {
       continue;
@@ -101,6 +103,48 @@ export function combatantTokenHook(
 }
 
 /**
+ * FR-CBT-39 / -179 / -180 (#455): a walked move adds its feet (capped) and pushes a move step of
+ * what it added (≤ `MOVE_STEPS_MAX`, the oldest drops); `cbt.undoMove`'s move back (`undoStep`)
+ * pops that step and takes its feet off; a teleport clears the steps (moves before a jump can't
+ * be walked back). The combatant after, or null when nothing changed.
+ */
+function countMove(
+  env: TokenHookEnv,
+  c: CombatantRecord,
+  before: TokenRecord,
+  after: TokenRecord,
+  ft: number,
+): CombatantRecord | null {
+  const steps = c.moveSteps ?? [];
+  let set: { movedFt?: number; moveSteps: MoveStep[] | null };
+  if (env.undoStep) {
+    const last = steps.at(-1);
+    if (last?.id !== env.undoStep) return null;
+    set = {
+      movedFt: Math.max(0, c.movedFt - last.ft),
+      moveSteps: steps.length > 1 ? steps.slice(0, -1) : null,
+    };
+  } else if (env.teleport) {
+    if (steps.length === 0) return null;
+    set = { moveSteps: null };
+  } else {
+    const movedFt = Math.min(MOVED_FT_MAX, c.movedFt + ft);
+    if (movedFt === c.movedFt) return null;
+    const step: MoveStep = {
+      id: env.ctx.ids.next(),
+      tokenId: after.id,
+      sceneId: after.sceneId,
+      from: { col: before.col, row: before.row },
+      to: { col: after.col, row: after.row },
+      ft: movedFt - c.movedFt,
+    };
+    set = { movedFt, moveSteps: [...steps, step].slice(-MOVE_STEPS_MAX) };
+  }
+  env.tx.update(combatant).set(set).where(eq(combatant.id, c.id)).run();
+  return readCombatant(env.tx, c.id);
+}
+
+/**
  * FR-CBT-97 (sprint 5): a committed move of any token on the started encounter's scene (bound
  * or not, any mover) appends to its trail, not while it is hidden (FR-MAP-66); its reveal resets
  * the trail. A teleport clears the trail instead (FR-MAP-123): one list of cells draws one line,
@@ -112,6 +156,11 @@ function trailHook(env: TokenHookEnv, before: TokenRecord, after: TokenRecord): 
   if (before.col === after.col && before.row === after.row) return;
   if (env.teleport) {
     if (after.trail) resetTrail(env, after);
+    return;
+  }
+  // FR-CBT-180: the DM's move back drops the step's cell instead of drawing a line back.
+  if (env.undoStep) {
+    popTrail(env, after, { col: after.col, row: after.row }, { col: before.col, row: before.row });
     return;
   }
   const enc = startedEncounter(env.tx, after.campaignId);
