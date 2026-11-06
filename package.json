@@ -27,7 +27,8 @@
     "upgrade:check": "bun scripts/upgrade-check.ts",
     "mcp": "bun src/mcp/index.ts",
     "mcp:play": "bun src/mcp/index.ts --play",
-    "mcp:call": "bun scripts/mcp-call.ts"
+    "mcp:call": "bun scripts/mcp-call.ts",
+    "gsb:import": "bun scripts/gsb-import.ts"
   },
   "dependencies": {
     "@codemirror/collab": "^6.1.1",

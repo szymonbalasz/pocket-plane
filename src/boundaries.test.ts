@@ -168,14 +168,15 @@ describe("import boundaries (AGENTS §9.1)", () => {
     expect(bad).toEqual([]);
   });
 
-  test("FR-AGENT-07 only scripts/mcp-call.ts imports the MCP server from outside src/mcp", () => {
+  test("FR-AGENT-07 only scripts/mcp-call.ts and scripts/gsb-import.ts import the MCP server from outside src/mcp", () => {
     const outside = [...files("scripts"), ...files("e2e")].filter((f) =>
       imports(readFileSync(path.join(ROOT, f), "utf8")).some(
         (imp) => imp.spec.startsWith("@mcp/") || modulePath(f, imp.spec).startsWith("src/mcp/"),
       ),
     );
     const others = outside.map((f) => f.split(path.sep).join("/"));
-    expect(others.filter((f) => f !== "scripts/mcp-call.ts")).toEqual([]);
+    const allowed = ["scripts/mcp-call.ts", "scripts/gsb-import.ts"];
+    expect(others.filter((f) => !allowed.includes(f))).toEqual([]);
   }, 30_000);
 
   test("the checker catches violations", () => {
