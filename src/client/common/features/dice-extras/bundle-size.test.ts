@@ -2,7 +2,8 @@
 // client's initial JS carries ≤ 15 KB gz of dice-extras code (parser, tray, flat dice, the 3D
 // loader), measured as the gzip of exactly the dice-extras modules in the initial chunks (an
 // upper bound on the growth vs `main`, which doesn't drift as other features land). `three` and
-// `cannon-es` sit only in the lazy 3D chunk, reached by dynamic import only; it's ≤ 170 KB gz.
+// `cannon-es` sit only in the lazy 3D chunk, reached by dynamic import only; it's ≤ 190 KB gz (the
+// DM raised it from 170 on 2026-11-06: the per-type damage dice effects, FR-DICEX-106, grew it).
 // The roll popup UI is a lazy chunk ≤ 8 KB gz (sprint 4, §12).
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -14,7 +15,7 @@ import { build, type Rollup } from "vite";
 const ROOT = path.resolve(import.meta.dir, "../../../../..");
 const KB = 1024;
 const INITIAL_DICEX_MAX = 15 * KB;
-const CHUNK_3D_MAX = 170 * KB;
+const CHUNK_3D_MAX = 190 * KB;
 /** FR-DICEX-39 / §12: the lazy roll-popup UI chunk. */
 const POPUP_MAX = 8 * KB;
 
@@ -60,7 +61,7 @@ function closure(start: Rollup.OutputChunk, byFile: Map<string, Rollup.OutputChu
 }
 
 describe("DICEX bundle size", () => {
-  test("FR-DICEX-22 FR-DICEX-39 initial chunks ≤ 15 KB gz of dice-extras per client; 3D only in a lazy chunk ≤ 170 KB gz; lazy RollPopup ≤ 8 KB gz", async () => {
+  test("FR-DICEX-22 FR-DICEX-39 initial chunks ≤ 15 KB gz of dice-extras per client; 3D only in a lazy chunk ≤ 190 KB gz; lazy RollPopup ≤ 8 KB gz", async () => {
     const chunks = await bundle();
     const byFile = new Map(chunks.map((c) => [c.fileName, c]));
     const initial = new Set<Rollup.OutputChunk>();
