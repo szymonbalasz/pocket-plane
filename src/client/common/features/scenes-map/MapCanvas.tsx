@@ -143,8 +143,10 @@ export interface MapCanvasProps {
   onEmptyClick?(): void;
   /** DM: Ctrl/Shift + left-drag on empty canvas; the ids whose footprint centre is inside. */
   onBoxSelect?(tokenIds: string[]): void;
-  /** DM: right-click on a token (FR-MAP-18). */
+  /** Right-click (long-press on touch) on a token: DM FR-MAP-18; player FR-NOTES-29. */
   onTokenMenu?(t: TokenView, at: { x: number; y: number }): void;
+  /** Player: the token has a menu (FR-NOTES-29); absent → none. The DM's tokens always do. */
+  hasTokenMenu?(t: TokenView): boolean;
   onTokenDoubleClick?(t: TokenView): void;
   /** DM: a Creatures row dropped on the canvas (FR-MAP-13); the pointer cell = top-left. */
   onDropDefinition?(definitionId: string, cell: { col: number; row: number }): void;
@@ -1136,10 +1138,18 @@ export function MapCanvas(props: MapCanvasProps) {
     return (id && tokensRef.current.find((t) => t.id === id)) || null;
   };
 
+  /** FR-MAP-18 / FR-NOTES-29: whether a right press on this token is the token menu's. */
+  const tokenHasMenu = (id: string): boolean => {
+    if (client === "dm") return true;
+    const t = props.onTokenMenu && tokensRef.current.find((x) => x.id === id);
+    return t ? (props.hasTokenMenu?.(t) ?? false) : false;
+  };
+
   const onMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const p = mapPoint();
     if (!p) return;
-    const onToken = tokenNodeOf(e.target) !== null;
+    const tokenNode = tokenNodeOf(e.target);
+    const onToken = tokenNode !== null;
     if (e.evt.button === 2) {
       // FR-MAP-71: doors' and props' menus never get here (`cancelBubble`).
       rightRef.current = null;
@@ -1150,10 +1160,11 @@ export function MapCanvas(props: MapCanvasProps) {
       const toolMenu = tp !== null && menuTool?.pointer?.menu?.(tp) === true;
       const menuCtx: LayerMenuContext = { ...ctx, off: useLayerToggles.getState().off };
       const found = isLive && !toolMenu ? layerMenuAt(canvasLayers, p, menuCtx) : null;
-      // The DM's token menu goes first, unless the layer's menu asks to go ahead (FR-SCN-58).
-      const dmToken = onToken && client === "dm";
-      const ahead = dmToken && found?.contextMenu?.first?.(menuCtx) === true;
-      const hit = dmToken && !ahead ? null : found;
+      // The token menu goes first, unless the layer's menu asks to go ahead (FR-SCN-58); a
+      // player's only on a token with a menu (FR-NOTES-29).
+      const menuToken = tokenNode !== null && tokenHasMenu(tokenNode.id());
+      const ahead = menuToken && found?.contextMenu?.first?.(menuCtx) === true;
+      const hit = menuToken && !ahead ? null : found;
       skipTokenMenu.current = ahead;
       const action = rightPress({
         client,
@@ -1256,7 +1267,7 @@ export function MapCanvas(props: MapCanvasProps) {
     skipTokenMenu.current = false;
     if (skip) return;
     const node = tokenNodeOf(e.target);
-    if (!node || client !== "dm" || !props.onTokenMenu || !liveRef.current) return;
+    if (!node || !props.onTokenMenu || !liveRef.current || !tokenHasMenu(node.id())) return;
     const t = tokens.find((x) => x.id === node.id());
     if (t) props.onTokenMenu(t, { x: e.evt.clientX, y: e.evt.clientY });
   };

@@ -88,6 +88,7 @@ import lootSubtractE2e from "./loot-subtract-e2e";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notes from "./notes";
+import notesToken from "./notes-token";
 import notifications from "./notifications";
 import overviewCrowd from "./overview-crowd";
 import overviewScenes from "./overview-scenes";
@@ -419,4 +420,6 @@ export const bundles: readonly Bundle[] = [
   notes,
   // Linked notes N7 (fix/notes-sim): the full session simulation with notes
   sessionSim18,
+  // Linked notes N9 token notes (build/notes-token)
+  notesToken,
 ];

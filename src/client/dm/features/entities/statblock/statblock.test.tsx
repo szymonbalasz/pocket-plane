@@ -526,10 +526,10 @@ describe("FR-KIT-107 dm only", () => {
     expect(wire).toEqual([]);
   });
 
-  test("FR-KIT-107 dm only: the player registry has no stat block window or launcher; players get no token menu (the DM map owns it)", () => {
+  test("FR-KIT-107 dm only: the player registry has no stat block window or launcher; the player token menu (FR-NOTES-29) has no Stat block (the DM map owns it)", () => {
     expect(PLAYER_REGISTRY).not.toContain(STATBLOCK_KIND);
     const playerMap = files(join(root, "src/client/player")).filter((f) =>
-      /token-menu|cmp-token-menu-statblock|cbt-init-row-statblock|cmp-statblock-open/.test(
+      /cmp-token-menu-statblock|cbt-init-row-statblock|cmp-statblock-open|compendium\/token-menu/.test(
         readFileSync(f, "utf8"),
       ),
     );
