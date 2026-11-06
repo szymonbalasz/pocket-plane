@@ -29,6 +29,10 @@ const totals = {
   monster: 0,
   spell: 0,
   item: 0,
+  feat: 0,
+  race: 0,
+  background: 0,
+  option: 0,
   entryOnly: 0,
   art: 0,
   noArt: 0,
@@ -45,6 +49,8 @@ for (const b of books) {
   totals.monster += r.counts.monster;
   totals.spell += r.counts.spell;
   totals.item += r.counts.item;
+  for (const k of ["feat", "race", "background", "option"] as const) totals[k] += r.counts[k];
+  const options = r.counts.feat + r.counts.race + r.counts.background + r.counts.option;
   totals.skipped += r.skipped;
   for (const w of r.warnings) {
     const f = w.field.replace(/\[\d+\]/g, "[]");
@@ -58,7 +64,7 @@ for (const b of books) {
     else totals.noArt++;
   }
   console.log(
-    `${b.abbr.padEnd(12)} M ${String(r.counts.monster).padStart(4)}  S ${String(r.counts.spell).padStart(3)}  I ${String(r.counts.item).padStart(4)}  warn ${String(r.warnings.length).padStart(4)}  skip ${r.skipped}  ${ms.toFixed(0)} ms`,
+    `${b.abbr.padEnd(12)} M ${String(r.counts.monster).padStart(4)}  S ${String(r.counts.spell).padStart(3)}  I ${String(r.counts.item).padStart(4)}  O ${String(options).padStart(3)}  warn ${String(r.warnings.length).padStart(4)}  skip ${r.skipped}  ${ms.toFixed(0)} ms`,
   );
 }
 console.log("\nTotals", totals);

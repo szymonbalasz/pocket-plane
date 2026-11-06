@@ -2940,3 +2940,17 @@ Index: `note_campaign_title` (`campaign_id`, `title_fold`).
 - **Not stored:** subscriptions, who is here, cursors (N2, memory only).
 - **Fixtures:** `notes-shared`, `notes-binned`, `notes-second-campaign`; bundle `notes`. Bodies are set by `notes.seedBody`, a fixtures-only command (not an intent) until co-writing exists.
 - **Load size** (`lazyLoadSizes`): 1,477 B for the fixture's 4 rows; at both caps with 100-character titles 974,612 B (≈ 487 B a row), under the 4 MiB result cap.
+
+## 155. Compendium character options (build/cmpx-options)
+
+From [compendium-expansion](../specs/post-mvp/compendium-expansion.md#6-functional-requirements) X5 (FR-CMPX-30–35, #455). No new table, column or record type.
+
+| Field / store | Change | Rule | Source |
+|---|---|---|---|
+| `compendium_entry.kind` | + `feat`, `race`, `background`, `option` | text enum with no CHECK: `drizzle-kit push` changes nothing | FR-CMPX-30 |
+| `feat` facets / body | `{}` / `{prerequisite?, text}` | prerequisite ≤ 200 (words); text markdown-lite, an ability increase first; `sourceKey` `feat/<slug>` | FR-CMPX-31 |
+| `race` facets / body | `{parent?}` / `{abilities?, size?, speed?, text}` | `parent` = a subrace's race name (≤ 80); facts ≤ 200 each; a subrace's entry is "Race (Sub)", merged; `sourceKey` `race/<slug>` | FR-CMPX-32 |
+| `background` facets / body | `{}` / `{text}` | `sourceKey` `background/<slug>` | FR-CMPX-33 |
+| `option` facets / body | `{types: OptionType[]}` / `{prerequisite?, text}` | `types` 1–10 unique labels of `OPTION_TYPES` (Eldritch Invocation … Other); `sourceKey` `option/<slug>` | FR-CMPX-33 |
+| `compendium_source.counts` | + the four kinds | a source imported before X5 has none of them (partial record); new imports store every kind, 0 included | FR-CMPX-30 |
+| Book list (derived, folder read) | `counts` + `feat`, `race`, `background`, `option` | a nameless subrace isn't counted (it folds into its race) | FR-CMPX-30 |

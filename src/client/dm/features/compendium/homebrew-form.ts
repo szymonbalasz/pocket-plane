@@ -15,6 +15,9 @@ import { copyName } from "@shared/scenes-map/geometry";
 
 export const HOMEBREW_KINDS = ["spell", "item", "condition", "feature", "rule"] as const;
 export type HomebrewKind = (typeof HOMEBREW_KINDS)[number];
+/** The form's kinds: imported character options (FR-CMPX-34) have no Clone; MCP homebrew only. */
+export const isHomebrewKind = (k: string): k is HomebrewKind =>
+  (HOMEBREW_KINDS as readonly string[]).includes(k);
 
 export type FormMode =
   /** `preset`: the kind to start with (the Rules window's New house rule: `rule`). */
@@ -84,7 +87,9 @@ export function initialFields(
   kind: HomebrewKind = mode.kind === "new" ? (mode.preset ?? "item") : "item",
 ): HomebrewFields {
   const src = mode.kind === "clone" ? mode.base : mode.kind === "edit" ? mode.entry : null;
-  if (!src || src.kind === "monster") return { ...BLANK, kind, images: [], facets: {}, body: {} };
+  if (!src || !isHomebrewKind(src.kind)) {
+    return { ...BLANK, kind, images: [], facets: {}, body: {} };
+  }
   const f = (src.facets ?? {}) as Record<string, unknown>;
   const b = (src.body ?? {}) as Record<string, unknown>;
   const name =

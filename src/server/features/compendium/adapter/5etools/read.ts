@@ -38,6 +38,13 @@ export interface FolderData {
   itemEntries: Raw[];
   /** `magicvariants.json`, flattened: `inherits` on top of the variant. */
   variants: Raw[];
+  /** FR-CMPX-30: character options; each file optional (an older folder lacks one: none). */
+  feats: Raw[];
+  races: Raw[];
+  /** Named or not: a nameless subrace folds into its race (FR-CMPX-32). */
+  subraces: Raw[];
+  backgrounds: Raw[];
+  optionalFeatures: Raw[];
   /** Rows dropped at read: file + position only, nothing of the row. */
   unreadable: string[];
 }
@@ -114,7 +121,22 @@ export function readFolder(read: ReadText): FolderData {
       unreadable.push(`${variantsRel}#${i}`);
       return false;
     });
+  const optional = (rel: string, field: string, named = true) =>
+    rows(objectAt(read, rel, true), field, rel, unreadable, named);
+  const racesRel = "data/races.json";
+  const racesDoc = objectAt(read, racesRel, true);
+  const subraces = rows(racesDoc, "subrace", racesRel, unreadable, false).filter((s, i) => {
+    // A subrace names its race; its own name may be absent.
+    if (typeof s.raceName === "string" && typeof s.source === "string") return true;
+    unreadable.push(`${racesRel}#subrace${i}`);
+    return false;
+  });
   return {
+    feats: optional("data/feats.json", "feat"),
+    races: rows(racesDoc, "race", racesRel, unreadable),
+    subraces,
+    backgrounds: optional("data/backgrounds.json", "background"),
+    optionalFeatures: optional("data/optionalfeatures.json", "optionalfeature"),
     monsters,
     monsterTemplates: rows(objectAt(read, tplRel, true), "monsterTemplate", tplRel, unreadable),
     legendaryGroups: rows(objectAt(read, lgRel), "legendaryGroup", lgRel, unreadable),

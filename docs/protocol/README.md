@@ -4588,3 +4588,16 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-11 and [ADR-0078](../arch
 - **`notes.updates`** updates may carry `clientId: "server"` (schema `NoteUpdateOut`; clients still can't bind it).
 - **Client:** a renamed note's old folded title resolves to it for 5 s, so chips stay solid until the rewrite lands.
 - **Search polish (r1, `GET /api/notes/search`):** body matching keeps the shared matcher's tiers but a note's own body rule: the **last** query word (being typed) matches body words as a prefix at any length; another word under 3 letters matches whole body words only; longer words match as prefixes (plural forms too), as before. Snippets drop markdown markers (`#`–`###`, list `-` / `*` / `1.`, `**`) in a window around the first hit. Bench at the caps (1,000 × 32 KiB, Windows, same machine): warm p95 21–33 ms ("the", "dragon", "gold coins", "captain of the guard", "lo"), was 2.8–25 ms; short and last-word queries cost more because they now match bodies.
+
+## 201. Compendium character options (build/cmpx-options)
+
+[compendium-expansion](../specs/post-mvp/compendium-expansion.md#6-functional-requirements) X5 (FR-CMPX-30–35). No new event, intent or route; shapes in `@shared/compendium`.
+
+| Surface | Change |
+|---|---|
+| `CompendiumKind` | + `feat`, `race`, `background`, `option`: every REST shape with a kind takes them (`EntrySummary`, `CompendiumEntry`, homebrew `PUT` via MCP); `ImportCounts` (event `CompendiumImported`) has a row per kind |
+| `GET /api/compendium/search` | `kind=feat \| race \| background` take no filter; `kind=option` takes `optionType` (one of `OPTION_TYPES`), matched against `facets.types`; on any other kind → `400 invalid` |
+| Visibility (FR-CMP-14) | unchanged: players read all four kinds, imported or shared homebrew |
+| `cmp.addToSheet` | `feat` and `option` → a `features` row; `race`, `background` → `400 invalid` |
+| `GET /api/compendium/sources` | `fiveEtools.books[].counts` + `feat`, `race`, `background`, `option` |
+| Share (FR-SHARE-04) | feat / option: Prerequisite fact + text; race: Ability Scores, Size, Speed facts + text; background: text |

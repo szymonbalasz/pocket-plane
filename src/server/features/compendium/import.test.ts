@@ -209,7 +209,18 @@ describe("FR-CMP-02 FR-CMP-03 FR-CMP-04 imported entries and source (cmp-srd-min
         url: SRD_51_SOURCE.url,
         version: "mini",
         importedAt: expect.any(String),
-        counts: { monster: 5, spell: 4, item: 4, condition: 3, feature: 39, rule: 0 },
+        counts: {
+          monster: 5,
+          spell: 4,
+          item: 4,
+          condition: 3,
+          feature: 39,
+          rule: 0,
+          feat: 0,
+          race: 0,
+          background: 0,
+          option: 0,
+        },
       },
     ]);
     expect(t.imported()).toHaveLength(55);
@@ -502,6 +513,10 @@ describe("FR-CMP-07 FR-CMP-31 full bundled import", () => {
       condition: { created: 15, updated: 0, existing: 0 },
       feature: { created: 202, updated: 0, existing: 0 },
       rule: { created: 160, updated: 0, existing: 0 },
+      feat: { created: 0, updated: 0, existing: 0 },
+      race: { created: 0, updated: 0, existing: 0 },
+      background: { created: 0, updated: 0, existing: 0 },
+      option: { created: 0, updated: 0, existing: 0 },
     });
     expect(s.db.select().from(entity).where(isNull(entity.campaignId)).all()).toHaveLength(322);
     const changes = () =>

@@ -26,6 +26,7 @@ import { readEventLog } from "../../events/log";
 import type { Actor } from "../../events/types";
 import { createTestServices, TEST_SECRET } from "../../testing/services";
 import { bookVersion } from "./adapter/5etools";
+import { sheetRowOf } from "./add-to-sheet";
 import { DERIVE_MONSTER } from "./derive";
 import { END_COMBAT_FIRST, IMPORT, type ImportResult } from "./import";
 import { bookAbbrOf, bookAttribution, FIVE_ETOOLS_LICENCE } from "./sources/five-etools";
@@ -563,5 +564,54 @@ describe("FR-CMPX-16 FR-CMPX-18 badges and credits", () => {
     expect(await t.search("goblin", t.player1)).toEqual([]);
     const wispId = t.entry(TB1, "monster/goblin")?.id;
     expect((await t.get(`/entries/${wispId}`, t.player1)).status).toBe(404);
+  });
+});
+
+describe("FR-CMPX-30–35 character options", () => {
+  test("FR-CMPX-30 a book's feats, races, backgrounds and class options import; counts", () => {
+    const t = fresh();
+    const r = t.run({ source: TB1 });
+    expect(r.counts.feat.created).toBe(3);
+    expect(r.counts.race.created).toBe(2);
+    expect(r.counts.background.created).toBe(1);
+    expect(r.counts.option.created).toBe(3);
+    expect(t.entry(TB1, "race/glimmerkin-deep")?.line).toBe("Subrace of Glimmerkin");
+  });
+
+  test("FR-CMPX-34 search per kind, the Class options type filter; players read them", async () => {
+    const t = fresh();
+    t.run({ source: TB1 });
+    const names = async (q: string, headers: Record<string, string> = DM) =>
+      SearchResponse.parse(await (await t.get(`/search?${q}`, headers)).json()).results.map(
+        (r) => r.name,
+      );
+    expect(await names("kind=feat")).toEqual(["Bolt Adept", "Lucky Hand", "Quick Draw"]);
+    expect(await names("kind=race")).toEqual(["Glimmerkin", "Glimmerkin (Deep)"]);
+    expect(await names("kind=background")).toEqual(["Lamplighter"]);
+    expect(await names("kind=option&optionType=Fighting%20Style")).toEqual(["Steady Stance"]);
+    expect(await names("kind=option&optionType=Other")).toEqual(["Odd Trick"]);
+    expect((await t.get("/search?kind=feat&optionType=Other")).status).toBe(400);
+    expect(await names("kind=feat&q=bolt", t.player1)).toEqual(["Bolt Adept"]);
+    const id = t.entry(TB1, "race/glimmerkin")?.id;
+    const read = EntryResponse.parse(await (await t.get(`/entries/${id}`, t.player1)).json());
+    expect(read.entry.body).toMatchObject({ abilities: "Dex +2", size: "Small" });
+  });
+
+  test("FR-CMPX-35 a feat and a class option go on a sheet as features; a race doesn't", () => {
+    const t = fresh();
+    t.run({ source: TB1 });
+    const row = (key: string) => {
+      const e = t.entry(TB1, key);
+      if (!e) throw new Error(`No ${key}`);
+      return e;
+    };
+    const sheet = (key: string) => t.s.db.transaction((tx) => sheetRowOf({ tx }, row(key)));
+    const feat = sheet("feat/quick-draw");
+    expect(feat).toEqual({
+      list: "features",
+      rows: [{ name: "Quick Draw", source: "TB1", text: "You draw two weapons at once." }],
+    });
+    expect(sheet("option/steady-stance").list).toBe("features");
+    expect(() => sheet("race/glimmerkin")).toThrow();
   });
 });

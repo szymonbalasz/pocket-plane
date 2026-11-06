@@ -1,0 +1,49 @@
+{
+  "background": [
+    {
+      "name": "Lamplighter",
+      "source": "TB1",
+      "page": 6,
+      "entries": [
+        {
+          "type": "list",
+          "style": "list-hang-notitle",
+          "items": [
+            {
+              "type": "item",
+              "name": "Skill Proficiencies:",
+              "entry": "{@skill Perception}, {@skill Stealth}"
+            },
+            { "type": "item", "name": "Equipment:", "entry": "A lamp, a pole and 5 gp" }
+          ]
+        },
+        {
+          "name": "Feature: Lamplight",
+          "type": "entries",
+          "entries": ["Watchmen know your face and let you pass after dark."],
+          "data": { "isFeature": true }
+        }
+      ]
+    },
+    {
+      "name": "Night Lamplighter",
+      "source": "TB2",
+      "page": 4,
+      "_copy": {
+        "name": "Lamplighter",
+        "source": "TB1",
+        "_mod": {
+          "entries": {
+            "mode": "replaceArr",
+            "replace": "Feature: Lamplight",
+            "items": {
+              "name": "Feature: Night Watch",
+              "type": "entries",
+              "entries": ["You never get lost in the dark."]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

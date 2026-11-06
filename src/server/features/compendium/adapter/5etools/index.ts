@@ -16,6 +16,16 @@ import { slugify } from "../text";
 import { type CopyResult, resolveCopies } from "./copy";
 import { mapGroup, mapItem, mapVariant } from "./item";
 import { mapMonster } from "./monster";
+import {
+  mapBackground,
+  mapFeat,
+  mapOption,
+  mapRace,
+  mergeSubrace,
+  type Replaces,
+  subraceName,
+  subraceParent,
+} from "./options";
 import { asStr, isRaw, nameOf, type Raw, rawList, refKey, sourceOf } from "./raw";
 import {
   type BookLabels,
@@ -33,10 +43,24 @@ export { tokenPath } from "./art";
 export { FolderError } from "./read";
 export type { FiveEtoolsResult } from "./run";
 
-export const ADAPTER_VERSION_5ET = "3";
+export const ADAPTER_VERSION_5ET = "4";
 export const SRD_SOURCE_KEY = "srd-5.1";
 
-type BookKind = Extract<CompendiumKind, "monster" | "spell" | "item">;
+type BookKind = Extract<
+  CompendiumKind,
+  "monster" | "spell" | "item" | "feat" | "race" | "background" | "option"
+>;
+/** Kinds the bundled SRD has: only these look for an `srd` entry to replace (FR-CMPX-13). */
+const SRD_KINDS: ReadonlySet<BookKind> = new Set(["monster", "spell", "item"]);
+const zeroBook = (): Record<BookKind, number> => ({
+  monster: 0,
+  spell: 0,
+  item: 0,
+  feat: 0,
+  race: 0,
+  background: 0,
+  option: 0,
+});
 
 /** FR-CMPX-02: `5et-<abbr lower>`. */
 export const bookKey = (abbr: string) => `5et-${abbr.toLowerCase()}`;
@@ -72,7 +96,7 @@ export function describeBooks(data: FolderData, labels: BookLabels): BookInfo[] 
   const add = (list: readonly Raw[], kind: BookKind) => {
     for (const r of list) {
       const abbr = sourceOf(r);
-      const row = counts.get(abbr) ?? { monster: 0, spell: 0, item: 0 };
+      const row = counts.get(abbr) ?? zeroBook();
       row[kind]++;
       counts.set(abbr, row);
     }
@@ -80,6 +104,11 @@ export function describeBooks(data: FolderData, labels: BookLabels): BookInfo[] 
   add(data.monsters, "monster");
   add(data.spells, "spell");
   for (const l of [data.items, data.itemGroups, data.baseItems, data.variants]) add(l, "item");
+  add(data.feats, "feat");
+  // A nameless subrace folds into its race (FR-CMPX-32): not an entry of its own.
+  add([...data.races, ...data.subraces.filter((s) => nameOf(s).trim() !== "")], "race");
+  add(data.backgrounds, "background");
+  add(data.optionalFeatures, "option");
   return [...counts]
     .map(([abbr, c]) => ({
       key: bookKey(abbr),
@@ -208,7 +237,7 @@ function replacer(c: Run, kind: BookKind, all: readonly Raw[], srd: SrdIndex) {
   const reprints = reprintIndex(kind, all);
   return (_kind: BookKind, r: Raw): string[] => {
     const refs = [...(reprints.get(refKey(nameOf(r), sourceOf(r))) ?? [])];
-    if (r.srd === true || typeof r.srd === "string") {
+    if (SRD_KINDS.has(kind) && (r.srd === true || typeof r.srd === "string")) {
       const name = typeof r.srd === "string" ? r.srd : nameOf(r);
       const key = findSrd(srd, kind, name);
       if (key) refs.push(`${SRD_SOURCE_KEY}:${key}`);
@@ -276,7 +305,68 @@ export function adaptBookData(data: FolderData, abbr: string, env: AdaptEnv): Fi
   for (const i of items.records) if (sourceOf(i) === abbr) mapItem(c, i, itemEnv);
   for (const g of data.itemGroups) if (sourceOf(g) === abbr) mapGroup(c, g, itemEnv);
   for (const v of data.variants) if (sourceOf(v) === abbr) mapVariant(c, v, itemEnv);
+  adaptOptions(c, data, abbr, wanted, srd);
   return c.result();
+}
+
+/** FR-CMPX-30–33: feats, races (+ subraces), backgrounds, class options of one book. */
+function adaptOptions(
+  c: Run,
+  data: FolderData,
+  abbr: string,
+  wanted: (r: Raw) => boolean,
+  srd: SrdIndex,
+) {
+  const mine = (r: Raw) => sourceOf(r) === abbr;
+  const replacesFor = (kind: BookKind, all: readonly Raw[]): Replaces => {
+    const fn = replacer(c, kind, all, srd);
+    return (_kind, r) => fn(kind, r);
+  };
+
+  for (const f of data.feats) if (mine(f)) mapFeat(c, f, replacesFor("feat", data.feats));
+
+  const bgs = resolveCopies(data.backgrounds, [], wanted);
+  copyWarnings(c, "background", bgs, abbr);
+  const bgReplaces = replacesFor("background", [...data.backgrounds, ...bgs.records]);
+  for (const b of bgs.records) if (mine(b)) mapBackground(c, b, bgReplaces);
+
+  const opts = data.optionalFeatures;
+  for (const o of opts) if (mine(o)) mapOption(c, o, replacesFor("option", opts));
+
+  // Races: copies resolved over every book (a base may sit anywhere), nameless subraces folded
+  // into their race, named ones merged with it under "Race (Subrace)".
+  const races = resolveCopies(data.races);
+  copyWarnings(c, "race", races, abbr);
+  const raceByRef = new Map(races.records.map((r) => [refKey(nameOf(r), sourceOf(r)), r]));
+  const folded = new Map<Raw, Raw>();
+  for (const s of data.subraces) {
+    if (nameOf(s).trim() !== "") continue;
+    const p = subraceParent(s);
+    const race = raceByRef.get(refKey(p.name, p.source));
+    if (race) folded.set(race, mergeSubrace(folded.get(race) ?? race, s));
+  }
+  const full = (r: Raw) => folded.get(r) ?? r;
+  const named = data.subraces
+    .filter((s) => nameOf(s).trim() !== "")
+    .map((s): Raw => ({ ...s, name: subraceName(s) }));
+  const raceReplaces = replacesFor("race", [...races.records, ...named]);
+  for (const r of races.records) if (mine(r)) mapRace(c, full(r), raceReplaces);
+  for (const s of named) {
+    if (!mine(s)) continue;
+    const key = `race/${slugify(nameOf(s))}`;
+    if (isRaw(s._copy)) {
+      c.skip(key, "_copy", "A copied subrace isn't supported; left out");
+      continue;
+    }
+    const p = subraceParent(s);
+    const race = raceByRef.get(refKey(p.name, p.source));
+    if (!race) {
+      c.skip(key, "raceName", "Its race isn't in the folder; left out");
+      continue;
+    }
+    const merged = { ...mergeSubrace(full(race), s), name: nameOf(s), source: sourceOf(s) };
+    mapRace(c, merged, raceReplaces, { parent: nameOf(race), raw: s });
+  }
 }
 
 export interface AdaptOptions extends ReadOptions, Partial<AdaptEnv> {}

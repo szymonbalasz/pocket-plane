@@ -291,18 +291,18 @@ describe("FR-CMP-19 entry views", () => {
 
 describe("FR-CMP-18 window body", () => {
   const api = {} as Api;
-  test("FR-CMP-18 search, Filters, Tabs: DM 6 with Monsters; player 5 without; loading skeleton before the first page", () => {
+  test("FR-CMP-18 search, Filters, Tabs: DM 10 with Monsters; player 9 without (FR-CMPX-34); loading skeleton before the first page", () => {
     resetCmpNav();
     const dm = render("dm", <CompendiumBody api={api} viewer="dm" top={<p>PANEL</p>} />);
     expect(dm).toContain('data-testid="cmp-window"');
     expect(dm).toContain('data-testid="cmp-search"');
     expect(dm).toContain('data-testid="cmp-filters"');
     expect(dm).toContain("PANEL");
-    expect(dm.match(/data-testid="cmp-tab"/g)).toHaveLength(6);
+    expect(dm.match(/data-testid="cmp-tab"/g)).toHaveLength(10);
     expect(dm).toContain('data-testid="cmp-tab" data-value="monster"');
     expect(dm).toContain('data-testid="cmp-loading"');
     const player = render("player", <CompendiumBody api={api} viewer="player" />);
-    expect(player.match(/data-testid="cmp-tab"/g)).toHaveLength(5);
+    expect(player.match(/data-testid="cmp-tab"/g)).toHaveLength(9);
     expect(player).not.toContain('data-value="monster"');
   });
 });
