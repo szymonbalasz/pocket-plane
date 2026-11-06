@@ -1,7 +1,8 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is the rule's effect field (MOD §8.4); rules are data, never awaited.
+
+import type { LinkSpendByNameInput } from "@server/features/character-sheet/fixture-commands";
 import { charCreate } from "@server/features/character-sheet/lifecycle";
 import { putTrigger } from "@server/features/effect-modifiers/trigger-commands";
-import type { LinkSpendByNameInput } from "@server/features/character-sheet/fixture-commands";
 import { defineFixture, type Refs, step } from "@server/features/fixtures-adapters/fixture-types";
 import type { CharCreateIntent } from "@shared/character-sheet/sheet";
 import type { PutTriggerInput } from "@shared/effect-modifiers/trigger-intents";
