@@ -43,13 +43,20 @@ export const BOOKS_CONFIRM = "Players will pause for a few seconds per book";
 const plural = (n: number, one: string) =>
   `${n.toLocaleString("en-US")} ${one}${n === 1 ? "" : "s"}`;
 
-/** "MM · 450 monsters · 0 spells · 0 items · imported 30 Oct 2026". */
+/**
+ * "MM · 450 monsters · 0 spells · 0 items · imported 30 Oct 2026"; character options only when
+ * the book has some: "PHB · 0 monsters · 361 spells · 0 items · 42 feats · 9 races · …".
+ */
 export const bookLine = (b: BookStatus) =>
   [
     b.abbr,
     plural(b.counts.monster, "monster"),
     plural(b.counts.spell, "spell"),
     plural(b.counts.item, "item"),
+    ...(b.counts.feat ? [plural(b.counts.feat, "feat")] : []),
+    ...(b.counts.race ? [plural(b.counts.race, "race")] : []),
+    ...(b.counts.background ? [plural(b.counts.background, "background")] : []),
+    ...(b.counts.option ? [plural(b.counts.option, "class option")] : []),
     ...(b.importedAt ? [`imported ${importedDay(b.importedAt)}`] : []),
   ].join(" · ");
 

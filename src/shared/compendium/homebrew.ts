@@ -59,7 +59,14 @@ export const AddToSheetResult = z.strictObject({
 export type AddToSheetResult = z.infer<typeof AddToSheetResult>;
 
 /** Kinds with **Add to sheet** (FR-CMP-28), and the sheet list each lands in. */
-export const SHEET_LIST_OF = { spell: "spells", item: "items", feature: "features" } as const;
+export const SHEET_LIST_OF = {
+  spell: "spells",
+  item: "items",
+  feature: "features",
+  // FR-CMPX-35: a feat or class option is a feature row.
+  feat: "features",
+  option: "features",
+} as const;
 export type SheetableKind = keyof typeof SHEET_LIST_OF;
 export const isSheetable = (k: string): k is SheetableKind => k in SHEET_LIST_OF;
 

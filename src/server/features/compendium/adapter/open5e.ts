@@ -17,6 +17,7 @@ import {
   type SrdClass,
   type StatBlockSection,
   StatBlockSection as StatBlockSectionSchema,
+  zeroCounts,
 } from "@shared/compendium/schemas";
 import { hpAverage, normalizeHpFormula, parseHpFormula } from "@shared/entities/hp-formula";
 import {
@@ -747,7 +748,7 @@ export function adaptOpen5e(responses: Open5eResponses): Open5eResult {
     c.warn(r.sourceKey, "sourceKey", "Duplicate; later record dropped");
     return false;
   });
-  const counts = { monster: 0, spell: 0, item: 0, condition: 0, feature: 0, rule: 0 };
+  const counts = zeroCounts();
   for (const r of records) counts[r.kind]++;
   // Every monster mapper above writes a definition: the SRD always has the numbers.
   return { records: records as Open5eRecord[], warnings: c.warnings, skipped: c.skipped, counts };

@@ -89,6 +89,9 @@ export function matchesFilters(facets: unknown, q: SearchQuery): boolean {
   if (q.subclass !== undefined && !same(f.subclass, q.subclass)) return false;
   if (q.chapter !== undefined && !same(f.chapter, q.chapter)) return false;
   if (q.section !== undefined && !same(f.section, q.section)) return false;
+  if (q.optionType !== undefined && !(Array.isArray(f.types) && f.types.includes(q.optionType))) {
+    return false;
+  }
   return true;
 }
 

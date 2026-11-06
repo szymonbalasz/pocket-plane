@@ -252,6 +252,17 @@ test("FR-CMPX-17 FR-CMPX-14 FR-CMPX-16 BL-177 import both books, 'goblin' → on
   await pw.getByTestId("cmp-search").fill("goblin");
   await expect(pw.getByTestId("cmp-result")).toHaveCount(0);
 
+  // FR-CMPX-34: the Feats tab lists the book's feats; one opens with its prerequisite.
+  await pw.getByTestId("cmp-search").fill("");
+  await pw.locator('[data-testid="cmp-tab"][data-value="feat"]').click();
+  const feat = pw.getByTestId("cmp-result").filter({ hasText: "Bolt Adept" });
+  await expect(feat).toHaveCount(1);
+  await expect(feat).toContainText("TB1");
+  await feat.click();
+  const featView = pw.getByTestId("cmp-entry");
+  await expect(featView).toHaveAttribute("data-value", "feat");
+  await expect(featView).toContainText("Dexterity 13 or higher");
+
   // BL-177: a fight on: Import selected off with a book ticked, its tooltip saying why.
   const enc = await openWindow(dm, "cbt.encounters");
   await enc.getByTestId("cbt-enc-new").click();

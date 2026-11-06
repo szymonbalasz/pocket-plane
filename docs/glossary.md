@@ -38,11 +38,12 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **NPC sheet** | The character sheet opened by the DM on a custom creature definition for full editing. | `npc` entity kind |
 | **Custom creature** | A custom monster definition together with its NPC sheet; what the MCP server's `creature_*` tools create, derive and edit ([agent-api](specs/agent-api.md)). | `npc` entity kind; imported definition |
 | **Mount** | Two custom creatures, rider and mount, linked by a "Mount: …" / "Rider: …" line in each one's notes; no link record ([agent-api](specs/agent-api.md)). | Companion |
-| **Compendium** | Global library of rules content (monsters, spells, items, conditions, class features) from bundled sources or homebrew; read on demand, never in the snapshot ([compendium](specs/compendium.md), [ADR-0046](architecture/adr/0046-compendium-scope.md)). | Entity |
+| **Compendium** | Global library of rules content (monsters, spells, items, conditions, class features, rules; from 5etools also feats, races, backgrounds, class options) from bundled sources or homebrew; read on demand, never in the snapshot ([compendium](specs/compendium.md), [ADR-0046](architecture/adr/0046-compendium-scope.md)). | Entity |
 | **Compendium entry** | One record in the compendium. | Entity |
 | **Search group** | Compendium entries with the same kind, name and source, shown as one expandable search row ([compendium](specs/compendium.md)). | — |
 | **Source** | Origin of imported data (e.g. fixtures, Open5e, 5etools JSON, homebrew), with licence/provenance. | Asset |
 | **Book** | One 5etools source (a book or adventure abbreviation, e.g. MM), imported as one compendium source `5et-<abbr>` ([compendium-expansion](specs/post-mvp/compendium-expansion.md)). | Source |
+| **Class option** | A 5etools optional feature a class picks from (Eldritch Invocation, Fighting Style, Maneuver, Metamagic, Artificer Infusion, …): compendium kind `option` ([compendium-expansion](specs/post-mvp/compendium-expansion.md) X5). Not a feature switch. | Optional feature |
 | **Replaced entry** | An imported compendium entry that another imported entry `replaces` (its SRD copy, or a reprint's original): hidden from search, still readable by id ([ADR-0074](architecture/adr/0074-user-supplied-sources.md)). | Superseded entry |
 | **Source rank** | Order of sources on equal search tiers: own, bundled, other imported, fixture ([compendium](specs/compendium.md)). | — |
 | **Adapter** | Bespoke code for one source that turns its data into normalised records for the import pipeline ([ADR-0015](architecture/adr/0015-source-adapters-fixtures.md)). | Import pipeline |

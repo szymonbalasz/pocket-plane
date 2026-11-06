@@ -176,7 +176,8 @@ const sharedWord = (shared: boolean) => (shared ? "shared with players" : "DM on
 const homebrewCreate = defineTool({
   name: "homebrew_create",
   description:
-    "Create a homebrew compendium entry (spell, item, condition, feature or house rule) in the " +
+    "Create a homebrew compendium entry (spell, item, condition, feature, house rule, feat, race, " +
+    "background or class option) in the " +
     "active campaign: {entry: {kind, name, facets, body}, shared?, derivedFromId?, " +
     "imageAssetIds?}. Unshared (DM only) unless the DM says share. Monsters are custom " +
     "creatures: use creature_create / creature_derive.",

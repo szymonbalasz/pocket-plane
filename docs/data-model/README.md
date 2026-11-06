@@ -2958,3 +2958,16 @@ From [class-resources](../specs/class-resources.md) FR-CRES-01–04, -14, -15. *
 - **Upgrade:** the column is added by push with its default; existing sheets read 0. No boot copy.
 - **Visibility:** as the sheet (DM + owner) and the stat block.
 - **Fixtures:** `char-vex` (Sorcerer 5 / Warlock 2, pact `{1, 2}`, "Pact blade" pact weapon, "Smite" trigger); bundle `class-resources`.
+## 156. Compendium character options (build/cmpx-options)
+
+From [compendium-expansion](../specs/post-mvp/compendium-expansion.md#6-functional-requirements) X5 (FR-CMPX-30–35, #458). No new table, column or record type.
+
+| Field / store | Change | Rule | Source |
+|---|---|---|---|
+| `compendium_entry.kind` | + `feat`, `race`, `background`, `option` | text enum with no CHECK: `drizzle-kit push` changes nothing | FR-CMPX-30 |
+| `feat` facets / body | `{}` / `{prerequisite?, text}` | prerequisite ≤ 200 (words); text markdown-lite, an ability increase first; `sourceKey` `feat/<slug>` | FR-CMPX-31 |
+| `race` facets / body | `{parent?}` / `{abilities?, size?, speed?, text}` | `parent` = a subrace's race name (≤ 80); facts ≤ 200 each; a subrace's entry is "Race (Sub)", merged; `sourceKey` `race/<slug>` | FR-CMPX-32 |
+| `background` facets / body | `{}` / `{text}` | `sourceKey` `background/<slug>` | FR-CMPX-33 |
+| `option` facets / body | `{types: OptionType[]}` / `{prerequisite?, text}` | `types` 1–10 unique labels of `OPTION_TYPES` (Eldritch Invocation … Other); `sourceKey` `option/<slug>` | FR-CMPX-33 |
+| `compendium_source.counts` | + the four kinds | a source imported before X5 has none of them (partial record); new imports store every kind, 0 included | FR-CMPX-30 |
+| Book list (derived, folder read) | `counts` + `feat`, `race`, `background`, `option` | a nameless subrace isn't counted (it folds into its race) | FR-CMPX-30 |

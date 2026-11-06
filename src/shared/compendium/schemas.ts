@@ -13,9 +13,17 @@ export const COMPENDIUM_KINDS = [
   "feature",
   // Sprint 9 (FR-CMP-59): SRD rules sections, one entry per heading (rule card).
   "rule",
+  // Character options from the 5etools import (compendium-expansion X5): reference cards.
+  "feat",
+  "race",
+  "background",
+  "option",
 ] as const;
 export const CompendiumKind = z.enum(COMPENDIUM_KINDS);
 export type CompendiumKind = z.infer<typeof CompendiumKind>;
+/** Every kind at 0: an adapter run's counts start here. */
+export const zeroCounts = (): Record<CompendiumKind, number> =>
+  Object.fromEntries(COMPENDIUM_KINDS.map((k) => [k, 0])) as Record<CompendiumKind, number>;
 
 /** FR-CMP-01: serialized entry (facets + body) cap, UTF-8 bytes of its JSON. */
 export const ENTRY_MAX_BYTES = 32 * 1024;
@@ -203,6 +211,52 @@ export const RuleFacets = z.strictObject({
 });
 export const RuleBody = z.strictObject({ text: text(ENTRY_TEXT_MAX) });
 
+// ---------- character options (compendium-expansion X5, FR-CMPX-30–36) ----------
+
+export const FeatFacets = z.strictObject({});
+export const FeatBody = z.strictObject({
+  /** "Dexterity 13 or higher", "Halfling"; absent = none. */
+  prerequisite: short.optional(),
+  text: text(ENTRY_TEXT_MAX),
+});
+
+export const RaceFacets = z.strictObject({
+  /** A subrace's race, e.g. "Elf" for "Elf (High)"; absent for a race. */
+  parent: text(NAME_MAX).optional(),
+});
+export const RaceBody = z.strictObject({
+  /** "Dex +2, Int +1"; absent when the race gives none. */
+  abilities: short.optional(),
+  size: short.optional(),
+  speed: short.optional(),
+  text: text(ENTRY_TEXT_MAX),
+});
+
+export const BackgroundFacets = z.strictObject({});
+export const BackgroundBody = z.strictObject({ text: text(ENTRY_TEXT_MAX) });
+
+/** Class option types (5etools `featureType`), as the Class options filter shows them. */
+export const OPTION_TYPES = [
+  "Eldritch Invocation",
+  "Fighting Style",
+  "Maneuver",
+  "Metamagic",
+  "Artificer Infusion",
+  "Arcane Shot",
+  "Elemental Discipline",
+  "Rune",
+  "Pact Boon",
+  "Other",
+] as const;
+export const OptionType = z.enum(OPTION_TYPES);
+export const OptionFacets = z.strictObject({
+  types: z.array(OptionType).min(1).max(OPTION_TYPES.length),
+});
+export const OptionBody = z.strictObject({
+  prerequisite: short.optional(),
+  text: text(ENTRY_TEXT_MAX),
+});
+
 // ---------- kind registry (FR-CMP-01) ----------
 
 export const kindRegistry = {
@@ -212,6 +266,10 @@ export const kindRegistry = {
   condition: { facets: ConditionFacets, body: ConditionBody },
   feature: { facets: FeatureFacets, body: FeatureBody },
   rule: { facets: RuleFacets, body: RuleBody },
+  feat: { facets: FeatFacets, body: FeatBody },
+  race: { facets: RaceFacets, body: RaceBody },
+  background: { facets: BackgroundFacets, body: BackgroundBody },
+  option: { facets: OptionFacets, body: OptionBody },
 } as const satisfies Record<CompendiumKind, { facets: z.ZodType; body: z.ZodType }>;
 
 export type FacetsOf<K extends CompendiumKind> = z.infer<(typeof kindRegistry)[K]["facets"]>;
@@ -235,6 +293,10 @@ export const EntryDraft = z
     draft("condition", kindRegistry.condition),
     draft("feature", kindRegistry.feature),
     draft("rule", kindRegistry.rule),
+    draft("feat", kindRegistry.feat),
+    draft("race", kindRegistry.race),
+    draft("background", kindRegistry.background),
+    draft("option", kindRegistry.option),
   ])
   .refine((e) => jsonBytes({ facets: e.facets, body: e.body }) <= ENTRY_MAX_BYTES, {
     message: "Entry is too large (32 KB)",
@@ -250,7 +312,9 @@ export const SourceKey = z
   .string()
   .min(1)
   .max(200)
-  .regex(/^(monster|spell|item|condition|feature|rule)\/[a-z0-9-]+(?:\/[a-z0-9-]+)*$/);
+  .regex(
+    /^(monster|spell|item|condition|feature|rule|feat|race|background|option)\/[a-z0-9-]+(?:\/[a-z0-9-]+)*$/,
+  );
 
 /** FR-CMPX-13: `<source>:<sourceKey>` of an entry an imported entry replaces. */
 export const REPLACES_MAX = 20;
@@ -390,6 +454,22 @@ export function entryLine(e: EntryDraft): string {
     case "rule":
       // FR-CMP-59: "‹section› · ‹chapter›" (a house rule without a section: the chapter only).
       line = e.facets.section ? `${e.facets.section} · ${e.facets.chapter}` : e.facets.chapter;
+      break;
+    case "feat":
+      line = e.body.prerequisite ? `Feat · ${e.body.prerequisite}` : "Feat";
+      break;
+    case "race":
+      line = e.facets.parent
+        ? `Subrace of ${e.facets.parent}`
+        : [e.body.size, e.body.speed].filter(Boolean).join(" · ") || "Race";
+      break;
+    case "background":
+      line = "Background";
+      break;
+    case "option":
+      line = e.body.prerequisite
+        ? `${e.facets.types.join(", ")} · ${e.body.prerequisite}`
+        : e.facets.types.join(", ");
       break;
     case "feature": {
       const who = e.facets.subclass

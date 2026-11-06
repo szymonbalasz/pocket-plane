@@ -11,6 +11,7 @@ import { ImportCounts } from "@shared/events/compendium";
 import {
   activeFilterCount,
   badgeLabel,
+  type CmpTab,
   crText,
   emptyText,
   entryForDefinition,
@@ -22,6 +23,7 @@ import {
   searchParams,
   sourceName,
   statBlockRoute,
+  TAB_LABEL,
   tabsFor,
 } from "./logic";
 import {
@@ -37,9 +39,34 @@ import {
 } from "./nav";
 
 describe("FR-CMP-18 window logic", () => {
-  test("FR-CMP-18 kind Tabs: DM All, Monsters, Spells, Items, Conditions, Features; players no Monsters", () => {
-    expect(tabsFor("dm")).toEqual(["all", "monster", "spell", "item", "condition", "feature"]);
-    expect(tabsFor("player")).toEqual(["all", "spell", "item", "condition", "feature"]);
+  test("FR-CMP-18 FR-CMPX-34 kind Tabs: DM All, Monsters, …, Features, Feats, Races, Backgrounds, Class options; players no Monsters", () => {
+    const options: CmpTab[] = ["feat", "race", "background", "option"];
+    expect(tabsFor("dm")).toEqual([
+      "all",
+      "monster",
+      "spell",
+      "item",
+      "condition",
+      "feature",
+      ...options,
+    ]);
+    expect(tabsFor("player")).toEqual(["all", "spell", "item", "condition", "feature", ...options]);
+    expect(options.map((t) => TAB_LABEL[t])).toEqual([
+      "Feats",
+      "Races",
+      "Backgrounds",
+      "Class options",
+    ]);
+  });
+
+  test("FR-CMPX-34 Class options filter by type; only that filter goes out", () => {
+    expect(FILTER_FIELDS.option.map((f) => f.key)).toEqual(["optionType"]);
+    expect(FILTER_FIELDS.option[0]?.options?.map((o) => o.value)).toContain("Eldritch Invocation");
+    expect(searchParams("", "option", { optionType: "Maneuver", level: "3" })).toEqual({
+      kind: "option",
+      optionType: "Maneuver",
+    });
+    expect(searchParams("", "feat", { optionType: "Maneuver" })).toEqual({ kind: "feat" });
   });
 
   test("FR-CMP-18 search params: trimmed q; kind per tab; only that kind's non-empty filters (FR-CMP-11)", () => {
@@ -175,7 +202,8 @@ describe("FR-CMP-20 import panel", () => {
         ]),
       ),
     );
-    expect(importSummary(counts)).toBe("1,050 new · 6 updated · 12 unchanged"); // 6 kinds (sprint 9: rule)
+    // 10 kinds (sprint 9: rule; compendium-expansion X5: feat, race, background, option).
+    expect(importSummary(counts)).toBe("1,090 new · 10 updated · 20 unchanged");
   });
 });
 

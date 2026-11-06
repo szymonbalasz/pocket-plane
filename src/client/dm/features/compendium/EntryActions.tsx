@@ -27,7 +27,7 @@ import { AddToParty } from "./AddToParty";
 import { hasAddToParty } from "./add-to-party";
 import { DeriveDialog } from "./DeriveDialog";
 import { HomebrewDialog } from "./HomebrewForm";
-import type { FormMode } from "./homebrew-form";
+import { type FormMode, isHomebrewKind } from "./homebrew-form";
 import { deleteEntry } from "./homebrew-rest";
 
 function ConfirmDelete({
@@ -120,32 +120,38 @@ export function EntryActions({
       toast.error(err instanceof ApiError ? err.message : "Something went wrong");
     }
   };
+  // FR-CMPX-34: character options aren't form kinds: no Clone or Edit (Delete stays).
+  const formKind = isHomebrewKind(e.kind);
   return (
     <>
-      <Tooltip content="Clone to homebrew">
-        <Button
-          variant="outline"
-          size="sm"
-          className={iconButton}
-          data-testid="cmp-clone"
-          disabled={!live}
-          onClick={() => setMode({ kind: "clone", base: e })}
-        >
-          <CopyIcon className="size-3.5" /> Clone
-        </Button>
-      </Tooltip>
-      {homebrew && (
-        <>
+      {formKind && (
+        <Tooltip content="Clone to homebrew">
           <Button
             variant="outline"
             size="sm"
             className={iconButton}
-            data-testid="cmp-edit"
+            data-testid="cmp-clone"
             disabled={!live}
-            onClick={() => setMode({ kind: "edit", entry: e })}
+            onClick={() => setMode({ kind: "clone", base: e })}
           >
-            <PencilIcon className="size-3.5" /> Edit
+            <CopyIcon className="size-3.5" /> Clone
           </Button>
+        </Tooltip>
+      )}
+      {homebrew && (
+        <>
+          {formKind && (
+            <Button
+              variant="outline"
+              size="sm"
+              className={iconButton}
+              data-testid="cmp-edit"
+              disabled={!live}
+              onClick={() => setMode({ kind: "edit", entry: e })}
+            >
+              <PencilIcon className="size-3.5" /> Edit
+            </Button>
+          )}
           <Tip content={`Delete ${e.name}`} off={!live}>
             <Button
               variant="ghost"

@@ -4600,3 +4600,15 @@ From [class-resources](../specs/class-resources.md) FR-CRES-02, -03, -15. **No n
 - **`char.rest`**: short and long both write `pactUsed: 0` (in the `creature-sheet` change, only when it was above 0). The short-rest confirm reads "Resets short-rest feature uses and pact slots. Spend hit dice on the sheet."
 - **`char.edit`** `set.spellcasting` and **`char.putRow`** attacks accept `pact` / `pactWeapon` (the stat-block zod); the content tools (`character_edit`, `character_put_row`) take them through the same schemas.
 - **`mod.putTrigger`** filters: + `{if: "pactWeapon"}` on `hit` / `roll` (`turnStart` → `invalid`). The roll hook and the tray preview set the fire fact from the owner's stat block: a weapon roll whose `row` name matches a `pactWeapon` attack row. Words: "with a pact weapon".
+## 202. Compendium character options (build/cmpx-options)
+
+[compendium-expansion](../specs/post-mvp/compendium-expansion.md#6-functional-requirements) X5 (FR-CMPX-30–35). No new event, intent or route; shapes in `@shared/compendium`.
+
+| Surface | Change |
+|---|---|
+| `CompendiumKind` | + `feat`, `race`, `background`, `option`: every REST shape with a kind takes them (`EntrySummary`, `CompendiumEntry`, homebrew `PUT` via MCP); `ImportCounts` (event `CompendiumImported`) has a row per kind |
+| `GET /api/compendium/search` | `kind=feat \| race \| background` take no filter; `kind=option` takes `optionType` (one of `OPTION_TYPES`), matched against `facets.types`; on any other kind → `400 invalid` |
+| Visibility (FR-CMP-14) | unchanged: players read all four kinds, imported or shared homebrew |
+| `cmp.addToSheet` | `feat` and `option` → a `features` row; `race`, `background` → `400 invalid` |
+| `GET /api/compendium/sources` | `fiveEtools.books[].counts` + `feat`, `race`, `background`, `option` |
+| Share (FR-SHARE-04) | feat / option: Prerequisite fact + text; race: Ability Scores, Size, Speed facts + text; background: text |

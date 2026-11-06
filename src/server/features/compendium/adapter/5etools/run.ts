@@ -1,12 +1,7 @@
 // One book's adapter run: warnings and the output records, in the Open5e adapter's style
 // (AdapterResult), with FR-CMP-01 caps as clips: a too-long text is clipped with a warning, the
 // record stays. Only a record the schema still refuses (or a duplicate key) is skipped.
-import {
-  type CompendiumKind,
-  ENTRY_MAX_BYTES,
-  EntryDraft,
-  SourceKey,
-} from "@shared/compendium/schemas";
+import { ENTRY_MAX_BYTES, EntryDraft, SourceKey, zeroCounts } from "@shared/compendium/schemas";
 import type { AdapterRecord, AdapterResult } from "../open5e";
 
 export type FiveEtoolsResult = AdapterResult;
@@ -104,14 +99,7 @@ export class Run {
   }
 
   result(): FiveEtoolsResult {
-    const counts: Record<CompendiumKind, number> = {
-      monster: 0,
-      spell: 0,
-      item: 0,
-      condition: 0,
-      feature: 0,
-      rule: 0,
-    };
+    const counts = zeroCounts();
     for (const r of this.records) counts[r.kind]++;
     return { records: this.records, warnings: this.warnings, skipped: this.skipped, counts };
   }
