@@ -19,7 +19,7 @@ export function fly(sim: RichSim, n: number, s: number, flying = true): SimDie[]
 
 /**
  * bun test has no DOM: a canvas whose 2D context is missing (the atlas stays blank). Returns the
- * undo: a stub left behind breaks later files in the same process that look for a DOM (sonner).
+ * undo: a stub left on globalThis breaks later files in the same process (sonner's CSS insert).
  */
 export function stubCanvas(): () => void {
   const g = globalThis as { document?: unknown };
