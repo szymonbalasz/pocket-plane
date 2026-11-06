@@ -145,6 +145,33 @@ describe("FR-CMP-77 sheet names → compendium entries", () => {
     ]);
   });
 
+  test("FR-CMPX-36 a race and a background are looked up as their own kinds", async () => {
+    for (const entry of [
+      { kind: "race", name: "Warforged", facets: {}, body: { text: "Living constructs." } },
+      { kind: "background", name: "Sailor", facets: {}, body: { text: "Ship's Passage." } },
+    ]) {
+      const made = await fetch(`${h.http}/api/compendium/entries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...DM },
+        body: JSON.stringify({ entry }),
+      });
+      expect(made.status).toBe(201);
+    }
+    const m = await look(
+      [
+        { kind: "race", name: "Warforged" },
+        { kind: "background", name: "Warforged" },
+        { kind: "race", name: "Sailor" },
+        { kind: "background", name: "sailor" },
+      ],
+      DM,
+    );
+    expect(m.sort((a, b) => a.kind.localeCompare(b.kind))).toEqual([
+      { kind: "background", name: "sailor", entryId: idOf("Sailor") },
+      { kind: "race", name: "Warforged", entryId: idOf("Warforged") },
+    ]);
+  });
+
   test("FR-CMP-77 FR-CMP-13 credentials, validation and Cache-Control as every compendium route", async () => {
     const names = [{ kind: "spell", name: "Fireball" }];
     const anon = await post({ names }, {});

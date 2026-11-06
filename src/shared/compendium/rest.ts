@@ -184,7 +184,15 @@ export type EntryResponse = z.infer<typeof EntryResponse>;
 // ---------- names on a sheet (FR-CMP-77) ----------
 
 /** The kinds a sheet row's name may link to. */
-export const NameLookupKind = z.enum(["spell", "item", "feature", "feat", "option"]);
+export const NameLookupKind = z.enum([
+  "spell",
+  "item",
+  "feature",
+  "feat",
+  "option",
+  "race",
+  "background",
+]);
 export type NameLookupKind = z.infer<typeof NameLookupKind>;
 
 /** Every row a full sheet holds (170), plus an attack's second try as a spell (20); more go in batches. */

@@ -124,6 +124,8 @@ function NameLink({
 }) {
   const openWindow = useOpenWindow();
   const { entryId, kind } = link;
+  // The name asked: the row's own, or (FR-CMPX-36) the source it fell back to.
+  const asked = link.name;
   return (
     <button
       type="button"
@@ -137,7 +139,7 @@ function NameLink({
           openWindow(CMP_ENTRY_KIND, popoutInstance({ mode: "entry", entryId }), { by: "user" });
           return;
         }
-        showSearch(name, kind);
+        showSearch(asked, kind);
         openWindow(CMP_KIND, undefined, { by: "user" });
       }}
     >
@@ -146,18 +148,24 @@ function NameLink({
   );
 }
 
-/** A name: a link to its entry (the first of `kinds` with a match), or plain text. */
+/** A name: a link to its entry (the first of `kinds` with a match), else to `via`'s (another
+ * name the row carries, FR-CMPX-36), or plain text. */
 export function LinkedName({
   kinds,
   name,
+  via,
   rowId,
   testId,
 }: {
   kinds: readonly NameLookupKind[];
   name: string;
+  via?: { kinds: readonly NameLookupKind[]; name: string };
   rowId?: string;
   testId: string;
 }) {
-  const link = linkOfKinds(useNameLinks(), kinds, name.trim());
+  const links = useNameLinks();
+  const link =
+    linkOfKinds(links, kinds, name.trim()) ??
+    (via ? linkOfKinds(links, via.kinds, via.name.trim()) : null);
   return link ? <NameLink link={link} name={name} rowId={rowId} testId={testId} /> : name;
 }

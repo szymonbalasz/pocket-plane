@@ -21,11 +21,27 @@ describe("FR-CMP-77 sheet name links", () => {
       "feat:rage",
       "feature:rage",
       "item:longsword",
+      "item:rage",
       "item:rope",
       "option:rage",
       "spell:bless",
       "spell:longsword",
     ]);
+  });
+
+  test("FR-CMPX-36 a feature row's source is asked as a race and a background", () => {
+    const features = [
+      { name: "Warforged Resilience", source: "Warforged" },
+      { name: "Hex Warrior", source: "" },
+    ] as never[];
+    const asked = namesToLookUp({ spells: [], features, items: [] }, []).map(
+      (n) => `${n.kind}:${n.name}`,
+    );
+    expect(asked).toContain("race:Warforged");
+    expect(asked).toContain("background:Warforged");
+    expect(asked.filter((a) => a.startsWith("race:") || a.startsWith("background:"))).toHaveLength(
+      2,
+    );
   });
 
   test("FR-CMP-77 the order doesn't depend on the rows' order (one request key)", () => {
@@ -52,6 +68,20 @@ describe("FR-CMP-77 sheet name links", () => {
     expect(linkOf(linkMap([feat]), "features", "Crossbow Expert")).toEqual(feat);
     expect(linkOf(linkMap([option]), "features", "Fighting Style")).toEqual(option);
     expect(linkOf(linkMap([feat]), "spells", "Crossbow Expert")).toBeNull();
+    const item: NameMatch = { kind: "item", name: "Starmetal Blaster", entryId: "i" };
+    expect(linkOf(linkMap([item]), "features", "Starmetal Blaster")).toEqual(item);
+  });
+
+  test("FR-CMPX-36 a feature row no name matches links by its source: race first, then background", () => {
+    const race: NameMatch = { kind: "race", name: "Warforged", entryId: "r" };
+    const bg: NameMatch = { kind: "background", name: "Sailor", entryId: "b" };
+    const own: NameMatch = { kind: "feature", name: "Pact Magic", entryId: "f" };
+    const links = linkMap([race, bg, own]);
+    expect(linkOf(links, "features", "Sentry's Rest", "Warforged")).toEqual(race);
+    expect(linkOf(links, "features", "Ship's Passage", "Sailor")).toEqual(bg);
+    expect(linkOf(links, "features", "Pact Magic", "Warforged")).toEqual(own);
+    expect(linkOf(links, "features", "Hex Warrior", "Hexblade 1")).toBeNull();
+    expect(linkOf(links, "items", "Rope", "Warforged")).toBeNull();
   });
 
   test("FR-CMP-77 with no link a name is plain text, no button", () => {

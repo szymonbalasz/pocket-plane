@@ -223,7 +223,7 @@ function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count:
         <>
           <div className="flex flex-wrap items-baseline justify-between gap-x-2">
             <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">
-              <CompendiumName list="features" name={f.name} rowId={f.id} />
+              <CompendiumName list="features" name={f.name} source={f.source} rowId={f.id} />
             </span>
             <span className="ml-auto flex min-w-0 items-center gap-1">
               {f.source && (
@@ -289,7 +289,7 @@ export function LimitedUsesBox() {
         >
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
             <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">
-              <CompendiumName list="features" name={f.name} rowId={f.id} />
+              <CompendiumName list="features" name={f.name} source={f.source} rowId={f.id} />
             </span>
             <span className="flex items-center gap-1">
               <FeatureUses f={f} />

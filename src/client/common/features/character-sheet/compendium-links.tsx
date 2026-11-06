@@ -19,13 +19,17 @@ import {
 export type LinkedList = "attacks" | "spells" | "features" | "items";
 
 /** The kinds a list's names can be, first match wins: an attack is a weapon, else a spell; a
- * feature is a class feature, else a feat, else a class option (FR-CMPX-36). */
+ * feature is a class feature, else a feat, a class option, an item (FR-CMPX-36). */
 const KINDS: Readonly<Record<LinkedList, readonly NameLookupKind[]>> = {
   attacks: ["item", "spell"],
   spells: ["spell"],
-  features: ["feature", "feat", "option"],
+  features: ["feature", "feat", "option", "item"],
   items: ["item"],
 };
+
+/** A feature row no name matches links by its source: a race trait to its race, a background's
+ * feature to its background (FR-CMPX-36). */
+const SOURCE_KINDS: readonly NameLookupKind[] = ["race", "background"];
 
 /** One sheet's lookup: each kind + name once, in a stable order (the request's key). */
 export function namesToLookUp(
@@ -42,15 +46,24 @@ export function namesToLookUp(
   for (const [list, named] of rows) {
     for (const { name } of named) for (const kind of KINDS[list]) out.push({ kind, name });
   }
+  for (const { source } of sheet.features) {
+    if (source) for (const kind of SOURCE_KINDS) out.push({ kind, name: source });
+  }
   return lookupNames(out);
 }
 
 export type SheetLinkMap = NameLinkMap;
 export { linkMap };
 
-/** What this row's name links to, or null: plain text. */
-export const linkOf = (links: SheetLinkMap, list: LinkedList, name: string): NameMatch | null =>
-  linkOfKinds(links, KINDS[list], name);
+/** What this row's name links to (a feature row: else its source), or null: plain text. */
+export const linkOf = (
+  links: SheetLinkMap,
+  list: LinkedList,
+  name: string,
+  source?: string,
+): NameMatch | null =>
+  linkOfKinds(links, KINDS[list], name) ??
+  (list === "features" && source ? linkOfKinds(links, SOURCE_KINDS, source) : null);
 
 /** Holds a sheet's links; `off` (edit mode: names are inputs) sends no lookups. */
 export function SheetLinks({
@@ -73,17 +86,26 @@ export function SheetLinks({
   );
 }
 
-/** A row's name in view mode: a link to its entry, or plain text. */
+/** A row's name in view mode: a link to its entry (a feature row: else its source's), or plain text. */
 export function CompendiumName({
   list,
   name,
+  source,
   rowId,
 }: {
   list: LinkedList;
   name: string;
+  source?: string;
   rowId?: string;
 }) {
+  const via = list === "features" && source ? { kinds: SOURCE_KINDS, name: source } : undefined;
   return (
-    <LinkedName kinds={KINDS[list]} name={name} rowId={rowId} testId="charx-compendium-link" />
+    <LinkedName
+      kinds={KINDS[list]}
+      name={name}
+      via={via}
+      rowId={rowId}
+      testId="charx-compendium-link"
+    />
   );
 }
