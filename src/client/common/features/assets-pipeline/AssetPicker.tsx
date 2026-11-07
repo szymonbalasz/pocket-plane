@@ -253,11 +253,14 @@ export function AssetPicker({
             <ClipboardPasteIcon className="size-4" /> Paste
           </Button>
         )}
-        <span className="text-xs text-muted-foreground">or drop / paste an image</span>
+        {/* One line at any width: the hint gives way first (a small host, the asset.test window). */}
+        <span className="min-w-0 truncate text-xs text-muted-foreground">
+          or drop / paste an image
+        </span>
         {everLive && (
           <span
             data-testid="asset-library-count"
-            className="ml-auto text-xs text-muted-foreground tabular-nums"
+            className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
           >
             {libraryCountText(assets.length)}
           </span>
