@@ -1,5 +1,5 @@
-// Image attach control (FR-ASSET-20–23, -27, ASSET §7): Upload, From library, drop and clipboard
-// paste for every form that holds image asset IDs. It never holds the caller's list: `onAdd` once
+// Image attach control (FR-ASSET-20–23, -27, -71, ASSET §7): Upload, Paste, From library, drop and
+// clipboard paste for every form that holds image asset IDs. It never holds the caller's list: `onAdd` once
 // per finished image; order, removal, slot layout and dedupe are the caller's (seams S5). Uploads
 // are attachments (`listed=false`). No uploader context (player client) → renders nothing.
 // S6: `context` tags its uploads and is passed to From library's picker (FR-ASSET-48).
@@ -11,11 +11,18 @@ import { Alert } from "@ui/components/ui/primitives";
 import { Progress } from "@ui/components/ui/progress";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
-import { ImagesIcon, UploadIcon } from "lucide-react";
+import { ClipboardPasteIcon, ImagesIcon, UploadIcon } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { AssetPickerDialog } from "../AssetPicker";
 import { type AttachUploader, useAttachUploader, withContextTags } from "../uploader";
-import { type AttachGate, handleDragOver, handleDrop, handlePaste } from "./handlers";
+import { browserClipboard } from "./clipboard-read";
+import {
+  type AttachGate,
+  handleDragOver,
+  handleDrop,
+  handlePaste,
+  pasteFromClipboard,
+} from "./handlers";
 import { ATTACH_TYPES, AttachQueue, IDLE_STATUS, noMoreImages, progressText } from "./queue";
 
 export interface ImageAttachProps {
@@ -110,6 +117,8 @@ function AttachControl({
   const [picking, setPicking] = useState(false);
   const assets = useRecords<AssetRecord>("asset");
   const live = useSync((s) => s.state === "live");
+  // FR-ASSET-71: only where the browser can read clipboard images (https or 127.0.0.1).
+  const [clipboard] = useState(browserClipboard);
 
   useTargetListeners(pasteTarget, self, (el) => {
     const onPaste = (e: ClipboardEvent) => handlePaste(e, gate());
@@ -198,6 +207,20 @@ function AttachControl({
             );
           }}
         />
+        {clipboard && (
+          <Why why={uploadWhy}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              data-testid="asset-attach-paste"
+              disabled={uploadWhy !== null}
+              onClick={() => void pasteFromClipboard(clipboard, gate())}
+            >
+              <ClipboardPasteIcon className="size-4" /> Paste
+            </Button>
+          </Why>
+        )}
         {showLibrary && (
           <Why why={libraryWhy}>
             <Button

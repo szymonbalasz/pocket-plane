@@ -1,5 +1,5 @@
-// DM asset picker (FR-ASSET-17, ASSET §7): the campaign's listed images, upload by file input or
-// drop, "Select" returns the asset ID. Hosted by scene / token / portrait flows (Dialog), the
+// DM asset picker (FR-ASSET-17, ASSET §7): the campaign's listed images, upload by file input,
+// drop or paste (Ctrl+V or the Paste button, FR-ASSET-71), "Select" returns the asset ID. Hosted by scene / token / portrait flows (Dialog), the
 // attach control's "From library" (FR-ASSET-23) and the test-mode `asset.test` window. In `@ui`
 // since S5; uploads go through the client's uploader context (FR-ASSET-27). S6 (FR-ASSET-44–48):
 // search (shared matcher over name + tags), tag chips, the selected image's tag editor and Manage
@@ -31,9 +31,16 @@ import { SearchInput } from "@ui/components/ui/search-input";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
-import { SearchIcon, UploadIcon } from "lucide-react";
+import { ClipboardPasteIcon, SearchIcon, UploadIcon } from "lucide-react";
 import { type ReactNode, type Ref, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  browserClipboard,
+  CLIPBOARD_DENIED,
+  NO_CLIPBOARD_IMAGE,
+  readClipboardImages,
+} from "./attach/clipboard-read";
+import { clipboardImages, pasteAction, pastedName } from "./attach/paste";
 import { ImageActions } from "./ImageActions";
 import { ManageTags } from "./tags/ManageTags";
 import { TagChipRow } from "./tags/TagChipRow";
@@ -114,6 +121,8 @@ export function AssetPicker({
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const uploader = useAttachUploader();
+  // FR-ASSET-71: only where the browser can read clipboard images (https or 127.0.0.1).
+  const [clipboard] = useState(browserClipboard);
   const canUpload = live && uploader !== null;
   const busy = upload.phase === "sending" || upload.phase === "processing";
   const sizeWarning = librarySizeWarning(assets.length);
@@ -135,13 +144,13 @@ export function AssetPicker({
     }
   }, [pending, assets]);
 
-  async function send(file: File) {
+  async function send(file: File, name?: string) {
     if (!uploader || !live || busy) return;
     setUpload({ phase: "sending", pct: 0 });
     // The library's own uploads stay listed (FR-ASSET-24) and carry the context tag (FR-ASSET-41).
     const r = await withContextTags(uploader, () => context)(
       file,
-      { listed: true },
+      name === undefined ? { listed: true } : { listed: true, name },
       {
         onProgress: (pct) => setUpload({ phase: "sending", pct }),
         onProcessing: () => setUpload({ phase: "processing" }),
@@ -162,6 +171,20 @@ export function AssetPicker({
     const f = files?.[0];
     if (f) void send(f);
   };
+
+  /** FR-ASSET-71: a pasted image uploads to the library like a drop (the first one, as a drop). */
+  const sendPasted = (file: File) => void send(file, pastedName(new Date()));
+
+  async function pasteButton() {
+    if (!clipboard) return;
+    const r = await readClipboardImages(clipboard);
+    if (r.kind === "images" && r.files[0]) sendPasted(r.files[0]);
+    else
+      setUpload({
+        phase: "error",
+        message: r.kind === "denied" ? CLIPBOARD_DENIED : NO_CLIPBOARD_IMAGE,
+      });
+  }
 
   return (
     <section
@@ -185,6 +208,14 @@ export function AssetPicker({
         if (!canUpload || busy || e.dataTransfer.files.length === 0) return;
         e.preventDefault();
         onFiles(e.dataTransfer.files);
+      }}
+      // FR-ASSET-71: Ctrl+V anywhere inside (the search Input too). Text pastes as text (FR-ASSET-22).
+      onPaste={(e) => {
+        const images = clipboardImages(e.clipboardData);
+        if (pasteAction(e.clipboardData.getData("text/plain"), images.length) !== "upload") return;
+        e.preventDefault();
+        const first = images[0];
+        if (canUpload && !busy && first) sendPasted(first);
       }}
     >
       <div className="flex items-center gap-2">
@@ -210,7 +241,19 @@ export function AssetPicker({
             e.target.value = "";
           }}
         />
-        <span className="text-xs text-muted-foreground">or drop an image here</span>
+        {clipboard && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            data-testid="asset-picker-paste"
+            disabled={!canUpload || busy}
+            onClick={() => void pasteButton()}
+          >
+            <ClipboardPasteIcon className="size-4" /> Paste
+          </Button>
+        )}
+        <span className="text-xs text-muted-foreground">or drop / paste an image</span>
         {everLive && (
           <span
             data-testid="asset-library-count"

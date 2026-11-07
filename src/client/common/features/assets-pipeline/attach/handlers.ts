@@ -1,5 +1,12 @@
 // Paste and drop handlers of the image attach control (FR-ASSET-22, -23), on the target's native
-// events. DOM-free: they take the event's parts, so `bun test` drives them with plain objects.
+// events, and the Paste button (FR-ASSET-71). DOM-free: they take the event's parts, so `bun test`
+// drives them with plain objects.
+import {
+  CLIPBOARD_DENIED,
+  type ClipboardLike,
+  NO_CLIPBOARD_IMAGE,
+  readClipboardImages,
+} from "./clipboard-read";
 import {
   carriesFiles,
   clipboardImages,
@@ -42,6 +49,24 @@ export function handlePaste(e: EventLike & { clipboardData: TransferLike | null 
   const name = pastedName(g.now());
   g.queue.add(
     images.map((file) => ({ file, name })),
+    g.free,
+    g.max,
+  );
+}
+
+/**
+ * FR-ASSET-71: the Paste button. The clipboard's images join the queue as a Ctrl+V paste would
+ * (same name, same slot refusal); no image → "No image on the clipboard"; access refused → a line
+ * pointing at Ctrl+V.
+ */
+export async function pasteFromClipboard(clip: ClipboardLike, g: AttachGate): Promise<void> {
+  const r = await readClipboardImages(clip);
+  if (r.kind === "denied") return g.queue.refuse(CLIPBOARD_DENIED);
+  if (r.kind === "empty") return g.queue.refuse(NO_CLIPBOARD_IMAGE);
+  if (g.disabled || g.free - g.queue.pending <= 0) return g.queue.refuse(noMoreImages(g.max));
+  const name = pastedName(g.now());
+  g.queue.add(
+    r.files.map((file) => ({ file, name })),
     g.free,
     g.max,
   );

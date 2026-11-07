@@ -2,8 +2,10 @@
 // Assets window (ASSET §13.3, FR-ASSET-67–70, #394): the launcher opens it; Images: the Town map
 // shows "Used in: Town (scene map)", double-click previews it full size; Sounds: Chime shows its
 // alerts and can't be deleted; an uploaded sound is renamed and deleted. Rules, uses and
-// visibility: bun test (manage*.test.ts, assets-window.test.tsx).
+// visibility: bun test (manage*.test.ts, assets-window.test.tsx). FR-ASSET-71: Ctrl+V and the Paste
+// button upload to the library (clipboard rules: clipboard-paste.test.tsx).
 import { expect, type Page, test } from "@playwright/test";
+import { pasteInto } from "./support/clipboard";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
 
@@ -92,4 +94,53 @@ test("FR-ASSET-69 FR-ASSET-70 FR-ASSET-67 Assets window: Images used-in and prev
   await expect(manage).toHaveCount(0);
   await expect(doorBell).toHaveCount(0);
   await expect(chime).toHaveCount(1);
+});
+
+test("FR-ASSET-71 Assets window: Ctrl+V uploads a pasted image to the library and selects it; text stays text; the Paste button reads the clipboard", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const ctx = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+  const dm = await ctx.newPage();
+  await dm.setViewportSize({ width: 1280, height: 720 });
+  await loginDm(dm, secret);
+  await live(dm);
+
+  const win = await openWindow(dm, "asset.library");
+  const count = win.getByTestId("asset-library-count");
+  const before = Number.parseInt((await count.textContent()) ?? "0", 10);
+  const search = win.getByTestId("asset-picker-search");
+  const selected = win.locator('[data-testid="asset-picker-item"][data-selected="true"]');
+
+  // Text on the clipboard: it lands in the search field, nothing uploads.
+  expect(await pasteInto(search, [], "goblin")).toBe(false);
+  await expect(search).toHaveValue("goblin");
+  await search.fill("");
+
+  // Ctrl+V of a screenshot while the search field has focus: a listed image, selected.
+  expect(await pasteInto(search, [{ png: "#2a6" }])).toBe(true);
+  await expect(count).toContainText(`${before + 1} images`);
+  await expect(selected).toHaveCount(1);
+  await expect(selected).toContainText("Pasted image");
+
+  // The Paste button reads the system clipboard (no focus needed).
+  await dm.evaluate(async () => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 8;
+    const g = c.getContext("2d") as CanvasRenderingContext2D;
+    g.fillStyle = "#c33";
+    g.fillRect(0, 0, 8, 8);
+    const blob = await new Promise<Blob>((r) => c.toBlob((b) => r(b as Blob), "image/png"));
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+  });
+  const first = await selected.getAttribute("data-record-id");
+  await win.getByTestId("asset-picker-paste").click();
+  await expect(count).toContainText(`${before + 2} images`);
+  await expect(selected).not.toHaveAttribute("data-record-id", first ?? "");
+
+  // Text only on the clipboard → the button says so.
+  await dm.evaluate(() => navigator.clipboard.writeText("not an image"));
+  await win.getByTestId("asset-picker-paste").click();
+  await expect(win.getByTestId("asset-upload-error")).toHaveText("No image on the clipboard");
+  await ctx.close();
 });
