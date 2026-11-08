@@ -4655,3 +4655,18 @@ From [linked-notes](../specs/linked-notes.md) FR-NOTES-25 – -28, -30 (#454). *
 - **Client only:** **+ New** asks for a title and one of the eight categories (none picked first; Create stays off until both). The `@` / `[[` picker's Create note, and a click on a missing chip, show the eight categories in the same popup (arrows + Enter, Session highlighted first; Esc closes, the text stays plain), then send `notes.create {title, category, ifMissing: true}`. The editor header's category select sends `notes.setCategory`. The list groups live notes by category in fold-outs (that order, with counts; empty groups hidden; A–Z inside; Session open by default, the others' open state per browser), or with **Recent** one list, last edited first, with the category on each row (per browser); the narrow dropdown follows the same choice. **Linked from** is a titled box with a count, four rows tall, scrolling past that.
 - **Browser storage:** `pp.notes.v1.groups` (JSON: category → open), `pp.notes.v1.sort` (`category` \| `recent`).
 - **Test IDs:** `notes-sort` (`aria-pressed`), `notes-group` (`data-category`, `data-count`, `data-state`), `notes-new-title`, `notes-category-pick` (`data-category`; + New's buttons and the popup's rows), `notes-category` (editor header select), `notes-list-item` gains `data-category`.
+
+## 205. Animated tokens (build/animated-tokens)
+
+From [animated-tokens](../specs/animated-tokens.md) FR-ANIM-01–16 ([ADR-0080](../architecture/adr/0080-animated-tokens.md)). One new route; no new intent, event or record type. Data side: [data model §158](../data-model/README.md#158-animated-tokens-buildanimated-tokens).
+
+| Surface | Change |
+|---|---|
+| `POST /api/assets` | + optional multipart `poster` (a file). `file` sniffed as WebM (EBML DocType `webm`) or MP4 (`ftyp`, not `qt  ` / `M4A ` / `M4B ` / `M4P `) → `poster` required, else `422` "A video needs its still frame (upload it from the picker)"; video > 20 MB → `413` "Video over 20 MB" (before the poster is read). `poster` with an image or sound → `400`; with any other file → `415`; `poster` not a file → `400` (path `poster`) |
+| `GET /api/assets/:id/motion` | **Anyone holding the ID.** The video (`Content-Type` = row `mime`), iff an animated image of the active campaign, else the common `404`. `Cache-Control` / `ETag` / `nosniff` as the other files; `Accept-Ranges: bytes`; one `Range` (`a-b`, `a-`, `-n`) → `206` + `Content-Range`; past the end → `416` + `Content-Range: bytes */size`; several ranges → the whole file |
+| `token` record | + `imageAnimated?: true`, the token's existing visibility (players get it with `imageAssetId`) |
+| `token-mirror` record | + `imageAnimated?: true`; a player's Shadow carries neither art nor flag |
+| `AssetIngested` / `asset` record | unchanged; `mime` tells a video (DM only) |
+| MCP `asset_upload` | unchanged; a video gets the `422` above |
+| Fixtures | `ingestStep(file, {poster})` (FR-ANIM-16); unit `animated-token`, `animated-town`; bundle `animated-tokens` |
+| Test IDs | `anim-upload-webm-note`, `anim-upload-webm-note-dismiss`, `anim-picker-badge`, `anim-preview-video` |

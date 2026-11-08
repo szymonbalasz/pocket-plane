@@ -2993,3 +2993,15 @@ From [compendium-expansion](../specs/post-mvp/compendium-expansion.md#6-function
 | `option` facets / body | `{types: OptionType[]}` / `{prerequisite?, text}` | `types` 1–10 unique labels of `OPTION_TYPES` (Eldritch Invocation … Other); `sourceKey` `option/<slug>` | FR-CMPX-33 |
 | `compendium_source.counts` | + the four kinds | a source imported before X5 has none of them (partial record); new imports store every kind, 0 included | FR-CMPX-30 |
 | Book list (derived, folder read) | `counts` + `feat`, `race`, `background`, `option` | a nameless subrace isn't counted (it folds into its race) | FR-CMPX-30 |
+
+## 158. Animated tokens (build/animated-tokens)
+
+From [animated-tokens](../specs/animated-tokens.md) (FR-ANIM-03, -04, -06; [ADR-0080](../architecture/adr/0080-animated-tokens.md)). No new table, column or record type; `upgrade:check` has nothing to move.
+
+| Field / store | Change | Rule | Source |
+|---|---|---|---|
+| `asset.mime` | + `video/webm`, `video/mp4` | an **animated** image: `kind` stays `image`; `bytes` / `hash` = the video's; `width` / `height` / display sizes = the still frame's | FR-ANIM-03, -04 |
+| Asset files `<hash>/` | `original` = the video, as uploaded | `display.webp` / `thumb.webp` from the still frame; same write order, dedupe and sweep | FR-ANIM-03 |
+| `token` wire row | + `imageAnimated?: true` (derived, not stored) | `imageAssetId` names an animated asset; absent otherwise; DM and players alike | FR-ANIM-06 |
+| `token-mirror` wire row | + `imageAnimated?: true` (derived) | from the copied `imageAssetId`; never on a player's Shadow | FR-ANIM-06 |
+| Animated-ID set (server memory) | asset IDs whose `mime` is a video | filled at ingest and at start (`assets-pipeline.animated` start hook); read by the token and mirror row builders | FR-ANIM-06 |
