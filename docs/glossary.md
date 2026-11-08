@@ -61,6 +61,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Derivative** | A generated variant of an asset (thumbnail, resized, format-converted). | — |
 | **Asset reference** | A record field holding an asset ID, set via `assets.require`; a player learns the ID only if they can see the field ([ADR-0023](architecture/adr/0023-asset-access-by-capability-id.md)). | Asset |
 | **Image tag** | A DM-only label on an image (built-ins Tokens, Portraits, Maps, Handouts, Props, Items, plus the DM's own; ≤ 8 per image) used to filter pickers ([assets-pipeline](specs/assets-pipeline.md)). | Search group |
+| **Animated token** | A token whose image is a video asset (WebM or MP4, `mime` `video/*`); plays as a muted loop on the map only, following Map effects ([animated-tokens](specs/animated-tokens.md), ADR-0080). | Asset |
+| **Still frame** | The image the DM's browser grabs from a video at upload (its first frame); the video asset's thumbnail and display copies are made from it. | Derivative |
 | **Shared matcher** | The one search matcher (`@shared/search/match`): whitespace-separated terms, partial, case-insensitive, all must match; used by the compendium and every image picker. | Source rank |
 
 ## Play

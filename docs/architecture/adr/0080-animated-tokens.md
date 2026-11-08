@@ -1,6 +1,6 @@
-# Proposed — Animated tokens: videos stored as-is, still frame from the browser
+# 0080 — Animated tokens: videos stored as-is, still frame from the browser
 
-- Status: proposed (DM direction, 2026-11-08)
+- Status: accepted (DM, 2026-11-08)
 - Date: 2026-11-08
 - Consistent with: [ADR-0023](0023-asset-access-by-capability-id.md) (the asset ID is the capability), [ADR-0001](0001-tech-stack.md) (no new dependency), [ADR-0071](0071-spell-fx.md) (the Map effects preference)
 - Amends: [assets-pipeline](../../specs/assets-pipeline.md) §4 non-goals: video was out of scope, citing [ADR-0007](0007-product-scope.md), which never names video

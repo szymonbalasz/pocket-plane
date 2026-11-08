@@ -70,7 +70,7 @@ phase: post-mvp-8
 ## 4. Non-goals
 
 - Preload, load progress, player-ready (ADR-0003's "preloaded" is deferred by [ADR-0014](../architecture/adr/0014-mvp-scope.md): assume immediate load). Preloading an inactive scene would reveal its IDs early; it needs a player-visible preload grant (post-MVP, [scene-tools](scene-tools.md)).
-- Player uploads (OQ-ASSET-02). Replace an asset's bytes; revoke (re-key) an asset that is still in use (OQ-ASSET-05). *(#386, #394: rename and delete an unused image or sound and the Assets window are in, §6.5.)* Image editing. Audio beyond short alert sounds (§6.4) / video ([ADR-0007](../architecture/adr/0007-product-scope.md)). Cloud storage, CDN.
+- Player uploads (OQ-ASSET-02). Replace an asset's bytes; revoke (re-key) an asset that is still in use (OQ-ASSET-05). *(#386, #394: rename and delete an unused image or sound and the Assets window are in, §6.5.)* Image editing. Audio beyond short alert sounds (§6.4) / video ([ADR-0007](../architecture/adr/0007-product-scope.md)), except token videos ([animated-tokens](animated-tokens.md), [ADR-0080](../architecture/adr/0080-animated-tokens.md)). Cloud storage, CDN.
 
 ## 5. User stories
 

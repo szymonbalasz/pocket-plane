@@ -160,6 +160,12 @@ DM picks #351 (ADR-0069), #355–#356 (Gilt & Stone default, Simple Dark; kit pa
 |---|---|---|---|
 | [Class resources](class-resources.md) | CRES | in-review: pact slots, sorcery points, feature uses with a cost, pact weapons; DM decisions 2026-11-05 | spec-class-resources |
 
+## Animated tokens (2026-11-08)
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Animated tokens](animated-tokens.md) | ANIM | complete, [ADR-0080](../architecture/adr/0080-animated-tokens.md) | spec-animated-tokens |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.

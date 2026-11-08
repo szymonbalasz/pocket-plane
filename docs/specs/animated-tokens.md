@@ -1,14 +1,14 @@
 ---
 title: Animated tokens
 prefix: ANIM
-status: in-review
+status: complete
 owner: spec-animated-tokens
 phase: post-mvp
 ---
 
 # Animated tokens
 
-> Five-minute read. Decided by the DM in conversation, 2026-11-08 ([proposed ADR](../architecture/adr/proposed-animated-tokens.md)). Amends [assets-pipeline](assets-pipeline.md) (which kept video out of scope) and [scenes-map](scenes-map.md).
+> Five-minute read. Decided by the DM in conversation, 2026-11-08 ([ADR-0080](../architecture/adr/0080-animated-tokens.md)). Amends [assets-pipeline](assets-pipeline.md) (which kept video out of scope) and [scenes-map](scenes-map.md).
 
 ## 1. Summary
 
@@ -155,8 +155,8 @@ Per [visual-direction](../design/visual-direction.md); no custom styles.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-ANIM-01 | Which frame is the still? | **A. The first frame** / B. The middle frame (some loops fade in from empty) | no (DM) | FR-ANIM-08 |
-| OQ-ANIM-02 | Glossary: *animated token*, *still frame* | **A. add as in §1** / B. other names | no (integrator) | glossary |
+| OQ-ANIM-01 | Which frame is the still? | **Decided (DM 2026-11-08): A. The first frame.** Options were: A / B. The middle frame (some loops fade in from empty) | no (decided) | FR-ANIM-08 |
+| OQ-ANIM-02 | Glossary: *animated token*, *still frame* | **Decided: A, added** | no (decided) | glossary |
 
 ## 16. Out of scope
 
