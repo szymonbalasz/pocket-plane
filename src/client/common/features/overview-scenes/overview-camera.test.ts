@@ -113,7 +113,7 @@ describe("FR-OVW-12 fit", () => {
     }
   });
 
-  test("FR-OVW-11 the fit stays in the zoom range, 10–400 %", () => {
+  test("FR-OVW-11 the fit stays in the zoom range, 10–800 %", () => {
     const free = { x: 100, y: 48, w: 1000, h: 800 };
     expect(fitOverview(itemsBox([image(0, 0, 8, 8)], measure), view, roomOf(free)).scale).toBe(
       ZOOM_MAX,

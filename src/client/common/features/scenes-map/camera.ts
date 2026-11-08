@@ -20,9 +20,9 @@ export interface Size {
   h: number;
 }
 
-/** FR-MAP-12 zoom range 10–400 % *(proposed, OQ-MAP-20)*. */
+/** FR-MAP-12 zoom range 10–800 % (DM, 2026-11-08). */
 export const ZOOM_MIN = 0.1;
-export const ZOOM_MAX = 4;
+export const ZOOM_MAX = 8;
 /** Per wheel notch. */
 export const ZOOM_STEP = 1.1;
 
