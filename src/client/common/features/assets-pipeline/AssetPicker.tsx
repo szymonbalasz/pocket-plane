@@ -17,6 +17,7 @@ import {
   tagChips,
 } from "@shared/assets-pipeline/search";
 import { type ImageContext, tagKey } from "@shared/assets-pipeline/tags";
+import { isAnimatedMime, videoLabel } from "@shared/assets-pipeline/video";
 import { Button } from "@ui/components/ui/button";
 import {
   Dialog,
@@ -31,7 +32,7 @@ import { SearchInput } from "@ui/components/ui/search-input";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
-import { ClipboardPasteIcon, SearchIcon, UploadIcon } from "lucide-react";
+import { ClipboardPasteIcon, FilmIcon, SearchIcon, UploadIcon, XIcon } from "lucide-react";
 import { type ReactNode, type Ref, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -46,11 +47,25 @@ import { ManageTags } from "./tags/ManageTags";
 import { TagChipRow } from "./tags/TagChipRow";
 import { TagEditor } from "./tags/TagEditor";
 import { useAttachUploader, withContextTags } from "./uploader";
+import {
+  grabStillFrame,
+  isVideoFile,
+  isWebmFile,
+  READING_VIDEO,
+  takesVideo,
+  VIDEO_ACCEPT,
+  VIDEO_ONLY_TOKENS,
+  VIDEO_UNREADABLE,
+  videoSizeError,
+  WEBM_NOTE,
+} from "./video-upload";
 
 type Upload =
   | { phase: "idle" }
   | { phase: "sending"; pct: number }
   | { phase: "processing" }
+  /** FR-ANIM-08: grabbing a video's still frame. */
+  | { phase: "reading" }
   | { phase: "error"; message: string };
 
 const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -124,7 +139,9 @@ export function AssetPicker({
   // FR-ASSET-71: only where the browser can read clipboard images (https or 127.0.0.1).
   const [clipboard] = useState(browserClipboard);
   const canUpload = live && uploader !== null;
-  const busy = upload.phase === "sending" || upload.phase === "processing";
+  const busy =
+    upload.phase === "sending" || upload.phase === "processing" || upload.phase === "reading";
+  const [note, setNote] = useState<string | null>(null);
   const sizeWarning = librarySizeWarning(assets.length);
   // FR-ASSET-45: a selection hidden by the search or filter stays selected.
   const selectedAsset = assets.find((a) => a.id === selected) ?? null;
@@ -146,11 +163,28 @@ export function AssetPicker({
 
   async function send(file: File, name?: string) {
     if (!uploader || !live || busy) return;
+    setNote(null);
+    // FR-ANIM-08, -09: a video only where it can be token art, ≤ 20 MB, with its still frame.
+    let poster: Blob | undefined;
+    if (isVideoFile(file)) {
+      const refused = !takesVideo(context) ? VIDEO_ONLY_TOKENS : videoSizeError(file);
+      if (refused) return setUpload({ phase: "error", message: refused });
+      setUpload({ phase: "reading" });
+      try {
+        poster = await grabStillFrame(file);
+      } catch {
+        return setUpload({ phase: "error", message: VIDEO_UNREADABLE });
+      }
+    }
     setUpload({ phase: "sending", pct: 0 });
     // The library's own uploads stay listed (FR-ASSET-24) and carry the context tag (FR-ASSET-41).
     const r = await withContextTags(uploader, () => context)(
       file,
-      name === undefined ? { listed: true } : { listed: true, name },
+      {
+        listed: true,
+        ...(name === undefined ? {} : { name }),
+        ...(poster ? { poster } : {}),
+      },
       {
         onProgress: (pct) => setUpload({ phase: "sending", pct }),
         onProcessing: () => setUpload({ phase: "processing" }),
@@ -163,6 +197,8 @@ export function AssetPicker({
       return;
     }
     setUpload({ phase: "idle" });
+    // FR-ANIM-10: a non-blocking note after a WebM upload.
+    if (isWebmFile(file)) setNote(WEBM_NOTE);
     if (r.outcome === "existing") toast("Already uploaded");
     setPending(r.asset.id);
   }
@@ -232,7 +268,11 @@ export function AssetPicker({
         <input
           ref={input}
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          accept={
+            takesVideo(context)
+              ? `image/png,image/jpeg,image/webp,image/svg+xml,${VIDEO_ACCEPT}`
+              : "image/png,image/jpeg,image/webp,image/svg+xml"
+          }
           className="hidden"
           data-testid="asset-picker-file-input"
           disabled={!canUpload || busy}
@@ -326,6 +366,30 @@ export function AssetPicker({
           <span>{upload.pct}%</span>
         </div>
       )}
+      {upload.phase === "reading" && (
+        <div data-testid="asset-upload-progress" className="text-xs text-muted-foreground">
+          {READING_VIDEO}
+        </div>
+      )}
+      {note && upload.phase === "idle" && (
+        <div
+          data-testid="anim-upload-webm-note"
+          className="flex items-center gap-2 text-xs text-muted-foreground"
+        >
+          <span className="min-w-0 flex-1">{note}</span>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="size-6"
+            aria-label="Dismiss"
+            data-testid="anim-upload-webm-note-dismiss"
+            onClick={() => setNote(null)}
+          >
+            <XIcon className="size-3" />
+          </Button>
+        </div>
+      )}
       {upload.phase === "processing" && (
         <div data-testid="asset-upload-progress" className="text-xs text-muted-foreground">
           Processing…
@@ -400,7 +464,22 @@ export function AssetPicker({
                     selected === a.id && "border-primary ring-2 ring-primary",
                   )}
                 >
-                  <AssetImg id={a.id} file="thumb" alt={a.name} className="aspect-square w-full" />
+                  <span className="relative block">
+                    <AssetImg
+                      id={a.id}
+                      file="thumb"
+                      alt={a.name}
+                      className="aspect-square w-full"
+                    />
+                    {isAnimatedMime(a.mime) && (
+                      // FR-ANIM-11: an animated image's tile mark.
+                      <FilmIcon
+                        data-testid="anim-picker-badge"
+                        aria-label="Animated"
+                        className="absolute right-1 bottom-1 size-4 rounded-sm bg-background/80 p-0.5"
+                      />
+                    )}
+                  </span>
                   <span className="truncate text-xs">{a.name}</span>
                 </button>
               </Tooltip>
@@ -412,9 +491,10 @@ export function AssetPicker({
   );
 }
 
-/** Tile Tooltip (ASSET §7): display size, MB and the tags. */
-function tileTip(a: AssetRecord): string {
-  const base = `${a.displayWidth} × ${a.displayHeight} · ${mb(a.bytes)}`;
+/** Tile Tooltip (ASSET §7): display size, MB and the tags. FR-ANIM-11: "Animated · WebM" first. */
+export function tileTip(a: AssetRecord): string {
+  const size = `${a.displayWidth} × ${a.displayHeight} · ${mb(a.bytes)}`;
+  const base = isAnimatedMime(a.mime) ? `Animated · ${videoLabel(a.mime)} · ${size}` : size;
   return a.tags.length > 0 ? `${base} · ${a.tags.join(", ")}` : base;
 }
 

@@ -12,7 +12,8 @@ import {
   USES_CHECKING,
   usedInText,
 } from "@shared/assets-pipeline/manage";
-import type { AssetRecord } from "@shared/assets-pipeline/schemas";
+import { type AssetRecord, assetPath } from "@shared/assets-pipeline/schemas";
+import { isAnimatedMime, motionPath } from "@shared/assets-pipeline/video";
 import type { CampaignRecord } from "@shared/campaign-management/schemas";
 import type { AlertKey, AlertSounds } from "@shared/campaign-management/table-state";
 import { Button } from "@ui/components/ui/button";
@@ -101,13 +102,27 @@ function ImagesTab() {
           <DialogHeader>
             <DialogTitle>{shown?.name}</DialogTitle>
           </DialogHeader>
-          {shown && (
-            <AssetImg
-              id={shown.id}
-              file="display"
-              alt={shown.name}
-              className="max-h-[calc(90vh-6rem)] w-full"
+          {shown && isAnimatedMime(shown.mime) ? (
+            // FR-ANIM-11: an animated image's preview plays (muted, looping).
+            <video
+              data-testid="anim-preview-video"
+              src={motionPath(shown.id)}
+              poster={assetPath(shown.id, "display")}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="max-h-[calc(90vh-6rem)] w-full object-contain"
             />
+          ) : (
+            shown && (
+              <AssetImg
+                id={shown.id}
+                file="display"
+                alt={shown.name}
+                className="max-h-[calc(90vh-6rem)] w-full"
+              />
+            )
           )}
         </DialogContent>
       </Dialog>

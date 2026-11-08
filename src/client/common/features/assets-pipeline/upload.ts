@@ -9,6 +9,7 @@ import {
   TAGS_PER_IMAGE_MAX,
 } from "@shared/assets-pipeline/tags";
 import { RestError } from "@shared/protocol/codes";
+import { isVideoFile, VIDEO_ONLY_TOKENS } from "./video-upload";
 
 export type UploadOutcome =
   | {
@@ -24,7 +25,8 @@ export type UploadOutcome =
 /** Inline error text naming the cause (ASSET §7). */
 export function uploadErrorMessage(status: number, body: unknown): string {
   const parsed = RestError.safeParse(body);
-  if (status === 413) return "File over 100 MB";
+  // FR-ANIM-02: a video's own limit comes back in the body ("Video over 20 MB").
+  if (status === 413) return parsed.success ? parsed.data.message : "File over 100 MB";
   if (status === 415) return "Unsupported file type";
   if (status === 422) return parsed.success ? parsed.data.message : "Image over 100 megapixels";
   return "Upload failed, try again";
@@ -61,6 +63,8 @@ export interface UploadOptions {
   name?: string;
   /** FR-ASSET-41: the host's context tag (FR-ASSET-48); absent or empty = no `tags` field. */
   tags?: readonly string[];
+  /** FR-ANIM-01, -08: a video's still frame (PNG), grabbed by the picker. */
+  poster?: Blob;
 }
 
 /** FR-ASSET-48: the tags an upload from `context` carries (none → undefined: no field sent). */
@@ -85,6 +89,7 @@ export function uploadBody(file: File, opts: UploadOptions): FormData {
   body.append("listed", opts.listed ? "true" : "false");
   if (opts.name !== undefined) body.append("name", opts.name);
   if (opts.tags?.length) body.append("tags", JSON.stringify(opts.tags));
+  if (opts.poster) body.append("poster", opts.poster, "poster.png");
   return body;
 }
 
@@ -94,6 +99,11 @@ export function uploadAsset(
   opts: UploadOptions,
   h: UploadHandlers,
 ): Promise<UploadOutcome> {
+  // FR-ANIM-09: only the token and portrait pickers send a video, always with its still frame;
+  // a video dropped anywhere else is refused here, before anything is sent.
+  if (isVideoFile(file) && !opts.poster) {
+    return Promise.resolve({ kind: "error", message: VIDEO_ONLY_TOKENS });
+  }
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/assets");

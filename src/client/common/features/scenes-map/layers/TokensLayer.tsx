@@ -38,6 +38,7 @@ import {
 import type { TokenBar, TokenCross, TokenCue, TokenIcon, TokenTurn } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
 import { useLayerToggles } from "../tool-store";
+import { useTokenVideo, useVideoRedraw } from "../video-redraw";
 import { DragPaths } from "./DragPaths";
 import { toneColor } from "./tone";
 
@@ -99,6 +100,23 @@ function CreatureArt({ t, side, type }: { t: BodyToken; side: number; type: Crea
   );
 }
 
+const isVideo = (image: CanvasImageSource): image is HTMLVideoElement =>
+  typeof HTMLVideoElement !== "undefined" && image instanceof HTMLVideoElement;
+
+/** The art's own size: a video's frame, an image's pixels; `side` when not known yet. */
+function artSize(image: HTMLImageElement | HTMLVideoElement, side: number) {
+  return isVideo(image)
+    ? { w: image.videoWidth || side, h: image.videoHeight || side }
+    : { w: image.naturalWidth || side, h: image.naturalHeight || side };
+}
+
+/** A Konva Image; drawing a video keeps its layer redrawing (FR-ANIM-13). */
+function ArtImage(props: Konva.ImageConfig & { image: HTMLImageElement | HTMLVideoElement }) {
+  const ref = useRef<Konva.Image>(null);
+  useVideoRedraw(ref, isVideo(props.image));
+  return <Image ref={ref} {...props} />;
+}
+
 /** Token art per shape (FR-MAP-35); creature-type art or initials when there is no image (yet). */
 export function TokenBody({
   t,
@@ -107,16 +125,16 @@ export function TokenBody({
 }: {
   t: BodyToken;
   side: number;
-  image: HTMLImageElement | null;
+  /** The still `thumb`, or an animated token's playing video (FR-ANIM-12). */
+  image: HTMLImageElement | HTMLVideoElement | null;
 }) {
   const { colors } = useCanvas();
   const r = side / 2;
   if (image) {
-    const w = image.naturalWidth || side;
-    const h = image.naturalHeight || side;
-    if (t.shape === "none") return <Image image={image} {...containRect(w, h, side)} />;
+    const { w, h } = artSize(image, side);
+    if (t.shape === "none") return <ArtImage image={image} {...containRect(w, h, side)} />;
     const cover = (
-      <Image image={image} x={0} y={0} width={side} height={side} crop={coverCrop(w, h)} />
+      <ArtImage image={image} x={0} y={0} width={side} height={side} crop={coverCrop(w, h)} />
     );
     if (t.shape === "square") return cover;
     return (
@@ -505,6 +523,8 @@ export function TokenNode({ t }: { t: TokenView }) {
   const c = useCanvas();
   const { grid, colors, cam } = c;
   const img = useAssetImage(t.imageAssetId, "thumb");
+  // FR-ANIM-12: an animated token plays its video once it can; the still until then.
+  const video = useTokenVideo(t.imageAssetId, t.imageAnimated);
   useEffect(() => {
     if (t.imageAssetId) retryAssetImage(t.imageAssetId, "thumb");
   }, [t]);
@@ -578,7 +598,7 @@ export function TokenNode({ t }: { t: TokenView }) {
           color={colors.playerAccent}
         />
       )}
-      <TokenBody t={t} side={side} image={img.image} />
+      <TokenBody t={t} side={side} image={video ?? img.image} />
       {deco.cross && <TokenCrossMark t={t} side={side} cross={deco.cross} />}
       <TokenOutline t={t} side={side} state={ring} />
       {deco.bar && <TokenBarMark t={t} side={side} bar={deco.bar} />}

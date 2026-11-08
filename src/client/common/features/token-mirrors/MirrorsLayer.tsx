@@ -17,6 +17,7 @@ import { TokenBody } from "../scenes-map/layers/TokensLayer";
 import { outlineOf } from "../scenes-map/shape";
 import { TOKEN_INSET } from "../scenes-map/token-decor";
 import { useLayerToggles } from "../scenes-map/tool-store";
+import { useTokenVideo } from "../scenes-map/video-redraw";
 import { useMirrorMenuIsland } from "./MirrorMenu";
 import {
   dmLabel,
@@ -96,6 +97,8 @@ function MirrorNode({
   const { grid, colors, cam, client, tokens, token } = useCanvas();
   const send = useMapIntent();
   const img = useAssetImage(m.imageAssetId ?? null, "thumb");
+  // FR-ANIM-06, -12: a mirror of an animated token plays too (a Shadow has no art).
+  const video = useTokenVideo(m.imageAssetId, m.imageAnimated);
   const side = footprint(m.size) * grid.gridCellSize;
   const { x, y } = cellToPx(grid, m.col, m.row);
   const shadow = drawsAsShadow(m);
@@ -147,7 +150,7 @@ function MirrorNode({
               name: m.name ?? "",
             }}
             side={side}
-            image={img.image}
+            image={video ?? img.image}
           />
         )}
       </Group>

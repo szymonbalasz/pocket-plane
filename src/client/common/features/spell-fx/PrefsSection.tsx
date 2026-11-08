@@ -6,10 +6,11 @@ import { definePrefSection } from "../play-shell/PreferencesWindow";
 import { FX_LEVEL_LABEL, FX_LEVELS, FxLevel, useVfxLevel, vfxPrefs } from "./prefs";
 
 const HINT: Record<FxLevel, string> = {
-  full: "Auras move and hits play on the map.",
+  // FR-ANIM-14: animated tokens follow the same level.
+  full: "Auras, hits and animated tokens move on the map.",
   reduced: "Fewer particles and short trails.",
-  still: "Auras hold still; hits still play once.",
-  off: "No map effects in this browser.",
+  still: "Auras and animated tokens hold still; hits still play once.",
+  off: "No map effects or animated tokens in this browser.",
 };
 
 export function VfxPrefsSection() {
