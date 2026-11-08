@@ -10,6 +10,7 @@ import {
 } from "@shared/assets-pipeline/audio";
 import { AssetName, type AssetRecord, nameFromFilename } from "@shared/assets-pipeline/schemas";
 import { type DroppedTag, ImageTags } from "@shared/assets-pipeline/tags";
+import { isAnimatedMime, VIDEO_MIMES } from "@shared/assets-pipeline/video";
 import { AssetIngested, AssetListed, AssetTagsSet } from "@shared/events/assets-pipeline";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -19,6 +20,7 @@ import { conflict, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { asset, assetSeqNext } from "../../db/schema";
 import type { Actor } from "../../events/types";
+import { markAnimated } from "./animated";
 import type { ProcessedImage } from "./image";
 import { assetUpsert, toAssetRecord } from "./records";
 import type { AssetStore } from "./store";
@@ -36,7 +38,7 @@ const Derivative = z.object({ data: Bytes, width: Dim, height: Dim });
 export const ProcessedImageSchema = z.object({
   hash: z.string().regex(/^[0-9a-f]{64}$/),
   sourceHash: z.string().regex(/^[0-9a-f]{64}$/),
-  mime: z.enum(["image/png", "image/jpeg", "image/webp"]),
+  mime: z.enum(["image/png", "image/jpeg", "image/webp", ...VIDEO_MIMES]),
   original: Bytes,
   width: Dim,
   height: Dim,
@@ -208,6 +210,8 @@ export function ingestCommand(store: AssetStore) {
         })
         .run();
       const row = tx.select().from(asset).where(eq(asset.id, id)).get() as AssetRow;
+      // FR-ANIM-06: token and mirror rows read the set (a rollback leaves an unreferenced ID).
+      if (isAnimatedMime(row.mime)) markAnimated(id);
       emit({
         type: AssetIngested.type,
         campaignId,

@@ -35,6 +35,8 @@ export interface IngestStepOptions {
   listed?: boolean;
   /** FR-ASSET-41 (S6): `ingestStep(file, {tags})`; absent = `[]`. Tags don't feed the ID seed. */
   tags?: string[];
+  /** FR-ANIM-16: a video's still frame under `fixtures/assets/` (`ingestStep(file, {poster})`). */
+  poster?: string;
 }
 
 /** Bytes built by a fixture module (no committed file), sniffed as an upload is. */
@@ -52,8 +54,25 @@ export function ingestStep(
   file: string | FixtureBytes,
   opts: string | IngestStepOptions = {},
 ): SetupStep {
-  const { name, listed, tags } =
+  const { name, listed, tags, poster } =
     typeof opts === "string" ? ({ name: opts } as IngestStepOptions) : opts;
+  const fixtureFile = (f: string) =>
+    new Uint8Array(readFileSync(path.join(WORKTREE_ROOT, ASSETS_ROOT, f)));
+  if (typeof file === "string" && poster !== undefined) {
+    // FR-ANIM-16: a video goes through the upload path with its committed still frame.
+    return {
+      command: INGEST,
+      input: () =>
+        prepareIngest({
+          bytes: fixtureFile(file),
+          poster: fixtureFile(poster),
+          filename: path.basename(file),
+          ...(name !== undefined ? { name } : {}),
+          ...(listed !== undefined ? { listed } : {}),
+          ...(tags !== undefined ? { tags } : {}),
+        }),
+    };
+  }
   if (typeof file !== "string") {
     return {
       command: INGEST,

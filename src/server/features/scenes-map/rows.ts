@@ -1,4 +1,5 @@
 // Row ↔ record mapping and lookups for scenes-map. Rows and DM records have the same fields.
+
 import {
   SCENE_FOLDER_TYPE,
   SCENE_TYPE,
@@ -11,6 +12,7 @@ import { conflict, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { scene, sceneFolder, token } from "../../db/schema";
 import type { Actor, RecordChange } from "../../events/types";
+import { isAnimatedAsset } from "../assets-pipeline/animated";
 
 type SceneRow = typeof scene.$inferSelect;
 type TokenRow = typeof token.$inferSelect;
@@ -49,6 +51,8 @@ export const toTokenRecord = ({
   ...r
 }: TokenRow): TokenRecord => ({
   ...r,
+  // FR-ANIM-06: derived from the image asset; on the wire only when true.
+  ...(isAnimatedAsset(r.imageAssetId) ? { imageAnimated: true as const } : {}),
   ...(fogged ? { fogged: true as const } : {}),
   ...(dead ? { dead: true as const } : {}),
   ...(invisible ? { invisible: true as const } : {}),

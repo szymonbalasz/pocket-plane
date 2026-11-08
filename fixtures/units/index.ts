@@ -1,5 +1,6 @@
 // Fixture unit registry. Append-only (AGENTS §9.9): add your own lines.
 import type { Fixture } from "@server/features/fixtures-adapters/fixture-types";
+import animatedToken from "./assets-pipeline/animated-token";
 import audioChime from "./assets-pipeline/audio-chime";
 import imageLarge from "./assets-pipeline/image-large";
 import imageTags from "./assets-pipeline/image-tags";
@@ -139,6 +140,7 @@ import scnPropImages from "./scene-tools/scn-prop-images";
 import scnProps from "./scene-tools/scn-props";
 import scnTemplates from "./scene-tools/scn-templates";
 import scnWalls from "./scene-tools/scn-walls";
+import animatedTown from "./scenes-map/animated-town";
 import battlemap from "./scenes-map/battlemap";
 import mtCrowd from "./scenes-map/mt-crowd";
 import scenesExtras from "./scenes-map/scenes-extras";
@@ -372,4 +374,7 @@ export const units: readonly Fixture[] = [
   entryPresent1,
   // Linked notes N9 token notes (build/notes-token)
   notesTokens,
+  // Animated tokens (build/animated-tokens)
+  animatedToken,
+  animatedTown,
 ];

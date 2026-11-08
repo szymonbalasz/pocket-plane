@@ -3,6 +3,7 @@ import type { Bundle } from "@server/features/fixtures-adapters/fixture-types";
 import agentApi from "./agent-api";
 import alertSounds from "./alert-sounds";
 import alertSoundsE2e from "./alert-sounds-e2e";
+import animatedTokens from "./animated-tokens";
 import assetAccess from "./asset-access";
 import assetLibrary from "./asset-library";
 import assetsWindowE2e from "./assets-window-e2e";
@@ -431,4 +432,6 @@ export const bundles: readonly Bundle[] = [
   itemPresent,
   // Linked notes N9 token notes (build/notes-token)
   notesToken,
+  // Animated tokens (build/animated-tokens)
+  animatedTokens,
 ];

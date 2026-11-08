@@ -27,7 +27,13 @@ export function redactMirror(r: TokenMirrorRecord): PlayerTokenMirrorRecord {
     shape: r.shape,
   };
   if (r.mode === "shadow") return base;
-  return { ...base, name: r.name, imageAssetId: r.imageAssetId, creatureType: r.creatureType };
+  return {
+    ...base,
+    name: r.name,
+    imageAssetId: r.imageAssetId,
+    ...(r.imageAnimated ? { imageAnimated: true as const } : {}),
+    creatureType: r.creatureType,
+  };
 }
 
 export function dmMirrorRecord(r: TokenMirrorRecord): TokenMirrorRecord {

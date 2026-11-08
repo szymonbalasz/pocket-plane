@@ -28,6 +28,13 @@ export function testPng(seed = 0, w = 64, h = 48): Promise<Buffer> {
 export const svgBytes = (attrs: string, body = '<rect width="100%" height="100%" fill="#363"/>') =>
   Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" ${attrs}>${body}</svg>`);
 
+/** An `ftyp` box with `brand` as the major brand, then filler. */
+export function mp4Bytes(brand = "isom", filler = 64): Uint8Array {
+  const head = [0, 0, 0, 0x18, ...Buffer.from(`ftyp${brand}`), 0, 0, 2, 0];
+  const compat = [...Buffer.from("isomavc1mp41")];
+  return new Uint8Array([...head, ...compat, ...new Array(filler).fill(7)]);
+}
+
 export function form(bytes: Uint8Array, filename: string, name?: string): FormData {
   const f = new FormData();
   f.append("file", new File([new Uint8Array(bytes)], filename));

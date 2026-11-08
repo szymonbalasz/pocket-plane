@@ -2,11 +2,12 @@
 // Format comes from content only; SVG is rasterised to PNG; derivatives are WebP via sharp.
 import { createHash } from "node:crypto";
 import { DISPLAY_EDGE, MAX_PIXELS, THUMB_EDGE } from "@shared/assets-pipeline/schemas";
+import type { VideoMime } from "@shared/assets-pipeline/video";
 import sharp, { type Metadata } from "sharp";
 
 export type SourceFormat = "png" | "jpeg" | "webp" | "svg";
 
-export type RejectStatus = 413 | 415 | 422;
+export type RejectStatus = 400 | 413 | 415 | 422;
 
 /** An upload refused before anything is written (FR-ASSET-02). */
 export class IngestRejected extends Error {
@@ -36,8 +37,9 @@ export interface ProcessedImage {
   hash: string;
   /** SHA-256 hex of the bytes as given (an SVG before rendering); seeds fixture asset IDs. */
   sourceHash: string;
-  /** Stored original's type; SVG is stored as PNG (FR-ASSET-02). */
-  mime: "image/png" | "image/jpeg" | "image/webp";
+  /** Stored original's type; SVG is stored as PNG (FR-ASSET-02). A video (FR-ANIM-03) keeps its
+   * own type; its sizes and derivatives come from the still frame. */
+  mime: "image/png" | "image/jpeg" | "image/webp" | VideoMime;
   original: Uint8Array;
   width: number;
   height: number;

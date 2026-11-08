@@ -7,7 +7,8 @@ import type { RunOptions } from "../../commands/commands";
 import type { Services } from "../../services";
 import { looksLikeAudio, probeAudio } from "./audio-probe";
 import { INGEST, type IngestInput, type IngestResult } from "./commands";
-import { IngestRejected, processImage, unsupported } from "./image";
+import { IngestRejected, processImage, sniffFormat, unsupported } from "./image";
+import { posterWithoutVideo, processVideo, sniffVideo } from "./video";
 
 export interface IngestRequest {
   bytes: Uint8Array;
@@ -20,6 +21,8 @@ export interface IngestRequest {
   /** *(Sprint 8)* The kind the uploader expects (the Alert sounds section sends `audio`): any
    * other content → 415. Absent = either. */
   kind?: AssetKind;
+  /** FR-ANIM-01: the still frame of a video upload (required with a video, refused without). */
+  poster?: Uint8Array;
 }
 
 /** FR-ASSET-52's refusals (the code stays `invalid`; the status carries the cause). */
@@ -35,6 +38,17 @@ export async function prepareIngest(req: IngestRequest): Promise<IngestInput> {
     ...(req.listed !== undefined ? { listed: req.listed } : {}),
     ...(req.tags !== undefined ? { tags: req.tags } : {}),
   };
+  // FR-ANIM-01–03: a video is an image asset; its still frame makes the derivatives.
+  const video = sniffVideo(req.bytes);
+  if (video) {
+    if (req.kind === "audio") throw notASound();
+    return { image: await processVideo(req.bytes, video, req.poster), ...rest };
+  }
+  if (req.poster !== undefined) {
+    // FR-ANIM-01: a poster with an image or sound is a bad request; any other file → 415.
+    if (sniffFormat(req.bytes) !== null || looksLikeAudio(req.bytes)) throw posterWithoutVideo();
+    throw unsupported();
+  }
   if (looksLikeAudio(req.bytes)) {
     if (req.kind === "image") throw unsupported();
     return { audio: probeSound(req.bytes), ...rest };

@@ -41,6 +41,8 @@ export const TokenMirrorRecord = z.object({
   /** FR-MIR-08: copies of the source token, so visibility reads only the record (ADR-0021). */
   name: z.string(),
   imageAssetId: z.string().nullable(),
+  /** FR-ANIM-06: derived, the art is a video; on the wire only when true. */
+  imageAnimated: z.literal(true).optional(),
   creatureType: TokenCreatureType.nullable(),
   size: TokenSize,
   shape: TokenShape,
@@ -64,6 +66,8 @@ export const PlayerTokenMirrorRecord = z.object({
   shape: TokenShape,
   name: z.string().optional(),
   imageAssetId: z.string().nullable().optional(),
+  /** FR-ANIM-06: not on a Shadow (it has no art). */
+  imageAnimated: z.literal(true).optional(),
   creatureType: TokenCreatureType.nullable().optional(),
 });
 export type PlayerTokenMirrorRecord = z.infer<typeof PlayerTokenMirrorRecord>;

@@ -4,13 +4,15 @@ import type { TokenMirrorRecord } from "@shared/token-mirrors/schemas";
 import { asc, eq } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { tokenMirror } from "../../db/schema";
+import { isAnimatedAsset } from "../assets-pipeline/animated";
 
 type Read = Pick<Db, "select">;
 type Row = typeof tokenMirror.$inferSelect;
 
 export function toMirrorRecord(r: Row): TokenMirrorRecord {
   const { createdAt: _c, updatedAt: _u, ...rest } = r;
-  return rest;
+  // FR-ANIM-06: derived from the copied art; on the wire only when true.
+  return isAnimatedAsset(rest.imageAssetId) ? { ...rest, imageAnimated: true } : rest;
 }
 
 export function readMirror(read: Read, id: string): TokenMirrorRecord | null {

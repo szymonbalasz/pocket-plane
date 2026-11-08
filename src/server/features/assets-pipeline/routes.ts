@@ -7,6 +7,7 @@ import {
   type UploadResponse,
 } from "@shared/assets-pipeline/schemas";
 import { ImageTags } from "@shared/assets-pipeline/tags";
+import { isAnimatedMime } from "@shared/assets-pipeline/video";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -63,6 +64,27 @@ function etagMatches(header: string | undefined, etag: string): boolean {
     .split(",")
     .map((t) => t.trim().replace(/^W\//, ""))
     .some((t) => t === etag || t === "*");
+}
+
+/**
+ * FR-ANIM-05: one `bytes=` range (`a-b`, `a-`, `-n`), clamped to the file; absent or not a
+ * single bytes range → null (the whole file); a start past the end → `unsatisfiable`.
+ */
+export function parseRange(
+  header: string | undefined,
+  size: number,
+): { start: number; end: number } | "unsatisfiable" | null {
+  const m = header?.trim().match(/^bytes=(\d*)-(\d*)$/);
+  if (!m || (m[1] === "" && m[2] === "")) return null;
+  if (m[1] === "") {
+    const n = Number(m[2]);
+    if (n === 0 || size === 0) return "unsatisfiable";
+    return { start: Math.max(0, size - n), end: size - 1 };
+  }
+  const start = Number(m[1]);
+  const end = m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
+  if (start >= size || end < start) return "unsatisfiable";
+  return { start, end };
 }
 
 export function assetRoutes(s: Services) {
@@ -122,6 +144,16 @@ export function assetRoutes(s: Services) {
               400,
             );
           }
+          // FR-ANIM-01: an optional still frame (a file); anything else is a bad request.
+          const poster = form.poster;
+          if (poster !== undefined && !(poster instanceof File)) {
+            return c.json(
+              errorBody("invalid", "Invalid poster", [
+                { path: ["poster"], message: "Expected a file" },
+              ]),
+              400,
+            );
+          }
           if (file.size > MAX_UPLOAD_BYTES) return rejected(c);
           const n = resolveName(file.name, name);
           if (!n.success) {
@@ -134,6 +166,7 @@ export function assetRoutes(s: Services) {
               filename: file.name,
               ...(name !== undefined ? { name } : {}),
               ...(kind ? { kind: kind.data } : {}),
+              ...(poster ? { poster: new Uint8Array(await poster.arrayBuffer()) } : {}),
             });
             const r = s.commands.run(
               INGEST,
@@ -182,6 +215,49 @@ export function assetRoutes(s: Services) {
           status: 200,
           headers: { ...headers, "Content-Type": row.mime },
         });
+      })
+      // FR-ANIM-05: an animated image's video (its stored original), no credential (the ID is
+      // the capability, ADR-0023), iff in the active campaign; any mismatch → the common 404.
+      // Range requests get 206 (video elements seek with them), an unsatisfiable range 416.
+      .get("/assets/:id/motion", (c) => {
+        const id = AssetId.safeParse(c.req.param("id"));
+        if (!id.success) return c.json(NOT_FOUND_BODY, 404);
+        const row = s.db
+          .select({ hash: asset.hash, mime: asset.mime })
+          .from(asset)
+          .innerJoin(campaign, eq(asset.campaignId, campaign.id))
+          .where(and(eq(asset.id, id.data), eq(campaign.active, true), eq(asset.kind, "image")))
+          .get();
+        if (!row || !isAnimatedMime(row.mime) || !store.isComplete(row.hash)) {
+          return c.json(NOT_FOUND_BODY, 404);
+        }
+        const etag = `"${id.data}-motion"`;
+        const headers = {
+          "Cache-Control": CACHE_CONTROL,
+          ETag: etag,
+          "X-Content-Type-Options": "nosniff",
+          "Accept-Ranges": "bytes",
+        };
+        if (etagMatches(c.req.header("if-none-match"), etag)) {
+          return c.body(null, 304, headers);
+        }
+        const f = Bun.file(store.originalPath(row.hash));
+        const range = parseRange(c.req.header("range"), f.size);
+        if (range === "unsatisfiable") {
+          return c.body(null, 416, { ...headers, "Content-Range": `bytes */${f.size}` });
+        }
+        if (range) {
+          return new Response(f.slice(range.start, range.end + 1), {
+            status: 206,
+            headers: {
+              ...headers,
+              "Content-Type": row.mime,
+              "Content-Range": `bytes ${range.start}-${range.end}/${f.size}`,
+              "Content-Length": String(range.end - range.start + 1),
+            },
+          });
+        }
+        return new Response(f, { status: 200, headers: { ...headers, "Content-Type": row.mime } });
       })
       // FR-ASSET-11/-13/-14: no credential; the ID is the capability. Served iff the asset
       // exists and belongs to the active campaign. `id` / `file` never reach a path.

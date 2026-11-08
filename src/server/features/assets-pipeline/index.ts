@@ -1,5 +1,6 @@
 import { realContext } from "../../commands/context";
 import type { Feature } from "../../services";
+import { loadAnimated } from "./animated-load";
 import { backfillAssetTags } from "./backfill";
 import { ingestCommand } from "./commands";
 import { assetUsesQuery, deleteAsset, renameAsset } from "./manage";
@@ -28,6 +29,10 @@ export const assetsPipeline: Feature = {
     // FR-ASSET-07: crash recovery on server start (never in the loader's preflight).
     r.onStart("asset-store-sweep", () => {
       store.sweep(s.db);
+    });
+    // FR-ANIM-06: animated asset IDs for the token and mirror wire rows (ingest adds new ones).
+    r.onStart("assets-pipeline.animated", (sv) => {
+      loadAnimated(sv.db);
     });
     // FR-ASSET-49: pre-IM-1 rows get guessed tags, once per DB.
     r.onStart("assets-pipeline.tags-backfill", (sv) => {

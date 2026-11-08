@@ -208,6 +208,8 @@ const tokenFields = {
   seq: z.number().int(),
   name: z.string(),
   imageAssetId: z.string().nullable(),
+  /** FR-ANIM-06: derived, the image asset is a video (animated token); on the wire only when true. */
+  imageAnimated: z.literal(true).optional(),
   size: TokenSize,
   col: z.number().int(),
   row: z.number().int(),
