@@ -1,7 +1,8 @@
 // Token mirrors layer (FR-MIR-15), under the tokens: a mirror's art at its cell in its mode's look.
 // Konva node `name` = `mir-mirror`, `id` = mirror id, attrs `mode`, `off` (DM: players see nothing);
 // label `mir-label` (attr `text`). Players' mirrors never listen: they can't be picked, dragged or
-// targeted. The DM drags one with the Select tool (FR-MIR-12) and right-clicks it (FR-MIR-16).
+// targeted. The DM drags one with the Select tool (FR-MIR-12) and right-clicks it (FR-MIR-16);
+// while the DM targets, a click on a mirror is a click on its token, and no mirror drags (FR-MIR-04).
 import { cellToPx, dropCell, footprint } from "@shared/scenes-map/geometry";
 import { MIR_INTENTS, type MirrorView, TOKEN_MIRROR_TYPE } from "@shared/token-mirrors/schemas";
 import type Konva from "konva";
@@ -21,9 +22,10 @@ import {
   dmLabel,
   drawsAsShadow,
   mirrorOpacity,
+  mirrorTarget,
   offForPlayers,
   playerLabel,
-  sceneMirrorsOf,
+  shownMirrorsOf,
 } from "./mirror-store";
 
 const LABEL_FONT_PX = 11;
@@ -82,8 +84,16 @@ function ShadowBody({ m, side }: { m: MirrorView; side: number }) {
   );
 }
 
-function MirrorNode({ m, draggable }: { m: MirrorView; draggable: boolean }) {
-  const { grid, colors, cam, client } = useCanvas();
+function MirrorNode({
+  m,
+  draggable,
+  targeting,
+}: {
+  m: MirrorView;
+  draggable: boolean;
+  targeting: boolean;
+}) {
+  const { grid, colors, cam, client, tokens, token } = useCanvas();
   const send = useMapIntent();
   const img = useAssetImage(m.imageAssetId ?? null, "thumb");
   const side = footprint(m.size) * grid.gridCellSize;
@@ -99,12 +109,18 @@ function MirrorNode({ m, draggable }: { m: MirrorView; draggable: boolean }) {
       off={dm ? offForPlayers(m) : undefined}
       x={x}
       y={y}
-      listening={draggable}
-      draggable={draggable}
+      listening={draggable || targeting}
+      draggable={draggable && !targeting}
       onMouseDown={(e) => {
-        // A left press drags the mirror: never the stage's selection box. A right press goes on
-        // to the stage, which opens this layer's menu (FR-MAP-71 step 4).
+        // A left press drags the mirror (or targets its token): never the stage's selection box.
+        // A right press goes on to the stage, which opens this layer's menu (FR-MAP-71 step 4).
         if (e.evt.button === 0) e.cancelBubble = true;
+      }}
+      onClick={(e) => {
+        // FR-MIR-04: targeting, the mirror stands for its token (plain click, Ctrl/Shift toggle).
+        if (!targeting || e.evt.button !== 0) return;
+        const t = mirrorTarget(m, tokens);
+        if (t) token.click(t, e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey);
       }}
       onDragEnd={(e) => {
         const node = e.target as Konva.Node;
@@ -152,19 +168,21 @@ function MirrorNode({ m, draggable }: { m: MirrorView; draggable: boolean }) {
 }
 
 export function MirrorsLayer() {
-  const { scene, client, live, tool } = useCanvas();
+  const { scene, client, live, tool, targeting } = useCanvas();
   const byId = useSync((s) => s.store.records[TOKEN_MIRROR_TYPE]);
   const dmOnlyOff = useLayerToggles((s) => s.off[DM_ONLY_SWITCH.key] === true) && client === "dm";
   useMirrorMenuIsland(useContext(SyncContext), client === "dm");
-  const drawn = useMemo(() => {
-    const all = sceneMirrorsOf(byId, scene.id);
-    return dmOnlyOff ? all.filter((m) => !offForPlayers(m)) : all;
-  }, [byId, scene.id, dmOnlyOff]);
+  const drawn = useMemo(
+    () => shownMirrorsOf(byId, scene.id, dmOnlyOff),
+    [byId, scene.id, dmOnlyOff],
+  );
   const draggable = client === "dm" && live && tool === "select";
+  // FR-MAP-33: targeting is the DM's only (always false on the player client).
+  const targets = client === "dm" && targeting;
   return (
     <Group name="mir-mirrors">
       {drawn.map((m) => (
-        <MirrorNode key={m.id} m={m} draggable={draggable} />
+        <MirrorNode key={m.id} m={m} draggable={draggable} targeting={targets} />
       ))}
     </Group>
   );

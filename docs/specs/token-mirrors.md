@@ -14,7 +14,7 @@ phase: post-mvp
 
 - A battle on several floors is **one map**: the DM lays the floors side by side in an image editor, walls keep them apart, and Teleport moves tokens between them.
 - A **mirror** shows a token in a second place on that map: a yard goblin also appears around the roof, for whoever stands on the roof.
-- A mirror is display only. It has no sight, no HP, no combat row, and nothing can target it.
+- A mirror is display only. It has no sight, no HP, no combat row, and is never a target itself; while the DM picks targets, it stands for its token.
 
 ## 2. Scope
 
@@ -51,7 +51,7 @@ phase: post-mvp
 | FR-MIR-01 | The DM's token menu has **Mirror**: the Teleport cell pick (hint panel, target footprint), then `mir.create {tokenId, col, row, mode?}` on the token's scene. Mode defaults to Visible. Players have no entry and the intent refuses them. | FR-MAP-121 |
 | FR-MIR-02 | Any number of mirrors per token, up to the cap. | |
 | FR-MIR-03 | A mirror's footprint must overlap the map when placed; off the map → `invalid`. | |
-| FR-MIR-04 | A mirror does nothing: never a vision source, combatant, target, or selectable token, and players can't move it. It is not a `token` row, so token code never meets it. | |
+| FR-MIR-04 | A mirror does nothing: never a vision source, combatant, target, or selectable token, and players can't move it. It is not a `token` row, so token code never meets it. One exception, for the DM: while targeting (attack popup), a click on a mirror is a click on its token (Ctrl/Shift-click toggles it), a box over a mirror adds its token, and mirrors don't drag (DM 2026-11-08). | FR-MAP-33, FR-CBT-33 |
 | FR-MIR-05 | ≤ 200 per scene and ≤ 2,000 per campaign → `conflict`. | Props' caps |
 | FR-MIR-06 | **Modes.** Hidden: no player. Visible (a normal look), Transparent and Shadow: only players whose sight reaches the mirror's cells (walls and fog apply, per player, party vision included). The modes differ in look only. *(Amended 2026-11-05, [#443](../decisions-log.md): Transparent and Shadow used to ignore walls and fog.)* | §7 |
 | FR-MIR-07 | A player's copy never carries the source token's id, `seenBy`, `fogged`, `suppressed` or the campaign. A Shadow also carries no name, art or creature type. | Checked on snapshot and live |
@@ -59,7 +59,7 @@ phase: post-mvp
 | FR-MIR-09 | While the token is hidden or Invisible, or the mirror has no cell on the map, no player gets it (`suppressed`), and it returns by itself when that ends. Its mode is unchanged. A mirror is otherwise independent of whether players see the token. | Stops a mirror giving away a hidden enemy |
 | FR-MIR-10 | A **teleport** of the token sets its mirrors to Hidden and leaves them where they are: the old distance means nothing after a jump. The DM drags them and picks a mode again. | FR-MAP-121 |
 | FR-MIR-11 | Deleting a token, or its scene, deletes its mirrors. | |
-| FR-MIR-12 | With the Select tool the DM drags a mirror to a new cell (`mir.move`); its distance to the token is whatever that leaves. | |
+| FR-MIR-12 | With the Select tool the DM drags a mirror to a new cell (`mir.move`); its distance to the token is whatever that leaves. Not while targeting (FR-MIR-04). | |
 | FR-MIR-13 | The menu's Delete removes the mirror only (`mir.delete`). | |
 | FR-MIR-14 | A scene copy keeps its mirrors, on the copied tokens. | FR-MAP-04 |
 | FR-MIR-15 | Drawn under the tokens, in the Konva objects layer (above fog). See §7. | |
@@ -123,7 +123,7 @@ Reference [visual-direction](../design/visual-direction.md). Uses the token's ar
 
 - **Fixtures:** `mir-goblin`. **Bundle:** `token-mirrors`.
 - **Server:** `token-mirrors.test.ts`, real socket, DM + two players, one named test per requirement.
-- **Browser:** `e2e/token-mirrors.e2e.ts`. **Walkthrough:** `fixtures:reset-load token-mirrors --profile verify`; the fixture's mirror starts out of sight (`· Fog`, nothing for the player) and shows once dragged into sight; mirror Mira, switch modes with a player window open, drag it, teleport the token and see it go Hidden.
+- **Browser:** `e2e/token-mirrors.e2e.ts`; targeting through a mirror (FR-MIR-04): `e2e/mirror-targeting.e2e.ts` (bundle `rules-effects`). **Walkthrough:** `fixtures:reset-load token-mirrors --profile verify`; the fixture's mirror starts out of sight (`· Fog`, nothing for the player) and shows once dragged into sight; mirror Mira, switch modes with a player window open, drag it, teleport the token and see it go Hidden.
 - Runs isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)).
 
 ## 14. Dependencies

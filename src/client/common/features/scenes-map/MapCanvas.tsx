@@ -27,6 +27,7 @@ import {
   type SceneView,
   type TokenView,
 } from "@shared/scenes-map/schemas";
+import { TOKEN_MIRROR_TYPE } from "@shared/token-mirrors/schemas";
 import type Konva from "konva";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Group, Layer, Stage } from "react-konva";
@@ -37,7 +38,8 @@ import { pauseGate } from "../pause/gate";
 import { setFitPort, useFreeArea } from "../play-shell/free-area";
 import type { Rect } from "../play-shell/geometry";
 import { isKeyboardFocus, spaceAction, trackFocusModality } from "../play-shell/keys";
-import { withoutDmOnly } from "../scene-tools/layer-switches";
+import { DM_ONLY_SWITCH, withoutDmOnly } from "../scene-tools/layer-switches";
+import { shownMirrorsOf, withMirrorTargets } from "../token-mirrors/mirror-store";
 import {
   appearanceKeeps,
   type Camera,
@@ -671,6 +673,8 @@ export function MapCanvas(props: MapCanvasProps) {
   const overlayRef = useRef(overlay);
   overlayRef.current = overlay;
   const store = useSync((s) => s.store);
+  const storeRef = useRef(store);
+  storeRef.current = store;
   const prevStore = useRef(store);
   useEffect(() => {
     if (isSnapshotStore(prevStore.current, store)) {
@@ -754,6 +758,8 @@ export function MapCanvas(props: MapCanvasProps) {
   );
 
   const targeting = props.targeting ?? false;
+  const targetingRef = useRef(targeting);
+  targetingRef.current = targeting;
   const canMove = useCallback(
     (t: TokenView) =>
       !targeting && (client === "dm" || (myPlayerId !== null && t.ownerPlayerId === myPlayerId)),
@@ -1034,8 +1040,18 @@ export function MapCanvas(props: MapCanvasProps) {
         const box = pointers.getState().box;
         if (boxing.current && box && !click) {
           // FR-SCN-05: tokens the DM-only items switch hides are not drawn, so not picked.
-          const pickable = withoutDmOnly(shownRef.current, client, useLayerToggles.getState().off);
-          onBoxSelect?.(tokensInBox(pickable, gridRef.current, box));
+          const off = useLayerToggles.getState().off;
+          const pickable = withoutDmOnly(shownRef.current, client, off);
+          const ids = tokensInBox(pickable, gridRef.current, box);
+          // FR-MIR-04: targeting, a drawn mirror in the box adds its token.
+          const mirrors = targetingRef.current
+            ? shownMirrorsOf(
+                storeRef.current.records[TOKEN_MIRROR_TYPE],
+                sceneIdRef.current,
+                off[DM_ONLY_SWITCH.key] === true,
+              )
+            : [];
+          onBoxSelect?.(withMirrorTargets(ids, mirrors, pickable, gridRef.current, box));
         } else if (click && !p.onToken) {
           onEmptyClick?.();
         }

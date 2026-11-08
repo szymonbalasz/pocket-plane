@@ -5,6 +5,7 @@ import type { MirrorMode, MirrorView } from "@shared/token-mirrors/schemas";
 import { TOKEN_MIRROR_TYPE } from "@shared/token-mirrors/schemas";
 import { create } from "zustand";
 import type { LayerContextMenu, MenuPoint } from "../scenes-map/layers";
+import { type Box, tokensInBox } from "../scenes-map/selection-logic";
 
 /** FR-MIR-16: the menu's words, in its order. */
 export const MODE_LABELS: readonly (readonly [MirrorMode, string])[] = [
@@ -54,6 +55,48 @@ export function sceneMirrorsOf(
   return all
     .filter((m) => m.sceneId === sceneId)
     .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0) || a.id.localeCompare(b.id));
+}
+
+/** The mirrors the canvas draws: the DM-only items switch off drops those players don't see. */
+export function shownMirrorsOf(
+  byId: Readonly<Record<string, unknown>> | undefined,
+  sceneId: string,
+  dmOnlyOff: boolean,
+): MirrorView[] {
+  const all = sceneMirrorsOf(byId, sceneId);
+  return dmOnlyOff ? all.filter((m) => !offForPlayers(m)) : all;
+}
+
+/**
+ * FR-MIR-04: while the DM targets, a mirror stands for its token. The token a pick on mirror `m`
+ * means, if that token is among `pickable` (the scene's drawn tokens); a player's copy of a mirror
+ * has no `tokenId`, so it means none.
+ */
+export function mirrorTarget<T extends { id: string }>(
+  m: Pick<MirrorView, "tokenId">,
+  pickable: readonly T[],
+): T | null {
+  return m.tokenId === undefined ? null : (pickable.find((t) => t.id === m.tokenId) ?? null);
+}
+
+/**
+ * FR-MIR-04 with FR-MAP-32: a targeting box adds the tokens of the mirrors whose footprint centre
+ * it holds, after `ids` (the tokens it holds itself), each token once.
+ */
+export function withMirrorTargets(
+  ids: readonly string[],
+  mirrors: readonly MirrorView[],
+  pickable: readonly { id: string }[],
+  grid: Grid,
+  box: Box,
+): string[] {
+  const out = [...ids];
+  const byMirror = new Map(mirrors.map((m) => [m.id, m]));
+  for (const mirrorId of tokensInBox(mirrors, grid, box)) {
+    const t = mirrorTarget(byMirror.get(mirrorId) ?? {}, pickable);
+    if (t && !out.includes(t.id)) out.push(t.id);
+  }
+  return out;
 }
 
 /** The topmost mirror whose footprint holds map point `p`. */

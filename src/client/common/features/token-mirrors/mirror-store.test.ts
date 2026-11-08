@@ -7,9 +7,12 @@ import {
   MODE_LABELS,
   mirrorAt,
   mirrorOpacity,
+  mirrorTarget,
   offForPlayers,
   playerLabel,
   sceneMirrorsOf,
+  shownMirrorsOf,
+  withMirrorTargets,
 } from "./mirror-store";
 
 const m = (over: Partial<MirrorView> = {}): MirrorView => ({
@@ -87,5 +90,45 @@ describe("FR-MIR-16 the right-click's hit", () => {
     expect(mirrorAt([low], grid, { x: 210, y: 220 })).toBeNull();
     const big = m({ id: "big", size: "large" });
     expect(mirrorAt([big], grid, { x: 279, y: 349 })?.id).toBe("big");
+  });
+});
+
+describe("FR-MIR-04 targeting through a mirror", () => {
+  const goblin = { id: "t-gob", col: 8, row: 8, size: "medium" as const };
+  const orc = { id: "t-orc", col: 0, row: 0, size: "medium" as const };
+  // The box holds cells 2–3 × 3 (centres 175 / 245, 245): not the tokens' cells.
+  const box = { x0: 140, y0: 210, x1: 290, y1: 280 };
+
+  test("FR-MIR-04 a mirror stands for its drawn token; a player's copy (no tokenId) for none", () => {
+    expect(mirrorTarget(m({ tokenId: "t-gob" }), [orc, goblin])).toBe(goblin);
+    expect(mirrorTarget(m({ tokenId: "t-gone" }), [orc, goblin])).toBeNull();
+    expect(mirrorTarget(m(), [orc, goblin])).toBeNull();
+  });
+
+  test("FR-MIR-04 a targeting box adds its mirrors' tokens, each once, after its own", () => {
+    const mirrors = [
+      m({ id: "a", tokenId: "t-gob" }),
+      m({ id: "b", tokenId: "t-gob", col: 3 }),
+      m({ id: "c", tokenId: "t-orc", col: 12 }),
+    ];
+    expect(withMirrorTargets([], mirrors, [orc, goblin], grid, box)).toEqual(["t-gob"]);
+    expect(withMirrorTargets(["t-orc"], mirrors, [orc, goblin], grid, box)).toEqual([
+      "t-orc",
+      "t-gob",
+    ]);
+    expect(withMirrorTargets(["t-gob"], mirrors, [orc, goblin], grid, box)).toEqual(["t-gob"]);
+    // A token the canvas doesn't draw (DM-only items off) is not picked through its mirror.
+    expect(withMirrorTargets([], mirrors, [orc], grid, box)).toEqual([]);
+    expect(withMirrorTargets(["t-orc"], [], [orc, goblin], grid, box)).toEqual(["t-orc"]);
+  });
+
+  test("FR-MIR-04 the DM-only items switch off drops mirrors players don't see", () => {
+    const byId = {
+      a: m({ id: "a", seq: 1 }),
+      b: m({ id: "b", seq: 2, mode: "hidden" }),
+      c: m({ id: "c", seq: 3, suppressed: true }),
+    };
+    expect(shownMirrorsOf(byId, "s1", false).map((x) => x.id)).toEqual(["a", "b", "c"]);
+    expect(shownMirrorsOf(byId, "s1", true).map((x) => x.id)).toEqual(["a"]);
   });
 });
