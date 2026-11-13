@@ -1,6 +1,6 @@
-# Proposed — Token forms: a derived form copy beside the token's own art
+# 0081 — Token forms: a derived form copy beside the token's own art
 
-- Status: proposed (spec-token-forms, 2026-11-13)
+- Status: accepted (DM, 2026-11-13)
 - Date: 2026-11-13
 - Consistent with: [ADR-0024](0024-definition-visibility.md) (display copies on tokens), [ADR-0049](0049-trigger-state.md) (`effectHooks` on every effect change), [ADR-0080](0080-animated-tokens.md) (`imageAnimated` derived on the token row)
 - Refines: [ADR-0080](0080-animated-tokens.md): `imageAnimated` is derived from the drawn art, not `imageAssetId` alone

@@ -166,6 +166,12 @@ DM picks #351 (ADR-0069), #355–#356 (Gilt & Stone default, Simple Dark; kit pa
 |---|---|---|---|
 | [Animated tokens](animated-tokens.md) | ANIM | complete, [ADR-0080](../architecture/adr/0080-animated-tokens.md) | spec-animated-tokens |
 
+## Token forms (2026-11-13)
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Token forms](token-forms.md) | FORM | complete, [ADR-0081](../architecture/adr/0081-token-forms.md) | spec-token-forms |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.

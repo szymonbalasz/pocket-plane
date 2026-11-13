@@ -1,14 +1,14 @@
 ---
 title: Token forms
 prefix: FORM
-status: draft
+status: complete
 owner: spec-token-forms
 phase: post-mvp
 ---
 
 # Token forms
 
-> Five-minute read. Asked by the DM in conversation, 2026-11-13: "when Ulfhild is raging I want her to use a different token". DM picked option C (a forms list **and** presets that switch to a form) and "players see it too". Cross-cutting part: [proposed ADR](../architecture/adr/proposed-token-forms.md). Amends [scenes-map](scenes-map.md), [token-mirrors](token-mirrors.md), [animated-tokens](animated-tokens.md), [effect-modifiers](effect-modifiers.md), [character-sheet-full](character-sheet-full.md), [combat-tracker](combat-tracker.md), [assets-pipeline](assets-pipeline.md).
+> Five-minute read. Asked by the DM in conversation, 2026-11-13: "when Ulfhild is raging I want her to use a different token". DM picked option C (a forms list **and** presets that switch to a form) and "players see it too". Cross-cutting part: [ADR-0081](../architecture/adr/0081-token-forms.md). Open questions decided 2026-11-13 (#465). Amends [scenes-map](scenes-map.md), [token-mirrors](token-mirrors.md), [animated-tokens](animated-tokens.md), [effect-modifiers](effect-modifiers.md), [character-sheet-full](character-sheet-full.md), [combat-tracker](combat-tracker.md), [assets-pipeline](assets-pipeline.md).
 
 ## 1. Summary
 
@@ -55,7 +55,7 @@ phase: post-mvp
 | FR-FORM-03 | **`forms.choose {characterId, formId \| null}`** (DM; owner, also while the sheet is locked, like `mod.toggle`). `formId` must name one of the character's forms. null = **Base** (the token's own art). Same value → success, no event. `TokenFormChosen`. | |
 | FR-FORM-04 | **Preset link.** A **character** preset gains optional `formId` (one of its character's forms, else `invalid`), set through `mod.putPreset` by whoever may edit the preset ([FR-MOD-07](effect-modifiers.md#6-functional-requirements)). On a campaign preset → `invalid`. Absent on a replace = kept. | Amends FR-MOD-06/07 |
 | FR-FORM-05 | **Shown form** (derived, server, `shownFormOf(tx, characterId)`): among the character's **active effects** whose `presetKey` is the id of one of its presets with a `formId` naming an existing form, the one started last (`createdAt`, then `seq`) gives the form; else the chosen `formId`; else none (Base). Read from effects, like a trigger's `requires.preset` (FR-MOD-54), not from `activeEffectId`, so write order inside a command doesn't matter. A preset form beats the manual choice only while it's on; the manual choice is kept underneath. | OQ-FORM-01, -06 |
-| FR-FORM-06 | **Token copy.** Each token with `characterId` = the character (every scene) holds `formImageAssetId` = the shown form's image, or null. A **display copy**: never in an intent. Re-derived in the same transaction by `forms.put`, `forms.choose`, `mod.putPreset` (a `formId` change), `mod.deletePreset` (it doesn't end the effect, so the form must drop here), and by token-forms' **effect hook line** ([`effectHooks`](../architecture/adr/0049-trigger-state.md), runs for every effect insert, end, update and restore, in and out of combat, so expiry, Down, encounter end and undo / Prev need no case of their own). Rows written only where the copy changes. Each changed token then runs scenes-map's **token-changed hooks** ([ADR-0028](../architecture/adr/0028-token-changed-hooks.md)) as an image change, so the mirrors' and combatants' copies follow (FR-FORM-08, -09). | Proposed ADR |
+| FR-FORM-06 | **Token copy.** Each token with `characterId` = the character (every scene) holds `formImageAssetId` = the shown form's image, or null. A **display copy**: never in an intent. Re-derived in the same transaction by `forms.put`, `forms.choose`, `mod.putPreset` (a `formId` change), `mod.deletePreset` (it doesn't end the effect, so the form must drop here), and by token-forms' **effect hook line** ([`effectHooks`](../architecture/adr/0049-trigger-state.md), runs for every effect insert, end, update and restore, in and out of combat, so expiry, Down, encounter end and undo / Prev need no case of their own). Rows written only where the copy changes. Each changed token then runs scenes-map's **token-changed hooks** ([ADR-0028](../architecture/adr/0028-token-changed-hooks.md)) as an image change, so the mirrors' and combatants' copies follow (FR-FORM-08, -09). | ADR-0081 |
 | FR-FORM-07 | **New tokens.** `map.placeToken`, `placeTokenIn`, `map.duplicateToken` and scene duplicate write `formImageAssetId` from `shownFormOf` for a character token. | Amends FR-MAP-13, -18 |
 | FR-FORM-08 | **Drawn art** = `formImageAssetId ?? imageAssetId` (`tokenImageOf`, `@shared/scenes-map`). Used by the canvas, `tokenArtOf` ([§64](../data-model/README.md#64-sprint-4-token-art-c-art)), `imageAnimated` (now from the drawn art: amends [FR-ANIM-06/07](animated-tokens.md#6-functional-requirements)) and mirrors (the stored art copy, FR-MIR-08's `sourceCopies`, takes the drawn art; [FR-MIR-07](token-mirrors.md#6-functional-requirements): a Shadow still carries no art). The token's own `imageAssetId` and its portrait-refresh rule ([FR-MAP-20](scenes-map.md#6-functional-requirements)) are untouched; the DM's token menu **Image** still edits the own art. | Amends FR-MAP-18, -20 |
 | FR-FORM-09 | **Initiative row.** A bound combatant's `imageAssetId` copy ([FR-CBT-08](combat-tracker.md#6-functional-requirements), refreshed by combat's token-changed hook line) takes the drawn art, and follows it when the form changes (FR-FORM-06's hook run, same transaction). Token-less combatants keep the portrait. | OQ-FORM-03 |
@@ -173,14 +173,14 @@ Columns only; no rename, no drop (`upgrade:check`).
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-FORM-01 | A manual form is on, then Rage starts and ends: where does the token go? | **A. Back to the manual form** (it's kept underneath) / B. Back to Base | yes (DM) | FR-FORM-05 |
-| OQ-FORM-02 | Does a form replace a token's DM custom art? | **A. Yes, every token of the character** / B. Custom-art tokens keep their art | yes (DM) | FR-FORM-10 |
-| OQ-FORM-03 | Does the Initiative row follow the form? | **A. Yes** / B. Always the token's own art | no | FR-FORM-09 |
-| OQ-FORM-04 | Should a form carry a size (Enlarge → Large) or more? | **A. Not now; image only** / B. Optional size per form | no | §4 |
-| OQ-FORM-05 | Forms on monsters and custom NPCs? | **A. Later** (per-definition vs per-token needs its own call) / B. Now, per definition | no | §4 |
-| OQ-FORM-06 | Two preset forms on at once: which shows? | **A. The one started last** / B. The preset listed first | no | FR-FORM-05 |
-| OQ-FORM-07 | Glossary: *token form* (a character's named alternate token image), *shown form* (FR-FORM-05), *Base* (no form: the token's own art), *drawn art* (form image, else the token's own; sits next to the existing *Token art*, the glyph fallback when a token has no image) | **A. Add all four** | no | glossary |
-| OQ-FORM-08 | Agent API: set forms and links from the MCP tools? | **A. Later**, follow-up to [agent-api](agent-api.md) / B. In this build | no | agent-api |
+| OQ-FORM-01 | A manual form is on, then Rage starts and ends: where does the token go? | **Decided (DM 2026-11-13): A. Back to the manual form** (it's kept underneath). Options were: A / B. Back to Base | no (decided) | FR-FORM-05 |
+| OQ-FORM-02 | Does a form replace a token's DM custom art? | **Decided (DM 2026-11-13): A. Yes, every token of the character.** Options were: A / B. Custom-art tokens keep their art | no (decided) | FR-FORM-10 |
+| OQ-FORM-03 | Does the Initiative row follow the form? | **Decided (with the spec, DM 2026-11-13): A. Yes.** Options were: A / B. Always the token's own art | no (decided) | FR-FORM-09 |
+| OQ-FORM-04 | Should a form carry a size (Enlarge → Large) or more? | **Decided: A. Not now; image only.** Options were: A / B. Optional size per form | no (decided) | §4 |
+| OQ-FORM-05 | Forms on monsters and custom NPCs? | **Decided: A. Later** (per-definition vs per-token needs its own call). Options were: A / B. Now, per definition | no (decided) | §4 |
+| OQ-FORM-06 | Two preset forms on at once: which shows? | **Decided: A. The one started last.** Options were: A / B. The preset listed first | no (decided) | FR-FORM-05 |
+| OQ-FORM-07 | Glossary: *token form* (a character's named alternate token image), *shown form* (FR-FORM-05), *Base* (no form: the token's own art), *drawn art* (form image, else the token's own; sits next to the existing *Token art*, the glyph fallback when a token has no image) | **Decided: A, added** | no (decided) | glossary |
+| OQ-FORM-08 | Agent API: set forms and links from the MCP tools? | **Decided: A. Later**, follow-up to [agent-api](agent-api.md). Options were: A / B. In this build | no (decided) | agent-api |
 
 ## 16. Out of scope
 

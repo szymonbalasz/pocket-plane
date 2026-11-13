@@ -85,6 +85,10 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Hidden token** | Token visible only to the DM (shown translucent to DM) until revealed with the hide/reveal button. MVP. | — |
 | **Token shape** | How a token is drawn: round (circular crop), square, or none (image as is). Owned by the token; new tokens take the definition's default (decisions #148). | — |
 | **Token art** | The glyph on its creature type's colour, drawn for a token without an image; the DM can switch a token to initials ([entities](specs/entities.md), [ADR-0050](architecture/adr/0050-token-creature-type.md)). | Token shape |
+| **Token form** | A character's named alternate token image (≤ 6), chosen by the DM or owner or switched on by a character preset such as Rage ([token-forms](specs/token-forms.md), ADR-0081). | Token art |
+| **Shown form** | The form a character's tokens show: the last-started active preset effect's form, else the chosen form, else Base. | Token form |
+| **Base** | No form: each token shows its own art. | Token form |
+| **Drawn art** | What a token shows: its form copy, else its own image (`tokenImageOf`); without either, token art. | Token art |
 | **Token label** | A token's name drawn on the grid line below it, on a layer above every token; overlay badges (e.g. Out) sit in the same row (decisions #172). | Movement indicator |
 | **Selection** | The DM's client-only set of selected tokens on the viewed scene (click, Ctrl/Shift-click, box select); never sent. Features read it, e.g. to preselect attack targets (#148). | Target |
 | **Box select** | DM Ctrl/Shift + drag on empty canvas: tokens whose footprint centre lies inside the box join the selection. | — |
