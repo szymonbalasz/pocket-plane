@@ -36,6 +36,7 @@ import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
 import { colorHex, colorKeyOf } from "../campaign-management/colors";
 import { useOpenWindow } from "../play-shell/ShellContext";
+import { FormHeaderSelect } from "../token-forms/forms";
 import { ActionsTab } from "./ActionsTab";
 import { SheetLinks } from "./compendium-links";
 import { useBusy } from "./fields";
@@ -430,6 +431,7 @@ function NameRow({
             )}
           </span>
         </span>
+        {c.kind === "character" && <FormHeaderSelect characterId={c.id} />}
       </div>
       {full && (
         <ChipsSlot

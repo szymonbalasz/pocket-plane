@@ -26,6 +26,7 @@ import {
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
 import { useSync } from "../../sync/store";
+import { PresetFormSelect } from "../token-forms/forms";
 import { ModifierEditor } from "./editor";
 import { draftOf, type ModDraft, modifiersOf } from "./editor-model";
 import { sheetIn, useModIntent } from "./store";
@@ -39,6 +40,8 @@ export interface PresetDraft {
   originKey?: BuiltinPresetKey | null;
   /** FR-MOD-12: the linked feature row (character presets). */
   usesFeatureId?: string | null;
+  /** FR-FORM-04: the linked token form (character presets). */
+  formId?: string | null;
   name: string;
   modifiers: Modifier[];
   durationRounds: number | null;
@@ -131,6 +134,7 @@ function PresetForm({ start, onDone }: { start: PresetDraft; onDone(): void }) {
   const [conc, setConc] = useState(start.concentration);
   const [note, setNote] = useState(start.note);
   const [uses, setUses] = useState(start.usesFeatureId ?? null);
+  const [formId, setFormId] = useState(start.formId ?? null);
   const mods = modifiersOf(drafts, 1);
   const rounds = parseRounds(duration);
   const valid =
@@ -147,7 +151,7 @@ function PresetForm({ start, onDone }: { start: PresetDraft; onDone(): void }) {
         characterId: start.characterId,
         ...(start.key ? { key: start.key } : {}),
         ...(!start.id && start.originKey ? { originKey: start.originKey } : {}),
-        ...(start.characterId ? { usesFeatureId: uses } : {}),
+        ...(start.characterId ? { usesFeatureId: uses, formId } : {}),
         name: name.trim(),
         modifiers: mods,
         durationRounds: rounds,
@@ -207,6 +211,14 @@ function PresetForm({ start, onDone }: { start: PresetDraft; onDone(): void }) {
             characterId={start.characterId}
             value={uses}
             onChange={setUses}
+            disabled={disabled}
+          />
+        )}
+        {start.characterId && (
+          <PresetFormSelect
+            characterId={start.characterId}
+            value={formId}
+            onChange={setFormId}
             disabled={disabled}
           />
         )}

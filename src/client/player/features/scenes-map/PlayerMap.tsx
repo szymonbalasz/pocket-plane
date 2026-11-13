@@ -47,11 +47,12 @@ function PlayerTokenMenu({
   const live = useLive();
   const [dialog, setDialog] = useState<{ entryId: string; tokenId: string } | null>(null);
   const menuToken = tokens.find((t) => t.id === menu?.tokenId) ?? null;
-  const entries = menuToken ? playerMenuFor(menuToken) : [];
+  const store = useSync((s) => s.store);
+  const entries = menuToken ? playerMenuFor(menuToken, undefined, store) : [];
   const dialogToken = tokens.find((t) => t.id === dialog?.tokenId) ?? null;
   const DialogC =
     dialog && dialogToken
-      ? playerMenuFor(dialogToken).find((e) => e.id === dialog.entryId)?.Dialog
+      ? playerMenuFor(dialogToken, undefined, store).find((e) => e.id === dialog.entryId)?.Dialog
       : undefined;
   return (
     <>

@@ -12,7 +12,7 @@
 // paths and combat trails (FR-MAP-52–55) are drawn first, below every token (`DragPaths`).
 import type { CreatureType } from "@shared/entities/schemas";
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
-import type { TokenView } from "@shared/scenes-map/schemas";
+import { type TokenView, tokenImageOf } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { memo, useEffect, useMemo, useRef } from "react";
 import { Circle, Group, Image, Line, Path, Rect, Shape, Text } from "react-konva";
@@ -522,11 +522,14 @@ function TokenCueMark({ t, side, cue }: { t: TokenView; side: number; cue: Token
 export function TokenNode({ t }: { t: TokenView }) {
   const c = useCanvas();
   const { grid, colors, cam } = c;
-  const img = useAssetImage(t.imageAssetId, "thumb");
+  // FR-FORM-08: the drawn art (the shown form's image, else the token's own).
+  const image = tokenImageOf(t);
+  const img = useAssetImage(image, "thumb");
   // FR-ANIM-12: an animated token plays its video once it can; the still until then.
-  const video = useTokenVideo(t.imageAssetId, t.imageAnimated);
+  const video = useTokenVideo(image, t.imageAnimated);
   useEffect(() => {
-    if (t.imageAssetId) retryAssetImage(t.imageAssetId, "thumb");
+    const drawn = tokenImageOf(t);
+    if (drawn) retryAssetImage(drawn, "thumb");
   }, [t]);
   // FR-MAP-40: another client's drag of T draws it at the previewed spot (only this group re-renders).
   const preview = useStore(c.previews, (s) => s.previews[t.id]);

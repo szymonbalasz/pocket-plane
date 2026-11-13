@@ -2,15 +2,18 @@
 // DOM-free so it runs under `bun test`.
 import type { CreatureType, TokenCreatureType } from "@shared/entities/schemas";
 import { CREATURE_TYPES } from "@shared/entities/schemas";
+import { tokenImageOf } from "@shared/scenes-map/schemas";
 
 /** The token node's `art` attr: image > creature-type art > initials (`"initials"` and null). */
 export type TokenArt = "image" | CreatureType | "initials";
 
 export function tokenArtOf(t: {
   imageAssetId: string | null;
+  /** FR-FORM-08: the drawn art is the form copy, else the token's own image. */
+  formImageAssetId?: string | null | undefined;
   creatureType: TokenCreatureType | null;
 }): TokenArt {
-  if (t.imageAssetId) return "image";
+  if (tokenImageOf(t)) return "image";
   return t.creatureType === null || t.creatureType === "initials" ? "initials" : t.creatureType;
 }
 

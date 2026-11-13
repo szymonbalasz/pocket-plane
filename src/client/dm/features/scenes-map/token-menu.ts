@@ -12,6 +12,7 @@ import { entTokenMenu } from "../entities/token-menu-entries";
 import { fogTokenMenu } from "../fog-of-war/token-menu-entries";
 import { notesTokenMenu } from "../linked-notes/token-menu-entries";
 import { vfxTokenMenu } from "../spell-fx/token-menu-entries";
+import { formsTokenMenu } from "../token-forms/token-menu-entries";
 import { scenesMapTokenMenu } from "./token-menu-entries";
 
 export interface TokenMenuItemProps {
@@ -56,6 +57,7 @@ export const tokenMenuEntries: readonly TokenMenuEntry[] = [
   ...entTokenMenu, // entities: Art ▸ Creature type / Initials (FR-ENT-28)
   ...vfxTokenMenu, // spell-fx: Show / Hide affected cells (FR-VFX-23)
   ...notesTokenMenu, // linked-notes: Open note / Create note (FR-NOTES-29)
+  ...formsTokenMenu, // token-forms: Form ▸ Base / each form (FR-FORM-15)
 ];
 
 /** Token double-click: the first available entry by order runs. Append your feature's line. */

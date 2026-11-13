@@ -61,6 +61,7 @@ import {
   roundsLeftText,
 } from "../combat-extras/logic";
 import { useStartedEncounter } from "../combat-tracker/store";
+import { FormIcon, presetFormName } from "../token-forms/forms";
 import { modifiersText } from "./describe";
 import { blankPreset, EffectModifiersDialog, PresetDialog, type PresetDraft } from "./dialogs";
 import { presetsIn, sheetIn, useModIntent } from "./store";
@@ -96,6 +97,7 @@ const draftFromRow = (p: EffectPresetRecord): PresetDraft => ({
   concentration: p.concentration,
   note: p.note,
   usesFeatureId: p.usesFeatureId,
+  formId: p.formId ?? null,
 });
 
 /** FR-MOD-36: the built-in a "Start from" entry stands for (a campaign preset: its own origin). */
@@ -192,6 +194,7 @@ function ToggleRow({
   const { send, disabled } = useModIntent();
   const [ask, setAsk] = useState(false);
   const uses = presetUses(p, features);
+  const formName = useSync((s) => presetFormName(s.store, p));
   const toggle = (v: boolean, o: { force?: true; overspend?: true } = {}) =>
     void send(MOD_INTENTS.toggle, {
       characterId: p.characterId,
@@ -268,6 +271,15 @@ function ToggleRow({
           </div>
         )}
         <div className="text-xs text-muted-foreground">{modifiersText(p.modifiers)}</div>
+        {formName && (
+          <div
+            data-testid="form-preset-mark"
+            data-record-id={p.id}
+            className="flex items-center gap-1 text-xs text-muted-foreground"
+          >
+            <FormIcon className="size-3" aria-hidden /> Token form: {formName}
+          </div>
+        )}
       </div>
       {isDm && !on && noneLeft && (
         <Button

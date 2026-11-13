@@ -38,6 +38,7 @@ import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
 import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
+import { FormsEditor } from "../token-forms/forms";
 import { WideActionBoxes } from "./ActionsTab";
 import { BOX_LABEL, BOX_UNIT, BOX_VALUE, Box, D20Glyph, ShieldOutline, WideLabel } from "./boxes";
 import { BreakdownTip } from "./breakdown";
@@ -628,6 +629,7 @@ function IdentityEditor() {
         )}
       </div>
       {isDm && <PortraitEditor />}
+      {isDm && c.kind === "character" && <FormsEditor characterId={c.id} />}
       {"level" in s && <ClassesEditor />}
     </div>
   );
