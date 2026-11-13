@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
 import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
@@ -255,18 +256,26 @@ export function FormsEditor({ characterId }: { characterId: string }) {
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
           Token forms
         </span>
-        <Button
-          data-testid="form-row-add"
-          type="button"
-          variant="outline"
-          size="sm"
-          className="ml-auto"
-          disabled={!live || full}
-          title={full ? `Up to ${FORMS_MAX} forms` : undefined}
-          onClick={() => setPicking({ index: null })}
-        >
-          Add form
-        </Button>
+        <span className="ml-auto">
+          {full ? (
+            <Tip content={`Up to ${FORMS_MAX} forms`} off>
+              <Button data-testid="form-row-add" type="button" variant="outline" size="sm" disabled>
+                Add form
+              </Button>
+            </Tip>
+          ) : (
+            <Button
+              data-testid="form-row-add"
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!live}
+              onClick={() => setPicking({ index: null })}
+            >
+              Add form
+            </Button>
+          )}
+        </span>
       </div>
       {forms.length === 0 ? (
         <p className="text-xs text-muted-foreground">
@@ -306,18 +315,20 @@ export function FormsEditor({ characterId }: { characterId: string }) {
             >
               Change…
             </Button>
-            <Button
-              data-testid="form-row-remove"
-              data-record-id={f.id}
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`Remove ${f.name}`}
-              disabled={!live}
-              onClick={() => put(current.filter((_, j) => j !== i))}
-            >
-              <XIcon />
-            </Button>
+            <Tip content={`Remove ${f.name}`} off={!live}>
+              <Button
+                data-testid="form-row-remove"
+                data-record-id={f.id}
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Remove ${f.name}`}
+                disabled={!live}
+                onClick={() => put(current.filter((_, j) => j !== i))}
+              >
+                <XIcon />
+              </Button>
+            </Tip>
           </div>
         ))
       )}

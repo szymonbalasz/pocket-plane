@@ -9,8 +9,11 @@ import { MIR_INTENTS } from "@shared/token-mirrors/schemas";
 import { asc, eq } from "drizzle-orm";
 import { combatant, token, tokenMirror } from "../../db/schema";
 import type { Actor } from "../../events/types";
+import type { Viewer } from "../../ws/records";
 import { assetUses } from "../assets-pipeline/manage";
+import { startCommand } from "../combat-tracker/lifecycle";
 import { modSetup } from "../effect-modifiers/testing";
+import { readToken } from "../scenes-map/rows";
 import { addAsset } from "../scenes-map/testing";
 import { shownFormOf } from "./derive";
 
@@ -243,5 +246,54 @@ describe("FR-FORM token forms", () => {
     const tok = ev?.event.changes.find((c) => c.type === "token" && c.id === t.tokens.mira);
     expect(tok?.after).toMatchObject({ formImageAssetId: "art-raging" });
     expect(tok?.before).not.toHaveProperty("formImageAssetId");
+  });
+
+  test("FR-FORM-06 Prev restores an expired Rage, and its form with it", () => {
+    const t = setup();
+    const rage = t.makePreset("Short rage", t.formId("Raging"), 1);
+    t.toggle(t.mira, rage, true);
+    t.nextTo("Mira", 2);
+    expect(t.shown()).toEqual([null]);
+    t.step("prev");
+    expect(t.active().some((e) => e.presetKey === rage)).toBe(true);
+    expect(t.shown()).toEqual(["art-raging"]);
+    expect(t.initiativeArt()).toBe("art-raging");
+  });
+
+  test("FR-FORM-06 FR-FORM-09 encounter End keeps tokens in step with Rage; a new fight binds the form art", () => {
+    const t = setup();
+    const rage = t.makePreset("Rage", t.formId("Raging"));
+    t.toggle(t.mira, rage, true);
+    t.endEncounter();
+    const on = t.active().some((e) => e.presetKey === rage);
+    expect(t.shown()).toEqual([on ? "art-raging" : null]);
+    t.choose(t.formId("Enlarged"));
+    if (on) t.toggle(t.mira, rage, false);
+    expect(t.shown()).toEqual(["art-enlarged"]);
+    const enc = t.createAmbush();
+    t.run(startCommand.name, { encounterId: enc.id, sceneId: t.sceneId });
+    const bound = t.combatants(enc.id).find((c) => c.tokenId === t.tokens.mira);
+    expect(bound?.imageAssetId).toBe("art-enlarged");
+  });
+
+  test("FR-FORM-12 players receive the token's form copy (not on Base)", () => {
+    const t = setup();
+    const viewer = (playerId: string): Viewer => ({
+      connId: "c",
+      campaignId: t.h.campaignId,
+      role: "player",
+      playerId,
+    });
+    t.run(MAP_INTENTS.activateScene, { sceneId: t.sceneId });
+    const row = () => readToken(t.s.db, t.tokens.mira);
+    expect(t.s.records.view("token", row(), viewer(t.h.p2.id)).data).not.toHaveProperty(
+      "formImageAssetId",
+    );
+    t.choose(t.formId("Raging"));
+    for (const p of [t.h.p1.id, t.h.p2.id]) {
+      const view = t.s.records.view("token", row(), viewer(p));
+      expect(view.vis).toBe("redacted");
+      expect(view.data).toMatchObject({ formImageAssetId: "art-raging" });
+    }
   });
 });
