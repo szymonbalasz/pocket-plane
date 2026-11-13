@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>mira-enlarged</title>
+  <!-- Fixture "mira-forms" (token-forms §13): Mira's "Enlarged" form, CC0, made in-repo.
+       Green ring, a large silhouette filling the token. -->
+  <circle cx="128" cy="128" r="120" fill="#2f8f4e" stroke="#14492a" stroke-width="12"/>
+  <circle cx="128" cy="78" r="38" fill="#14492a"/>
+  <path d="M52 236 L70 132 C90 112 166 112 186 132 L204 236 Z" fill="#14492a"/>
+  <path d="M186 140 L220 30 L232 28 L228 42 L198 146 Z" fill="#e8f5ec"/>
+</svg>

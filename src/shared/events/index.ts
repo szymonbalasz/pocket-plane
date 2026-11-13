@@ -21,6 +21,7 @@ import * as sceneTools from "./scene-tools";
 import * as scenesMap from "./scenes-map";
 import * as spellFx from "./spell-fx";
 import * as strongholds from "./strongholds";
+import * as tokenForms from "./token-forms";
 import * as tokenMirrors from "./token-mirrors";
 import { type DomainEventDef, isDomainEventDef } from "./types";
 
@@ -64,6 +65,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...Object.values<unknown>(spellFx).filter(isDomainEventDef),
   // overview scenes (fix/ovw-core).
   ...Object.values<unknown>(overviewScenes).filter(isDomainEventDef),
+  // token forms (build/token-forms, ADR-0081).
+  ...Object.values<unknown>(tokenForms).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */

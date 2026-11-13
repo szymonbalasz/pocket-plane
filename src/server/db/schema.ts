@@ -54,6 +54,7 @@ import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/s
 import type { TokenTrail } from "@shared/scenes-map/schemas";
 import type { FxRecord } from "@shared/spell-fx/fx";
 import type { Facility, Staff } from "@shared/strongholds/schemas";
+import type { TokenForm } from "@shared/token-forms/schemas";
 import { MIRROR_MODES } from "@shared/token-mirrors/schemas";
 import { sql } from "drizzle-orm";
 import {
@@ -256,6 +257,13 @@ export const entity = sqliteTable(
      * an unhidden token on the active scene; other players receive the pet only while true.
      */
     petPresent: integer("pet_present", { mode: "boolean" }).notNull().default(false),
+    /**
+     * FR-FORM-01 (ADR-0081): JSON leaf `{id, name, imageAssetId}[]` 0–6, characters only (other
+     * kinds `[]`). Each image an asset reference (`assets.require`, no FK).
+     */
+    tokenForms: text("token_forms", { mode: "json" }).$type<TokenForm[]>().notNull().default([]),
+    /** FR-FORM-03: the hand-picked form (soft id into `tokenForms`); null = Base. No FK. */
+    formId: text("form_id"),
     source: text("source"),
     sourceKey: text("source_key"),
     licence: text("licence"),
@@ -508,6 +516,12 @@ export const token = sqliteTable(
      * tokens only (FR-MAP-66).
      */
     trail: text("trail", { mode: "json" }).$type<TokenTrail | null>(),
+    /**
+     * FR-FORM-06 (ADR-0081): display copy of the character's shown form image; null = Base.
+     * Written only by token-forms' writer and placement; drawn art = this ?? `imageAssetId`.
+     * Asset reference, no FK (an added column can't carry one under push).
+     */
+    formImageAssetId: text("form_image_asset_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -1170,6 +1184,8 @@ export const effectPreset = sqliteTable(
     usesFeatureId: text("uses_feature_id"),
     /** FR-MOD-36 (R5): the built-in key "Start from" copied (soft), else null. */
     originKey: text("origin_key"),
+    /** FR-FORM-04: character presets only, a soft id into the character's `tokenForms`. */
+    formId: text("form_id"),
     note: text("note").notNull().default(""),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),

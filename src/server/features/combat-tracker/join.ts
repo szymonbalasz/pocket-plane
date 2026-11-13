@@ -13,7 +13,7 @@ import {
   type StatBlock,
 } from "@shared/entities/schemas";
 import { cellToPx, freeCellsNear, pxToCell } from "@shared/scenes-map/geometry";
-import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
+import { type SceneRecord, type TokenRecord, tokenImageOf } from "@shared/scenes-map/schemas";
 import { and, asc, eq } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
 import { CommandError, conflict } from "../../commands/errors";
@@ -92,8 +92,9 @@ export class TokenPlacer {
    */
   private imageOf(def: DefinitionRecord): { imageAssetId?: string } {
     if (def.portraitAssetId) return {};
-    const art = this.tokens.findLast((t) => t.definitionId === def.id && t.imageAssetId !== null);
-    return art?.imageAssetId ? { imageAssetId: art.imageAssetId } : {};
+    const art = this.tokens.findLast((t) => t.definitionId === def.id && tokenImageOf(t) !== null);
+    const image = art ? tokenImageOf(art) : null;
+    return image ? { imageAssetId: image } : {};
   }
 }
 

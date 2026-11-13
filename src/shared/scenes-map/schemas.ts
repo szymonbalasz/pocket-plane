@@ -210,6 +210,11 @@ const tokenFields = {
   imageAssetId: z.string().nullable(),
   /** FR-ANIM-06: derived, the image asset is a video (animated token); on the wire only when true. */
   imageAnimated: z.literal(true).optional(),
+  /**
+   * FR-FORM-06 (ADR-0081): display copy of the character's shown form image; on the wire only
+   * when set. Drawn art = `tokenImageOf` (this, else `imageAssetId`).
+   */
+  formImageAssetId: z.string().optional(),
   size: TokenSize,
   col: z.number().int(),
   row: z.number().int(),
@@ -268,6 +273,12 @@ export type TokenRecord = z.infer<typeof TokenRecord>;
  */
 export const PlayerTokenRecord = z.object({ ...tokenFields, speed: TokenSpeed.optional() });
 export type PlayerTokenRecord = z.infer<typeof PlayerTokenRecord>;
+
+/** FR-FORM-08: a token's drawn art: its form copy, else its own image. */
+export const tokenImageOf = (t: {
+  imageAssetId: string | null;
+  formImageAssetId?: string | null | undefined;
+}): string | null => t.formImageAssetId ?? t.imageAssetId;
 
 /** Fields both clients render a token from. */
 export type TokenView = PlayerTokenRecord & { definitionId?: string };

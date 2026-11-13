@@ -3,8 +3,10 @@
 // copies the token's name, image and `hidden` (FR-CBT-08 rule, OQ-CBTX-23); a `hidden` change
 // reranks and rewrites the player turn and the effects' hidden copies (FR-CBTX-13). Unlinking
 // keeps the copies; the token stays on the map. `movedFt` unchanged either way. DM only.
+
 import { BindTokenInput, CBTX_INTENTS } from "@shared/combat-extras/intents";
 import { CombatantBound } from "@shared/events/combat-extras";
+import { tokenImageOf } from "@shared/scenes-map/schemas";
 import { and, eq } from "drizzle-orm";
 import { defineCommand } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
@@ -49,7 +51,7 @@ export const bindToken = defineCommand({
       // FR-FOG-14: the hidden copy = the token's `hidden` or fog-hidden.
       const hidden = tokenHiddenForPlayers(t);
       tx.update(combatant)
-        .set({ tokenId: t.id, name: t.name, imageAssetId: t.imageAssetId, hidden })
+        .set({ tokenId: t.id, name: t.name, imageAssetId: tokenImageOf(t), hidden })
         .where(eq(combatant.id, c.id))
         .run();
       if (hidden !== c.hidden) rerank(tx, enc.id);

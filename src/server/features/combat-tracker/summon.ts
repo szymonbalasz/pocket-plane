@@ -4,6 +4,7 @@
 // owner's player), combatants with owner copies, mode, HP, `card`, side `ally`, the optional
 // concentration link, ranks, one `cbt.companion` line; `CompanionsSummoned`, then the `added`
 // rule hooks. Not undoable (Dismiss). Summons exist only in a started encounter (OQ-CBT-83c).
+
 import { COMBATANTS_MAX } from "@shared/combat-extras/intents";
 import { LOG_KIND_COMPANION } from "@shared/combat-tracker/companion-kind";
 import {
@@ -15,6 +16,7 @@ import {
 import { companionCard, effectiveStats, type StatBlock } from "@shared/entities/schemas";
 import { CompanionsSummoned } from "@shared/events/combat-tracker";
 import { numberedName } from "@shared/scenes-map/geometry";
+import { tokenImageOf } from "@shared/scenes-map/schemas";
 import { defineCommand } from "../../commands/commands";
 import { conflict, invalid } from "../../commands/errors";
 import { combatant, combatantSeqNext } from "../../db/schema";
@@ -103,7 +105,7 @@ export const summonCommandWith = (hooks: CombatRuleHooks) =>
             entityId: def.id,
             tokenId: tok?.id ?? null,
             name,
-            imageAssetId: tok ? tok.imageAssetId : def.portraitAssetId,
+            imageAssetId: tok ? tokenImageOf(tok) : def.portraitAssetId,
             // FR-FOG-14: a token's hidden copy is its `hidden` or fog-hidden.
             hidden: tok ? tokenHiddenForPlayers(tok) : hidden,
             active: true,

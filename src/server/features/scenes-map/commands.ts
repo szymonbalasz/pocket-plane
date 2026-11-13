@@ -74,6 +74,7 @@ import { requireAsset } from "../assets-pipeline/commands";
 import { importedArtOfDefinition } from "../compendium/imported-art-lookup";
 import { resolveDefinition } from "../entities/commands";
 import { getOverview } from "../overview-scenes/rows";
+import { formImageFor } from "../token-forms/derive";
 import { copyMirrors } from "../token-mirrors/copy";
 import { characterIdOf } from "./character-copy";
 import { entriesIn, nextPosition, placeEntries } from "./list-order";
@@ -648,6 +649,8 @@ export function placeTokenIn(
     ownerPlayerId,
     hidden: input.hidden ?? false,
     characterId: characterIdOf(def),
+    // FR-FORM-07: a character token placed while a form shows starts in it.
+    formImageAssetId: formImageFor(tx, characterIdOf(def)),
     ...tokenCopies(tx, { sceneId: s.id, col: input.col, row: input.row, size, ownerPlayerId }),
   });
   const dependants = rederiveDependants(env, tokenChange(null, after));
@@ -943,6 +946,8 @@ export const duplicateToken = defineCommand({
       ownerPlayerId: src.ownerPlayerId,
       hidden: src.hidden,
       characterId: src.characterId,
+      // FR-FORM-07: the character's shown form, as on placement.
+      formImageAssetId: formImageFor(tx, src.characterId),
       invisible: src.invisible === true,
       ...tokenCopies(tx, { ...src, sceneId: s.id, col: cell.col, row: cell.row }),
     });

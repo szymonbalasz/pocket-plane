@@ -48,11 +48,14 @@ export const toTokenRecord = ({
   seenBy,
   sizeOverridden,
   dead,
+  formImageAssetId,
   ...r
 }: TokenRow): TokenRecord => ({
   ...r,
-  // FR-ANIM-06: derived from the image asset; on the wire only when true.
-  ...(isAnimatedAsset(r.imageAssetId) ? { imageAnimated: true as const } : {}),
+  // FR-FORM-06: the form copy rides the wire only when set.
+  ...(formImageAssetId ? { formImageAssetId } : {}),
+  // FR-ANIM-06 (+ FR-FORM-08): derived from the drawn art; on the wire only when true.
+  ...(isAnimatedAsset(formImageAssetId ?? r.imageAssetId) ? { imageAnimated: true as const } : {}),
   ...(fogged ? { fogged: true as const } : {}),
   ...(dead ? { dead: true as const } : {}),
   ...(invisible ? { invisible: true as const } : {}),

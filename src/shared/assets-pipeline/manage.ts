@@ -31,6 +31,7 @@ export const ASSET_USE_KINDS = [
   "overview image", // FR-OVW-45: an overview item's `assetId`
   "token",
   "portrait",
+  "token form", // FR-FORM-11: a character's token form image
   "combatant",
   "handout",
   "compendium entry",

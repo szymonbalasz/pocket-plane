@@ -31,6 +31,9 @@ const base = (r: EntityRow) => ({
   tempHp: r.tempHp,
   deathSuccesses: r.deathSuccesses,
   deathFailures: r.deathFailures,
+  // Token forms (FR-FORM-01, -03); the monster / imported schemas strip them.
+  tokenForms: r.tokenForms,
+  formId: r.formId,
   derivedFromId: r.derivedFromId,
   // Pet fields (sprint 6, FR-ENT-31 / -37); the character / imported schemas strip them.
   companionOf: r.companionOf,

@@ -4,7 +4,7 @@
 // it sets the mode to Hidden and leaves the mirror for the DM to place (FR-MIR-10). Never rejects
 // a move (ADR-0031). Writes through `env.tx` only.
 import { footprint, type MapRect, overlapsMap } from "@shared/scenes-map/geometry";
-import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
+import { type SceneRecord, type TokenRecord, tokenImageOf } from "@shared/scenes-map/schemas";
 import { TOKEN_MIRROR_TYPE, type TokenMirrorRecord } from "@shared/token-mirrors/schemas";
 import { eq } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
@@ -20,7 +20,8 @@ type At = { col: number; row: number; size: TokenRecord["size"] };
 /** FR-MIR-08: what a mirror copies from its source. */
 export const sourceCopies = (t: TokenRecord) => ({
   name: t.name,
-  imageAssetId: t.imageAssetId ?? null,
+  // FR-FORM-08: the drawn art (the form copy, else the token's own image).
+  imageAssetId: tokenImageOf(t),
   creatureType: t.creatureType ?? null,
   size: t.size,
   shape: t.shape,

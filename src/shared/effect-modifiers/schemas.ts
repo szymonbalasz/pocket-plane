@@ -249,6 +249,8 @@ export const EffectPresetRecordShape = z.object({
    * customised built-in (its `key` already is it). Origin match for rule triggers' `requires`.
    */
   originKey: z.string().min(1).max(PRESET_KEY_MAX).nullable(),
+  /** FR-FORM-04 (ADR-0081): character presets: the token form shown while on (soft id); else null. */
+  formId: Id.nullable().optional(),
   note: z.string().max(PRESET_NOTE_MAX),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -260,6 +262,7 @@ export const EffectPresetRecord = EffectPresetRecordShape.superRefine((r, ctx) =
     if (r.ownerPlayerId !== null) issue("Owner on character presets only");
     if (r.activeEffectId !== null) issue("Toggle state on character presets only");
     if (r.usesFeatureId !== null) issue("Uses on character presets only");
+    if (r.formId) issue("Token forms on character presets only");
   } else if (r.key !== null) {
     issue("Key on campaign presets only");
   }

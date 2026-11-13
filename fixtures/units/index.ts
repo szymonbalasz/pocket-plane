@@ -166,6 +166,7 @@ import holdGreystoneStores from "./strongholds/hold-greystone-stores";
 import holdTowerMove from "./strongholds/hold-tower-move";
 import holdTowerSecret from "./strongholds/hold-tower-secret";
 import themeRound3 from "./theme-system/theme-round-3";
+import miraForms from "./token-forms/mira-forms";
 import mirGoblin from "./token-mirrors/mir-goblin";
 
 export const units: readonly Fixture[] = [
@@ -377,4 +378,6 @@ export const units: readonly Fixture[] = [
   // Animated tokens (build/animated-tokens)
   animatedToken,
   animatedTown,
+  // Token forms (build/token-forms)
+  miraForms,
 ];

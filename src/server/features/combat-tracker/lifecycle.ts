@@ -3,6 +3,7 @@
 // kept HP on rebind FR-CBT-141, every summon's token goes at End FR-CBT-145; a monster's token at
 // 0 HP stays marked dead, FR-MAP-151).
 // `started` / `ended` rule hooks run after the event (FR-CBTX-01, ADR-0035).
+
 import { type BindSlot, planBindings } from "@shared/combat-tracker/rules";
 import {
   CBT_INTENTS,
@@ -18,6 +19,7 @@ import {
   type MonsterRecord,
 } from "@shared/entities/schemas";
 import { EncounterEnded, EncounterStarted } from "@shared/events/combat-tracker";
+import { tokenImageOf } from "@shared/scenes-map/schemas";
 import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, invalid } from "../../commands/errors";
@@ -201,6 +203,8 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
         ...t,
         seq,
         hidden: tokenHiddenForPlayers(t),
+        // FR-FORM-09: a bound combatant copies the drawn art.
+        imageAssetId: tokenImageOf(t),
       }));
       const bindings = planBindings(slots, placed).map((b, i) => {
         const def = slots[i]?.def;
@@ -210,7 +214,7 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
           ...b,
           tokenId: t.id,
           name: t.name,
-          imageAssetId: t.imageAssetId,
+          imageAssetId: tokenImageOf(t),
           hidden: tokenHiddenForPlayers(t),
         };
       });

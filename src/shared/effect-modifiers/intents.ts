@@ -41,6 +41,8 @@ export const PresetInput = z
     key: BuiltinKey.nullable().default(null),
     originKey: BuiltinKey.nullable().optional(),
     usesFeatureId: Id.nullable().optional(),
+    /** FR-FORM-04: a form of the preset's character; character presets only; absent on a replace = kept. */
+    formId: Id.nullable().optional(),
     name: EffectLabel,
     modifiers: PresetModifiers,
     durationRounds: Duration.nullable(),
@@ -65,6 +67,13 @@ export const PresetInput = z
         code: "custom",
         path: ["usesFeatureId"],
         message: "Uses on character presets only",
+      });
+    }
+    if (v.characterId === null && v.formId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["formId"],
+        message: "Token forms on character presets only",
       });
     }
     if (v.key !== null && v.originKey) {

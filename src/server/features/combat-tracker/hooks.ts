@@ -10,7 +10,7 @@ import {
 } from "@shared/combat-tracker/schemas";
 import { companionCard, type EntityRecord } from "@shared/entities/schemas";
 import { distanceFt } from "@shared/scene-tools/geometry";
-import type { TokenRecord } from "@shared/scenes-map/schemas";
+import { type TokenRecord, tokenImageOf } from "@shared/scenes-map/schemas";
 import { and, eq } from "drizzle-orm";
 import { conflict } from "../../commands/errors";
 import { combatant } from "../../db/schema";
@@ -85,14 +85,14 @@ export function combatantTokenHook(
       const now = countMove(env, c, before, after, ft);
       if (now) out.push(combatantChange(c, now));
     }
-    if (c.name === after.name && c.imageAssetId === after.imageAssetId && c.hidden === hidden) {
+    if (c.name === after.name && c.imageAssetId === tokenImageOf(after) && c.hidden === hidden) {
       continue;
     }
     const rows = combatantsOf(env.tx, c.encounterId);
     const encBefore = readEncounter(env.tx, c.encounterId);
     env.tx
       .update(combatant)
-      .set({ name: after.name, imageAssetId: after.imageAssetId, hidden })
+      .set({ name: after.name, imageAssetId: tokenImageOf(after), hidden }) // FR-FORM-09: drawn art
       .where(eq(combatant.id, c.id))
       .run();
     if (c.hidden !== hidden) rerank(env.tx, c.encounterId);

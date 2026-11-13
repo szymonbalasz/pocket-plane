@@ -13,7 +13,7 @@ import {
   RenameAssetIntent,
 } from "@shared/assets-pipeline/manage";
 import { AssetDeleted, AssetRenamed } from "@shared/events/assets-pipeline";
-import { and, asc, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, ne, or, sql } from "drizzle-orm";
 import { defineCommand } from "../../commands/commands";
 import { conflict, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
@@ -85,13 +85,23 @@ export function assetUses(tx: Pick<Tx, "select">, assetId: string): AssetUse[] {
   const tokens = tx
     .select({ name: token.name })
     .from(token)
-    .where(eq(token.imageAssetId, assetId))
+    // FR-FORM-11: a token's form copy holds the image too.
+    .where(or(eq(token.imageAssetId, assetId), eq(token.formImageAssetId, assetId)))
     .orderBy(asc(token.name))
     .all();
   const portraits = tx
     .select({ name: entity.name })
     .from(entity)
     .where(eq(entity.portraitAssetId, assetId))
+    .orderBy(asc(entity.name))
+    .all();
+  // FR-FORM-11: a character's token forms (JSON leaf of objects).
+  const forms = tx
+    .select({ name: entity.name })
+    .from(entity)
+    .where(
+      sql`exists (select 1 from json_each(${entity.tokenForms}) where json_extract(value, '$.imageAssetId') = ${assetId})`,
+    )
     .orderBy(asc(entity.name))
     .all();
   const combatants = tx
@@ -140,6 +150,7 @@ export function assetUses(tx: Pick<Tx, "select">, assetId: string): AssetUse[] {
     ...of("overview image", [...new Set(names(overviewImages))]),
     ...of("token", names(tokens)),
     ...of("portrait", names(portraits)),
+    ...of("token form", names(forms)),
     ...of("combatant", names(combatants)),
     ...of("handout", names(handouts)),
     ...of("compendium entry", names(entries)),

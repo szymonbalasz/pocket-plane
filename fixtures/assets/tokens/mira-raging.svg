@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>mira-raging</title>
+  <!-- Fixture "mira-forms" (token-forms §13): Mira's "Raging" form, CC0, made in-repo.
+       Red ring with flame spikes, both arms raised. -->
+  <circle cx="128" cy="128" r="120" fill="#c8321e" stroke="#6e1408" stroke-width="12"/>
+  <path d="M40 92 L58 108 L52 70 L76 96 L80 54 L100 88 L128 40 L156 88 L176 54 L180 96 L204 70 L198 108 L216 92 L200 128 L56 128 Z" fill="#f2a51a"/>
+  <circle cx="128" cy="100" r="28" fill="#6e1408"/>
+  <path d="M84 214 L96 140 C108 128 148 128 160 140 L172 214 Z" fill="#6e1408"/>
+  <path d="M96 146 L60 92 L70 86 L106 138 Z" fill="#6e1408"/>
+  <path d="M160 146 L196 92 L186 86 L150 138 Z" fill="#6e1408"/>
+</svg>

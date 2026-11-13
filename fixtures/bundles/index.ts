@@ -160,6 +160,7 @@ import tableToolsPausedE2e from "./table-tools-paused-e2e";
 import themeGilt from "./theme-gilt";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
+import tokenForms from "./token-forms";
 import tokenMirrors from "./token-mirrors";
 import tplMenu from "./tpl-menu";
 import trayAttacks from "./tray-attacks";
@@ -434,4 +435,6 @@ export const bundles: readonly Bundle[] = [
   notesToken,
   // Animated tokens (build/animated-tokens)
   animatedTokens,
+  // Token forms (build/token-forms)
+  tokenForms,
 ];

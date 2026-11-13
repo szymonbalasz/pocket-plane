@@ -19,6 +19,7 @@ import { summonConcentrationEffectHook } from "../combat-tracker/concentration-c
 import { modTriggerStateEffectHook } from "../effect-modifiers/trigger-state-hooks";
 import { fogBlindedEffectHook } from "../fog-of-war/blinded";
 import { spellFxTemplateEffectHook } from "../spell-fx/template-hook";
+import { tokenFormsEffectHook } from "../token-forms/effect-hook";
 
 export type EffectHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
 
@@ -44,6 +45,7 @@ export const effectHooks: readonly EffectHook[] = [
   fogBlindedEffectHook, // fog-of-war: Blinded re-derives sight (FR-FOG-48)
   summonConcentrationEffectHook, // combat-tracker: a summon's concentration ends → DM card (FR-CBT-120)
   spellFxTemplateEffectHook, // spell-fx: a cast template ends with its effect (FR-VFX-40)
+  tokenFormsEffectHook, // token-forms: the shown form follows preset effects (FR-FORM-06)
 ];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */

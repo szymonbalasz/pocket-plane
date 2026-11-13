@@ -70,6 +70,7 @@ import {
 } from "../combat-extras/rows";
 import { activeCombatant } from "../combat-tracker/guards";
 import { startedEncounter } from "../combat-tracker/rows";
+import { rederiveForms } from "../token-forms/derive";
 import {
   campaignOf,
   customisedPreset,
@@ -116,6 +117,15 @@ export const putPreset = defineCommand({
         ]);
       }
     }
+    const formId = p.formId === undefined ? (before?.formId ?? null) : p.formId;
+    // FR-FORM-04: a new link must name one of the character's forms; a kept one stays.
+    if (owner && formId !== null && formId !== (before?.formId ?? null)) {
+      if (!owner.tokenForms.some((f) => f.id === formId)) {
+        throw invalid("Pick one of this character's token forms", [
+          { path: ["preset", "formId"], message: "Not a form of this character" },
+        ]);
+      }
+    }
     if (!before) {
       if (p.key !== null) {
         if (!builtinPreset(p.key)) throw invalid("This built-in preset is not available yet");
@@ -143,6 +153,7 @@ export const putPreset = defineCommand({
       // FR-MOD-36: kept on a replace that doesn't name it.
       originKey: p.originKey === undefined ? (before?.originKey ?? null) : p.originKey,
       usesFeatureId,
+      formId,
       updatedAt: now,
     };
     let id: string;
@@ -173,6 +184,8 @@ export const putPreset = defineCommand({
       changes: [
         presetChange(before, readPreset(env.tx, id)),
         ...triggerStates(env, startedEncounter(env.tx, cid)),
+        // FR-FORM-06: a changed form link may change what the character's tokens show.
+        ...(owner && formId !== (before?.formId ?? null) ? rederiveForms(env, [owner.id]) : []),
       ],
     });
     return { presetId: id };
@@ -219,6 +232,8 @@ export const deletePreset = defineCommand({
       changes: [
         presetChange(before, null),
         ...triggerStates(env, startedEncounter(env.tx, before.campaignId)),
+        // FR-FORM-06: deleting doesn't end the effect, so its form drops here.
+        ...(before.characterId && before.formId ? rederiveForms(env, [before.characterId]) : []),
       ],
     });
   },

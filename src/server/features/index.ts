@@ -28,6 +28,7 @@ import { sessionRecap } from "./session-recap";
 import { spellFx } from "./spell-fx";
 import { stats } from "./stats";
 import { strongholds } from "./strongholds";
+import { tokenForms } from "./token-forms";
 import { tokenMirrors } from "./token-mirrors";
 
 export const features: readonly Feature[] = [
@@ -68,4 +69,6 @@ export const features: readonly Feature[] = [
   logShare,
   // Linked notes records (build/notes-core)
   linkedNotes,
+  // Token forms (build/token-forms, ADR-0081)
+  tokenForms,
 ];

@@ -2,6 +2,7 @@
 // REST bodies, derived values. One schema for pipeline, commands, fixtures and clients.
 import { DeathSaveCount, TempHp } from "@shared/combat-extras/schemas";
 import { sourceRank } from "@shared/compendium/match";
+import { FORMS_MAX, TokenForm } from "@shared/token-forms/schemas";
 import { z } from "zod";
 import { HP_FORMULA_MESSAGE, normalizeHpFormula, parseHpFormula } from "./hp-formula";
 
@@ -603,6 +604,10 @@ export const EntityRecord = z.discriminatedUnion("kind", [
     tempHp: TempHp.default(0),
     deathSuccesses: DeathSaveCount.default(0),
     deathFailures: DeathSaveCount.default(0),
+    // token forms (FR-FORM-01, -03, ADR-0081): DM + owner only, never in `RedactedCharacter`.
+    // Defaults let records built before them parse.
+    tokenForms: z.array(TokenForm).max(FORMS_MAX).default([]),
+    formId: z.string().nullable().default(null),
   }),
 ]);
 export type EntityRecord = z.infer<typeof EntityRecord>;

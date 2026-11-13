@@ -20,7 +20,7 @@ import type { CombatantKind, HpMode } from "@shared/combat-tracker/schemas";
 import { companionCard, type DefinitionRecord, type MonsterRecord } from "@shared/entities/schemas";
 import { CombatantsAdded } from "@shared/events/combat-extras";
 import { numberedName } from "@shared/scenes-map/geometry";
-import { TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
+import { TOKEN_TYPE, type TokenRecord, tokenImageOf } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { defineCommand } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
@@ -144,7 +144,7 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
               hpMode,
               tokenId: tok.id,
               name: tok.name,
-              imageAssetId: tok.imageAssetId,
+              imageAssetId: tokenImageOf(tok),
               hidden: tokenHiddenForPlayers(tok),
             }
           : {

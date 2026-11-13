@@ -34,6 +34,8 @@ const mira: EntityRecord = {
   tempHp: 0,
   deathSuccesses: 0,
   deathFailures: 0,
+  tokenForms: [{ id: "form-1", name: "Raging", imageAssetId: "asset-raging" }],
+  formId: "form-1",
 };
 const elite: EntityRecord = {
   ...common,
@@ -166,6 +168,23 @@ describe("entities record types", () => {
         "ac",
       ].sort(),
     );
+  });
+
+  test("FR-FORM-12 token forms: DM and owner get them; other players never (not in the whitelist)", () => {
+    const s = entityServices();
+    const dm = s.records.view("entity", mira, v("dm", null));
+    const owner = s.records.view("entity", mira, v("player", "p1"));
+    const other = s.records.view("entity", mira, v("player", "p2"));
+    for (const view of [dm, owner]) {
+      expect(view.vis).toBe("full");
+      expect(view.data).toMatchObject({
+        tokenForms: mira.kind === "character" ? mira.tokenForms : [],
+        formId: "form-1",
+      });
+    }
+    expect(other.vis).toBe("redacted");
+    expect(other.data).not.toHaveProperty("tokenForms");
+    expect(other.data).not.toHaveProperty("formId");
   });
 
   test("FR-ENT-15 the registry gives the DM full, filters players (incl. other campaign)", () => {
