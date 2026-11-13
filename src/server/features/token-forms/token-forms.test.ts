@@ -285,7 +285,7 @@ describe("FR-FORM token forms", () => {
       playerId,
     });
     t.run(MAP_INTENTS.activateScene, { sceneId: t.sceneId });
-    const row = () => readToken(t.s.db, t.tokens.mira);
+    const row = () => t.s.db.transaction((tx) => readToken(tx, t.tokens.mira));
     expect(t.s.records.view("token", row(), viewer(t.h.p2.id)).data).not.toHaveProperty(
       "formImageAssetId",
     );
