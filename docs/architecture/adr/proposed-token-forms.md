@@ -26,7 +26,8 @@
 **C.**
 
 - **Shown form is derived, never toggled by hand into tokens**: `shownFormOf(character)` = the newest active preset effect whose preset names a form, else the manual choice, else none.
-- **One writer** re-derives the copies on the character's tokens and bound combatants: the form commands, `mod.putPreset`, placement / duplicate, and token-forms' line in `effectHooks`. That hook already runs for every effect insert, end and restore, so no end path needs its own case.
+- **One writer** re-derives the copy on the character's tokens: the form commands, `mod.putPreset` / `mod.deletePreset`, placement / duplicate, and token-forms' line in `effectHooks`. That hook already runs for every effect insert, end and restore, so no end path needs its own case. A changed token runs the token-changed hooks as an image change, so mirror and combatant copies follow through their existing lines.
+- **"On" is read from active effects (`presetKey`)**, like trigger `requires.preset`, not from `activeEffectId`: no dependence on write order inside a command.
 - **Drawn art = `formImageAssetId ?? imageAssetId`** everywhere a token's art is used: canvas, `tokenArtOf`, `imageAnimated`, mirrors, the combatant image copy. One shared helper (`tokenImageOf`).
 - **Players get the art, not the forms**: `formImageAssetId` rides the token row; forms stay on the full character (DM, owner).
 
