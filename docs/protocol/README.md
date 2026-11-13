@@ -4670,3 +4670,23 @@ From [animated-tokens](../specs/animated-tokens.md) FR-ANIM-01–16 ([ADR-0080](
 | MCP `asset_upload` | unchanged; a video gets the `422` above |
 | Fixtures | `ingestStep(file, {poster})` (FR-ANIM-16); unit `animated-token`, `animated-town`; bundle `animated-tokens` |
 | Test IDs | `anim-upload-webm-note`, `anim-upload-webm-note-dismiss`, `anim-picker-badge`, `anim-preview-video` |
+
+## 206. Token forms (build/token-forms)
+
+From [token-forms](../specs/token-forms.md) FR-FORM-01–16 ([ADR-0081](../architecture/adr/0081-token-forms.md)). Two intents, two events; no new route or record type. Data side: [data model §159](../data-model/README.md#159-token-forms-buildtoken-forms).
+
+| Surface | Change |
+|---|---|
+| `forms.put {characterId, forms: [{id?, name, imageAssetId}] 0–6}` | **DM.** Whole replace of a character's forms. Unknown `id` → `invalid`; no `id` → `ctx.ids`; names trimmed 1–24, unique (case-insensitive); each image `assets.require` (`not_found` for another campaign's); not a character of the campaign → `not_found`. Same list → ack, no event. Clears `formId` / preset `formId` naming a removed form. → `TokenFormsSaved {characterId}` |
+| `forms.choose {characterId, formId \| null}` | **DM; owner** (also while the sheet is locked); another player → `forbidden` "Not your character". `formId` not a form of the character → `invalid`. Same value → ack, no event. → `TokenFormChosen {characterId, formId}` |
+| `mod.putPreset` | `preset.formId?` (character presets only, else `invalid` "Token forms on character presets only"; must name one of the character's forms, else `invalid`; absent on a replace = kept). A changed link re-derives the tokens in `EffectPresetSaved` |
+| `mod.deletePreset` | a deleted preset's form drops in `EffectPresetDeleted` (deleting doesn't end the effect) |
+| Effect events (`EffectToggled`, `PresetApplied`, CBTX effect events, turn / undo events that end or restore effects) | + `token` rows (and their `token-mirror` / `combatant` rows from the token-changed hooks) from the `token-forms.shown-form` line in `effectHooks` |
+| `TokenFormsSaved`, `TokenFormChosen` | logged, not undoable; changes: `entity` (+ `effect-preset` on a removal) + `token` (+ `token-mirror`, `combatant`) rows, each by its record type's rule |
+| `entity` record (character) | + `tokenForms`, `formId` (DM, owner; never in the redacted whitelist) |
+| `effect-preset` record | + `formId?` |
+| `token` record | + `formImageAssetId?` (only when set; everyone who receives the token); `imageAnimated` from the drawn art |
+| Internal command | `forms.putPresetWithForm {preset, form}` (fixtures; not an intent): `mod.putPreset` with the form named `form` |
+| Fixtures | unit `mira-forms` (assets `tokens/mira-raging.svg`, `tokens/mira-enlarged.svg`); bundle `token-forms` |
+| Client registries | DM token menu `forms.form` (order 27); player token menu `forms.form` (order 20); the player registry's `available(t, store?)` gains the client's records (`playerMenuFor(t, entries, store)`) |
+| Test IDs | `form-row`, `form-row-add`, `form-row-item`, `form-row-name`, `form-row-change`, `form-row-remove`, `form-header-select`, `form-header-option`, `form-header-preset`, `form-menu`, `form-menu-item`, `form-preset-select`, `form-preset-option`, `form-preset-mark` |

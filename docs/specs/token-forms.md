@@ -62,10 +62,10 @@ phase: post-mvp
 | FR-FORM-10 | **Form overrides custom art.** The shown form applies to every token of the character, including one with DM custom art. Base shows each token's own art again. | OQ-FORM-02 |
 | FR-FORM-11 | **Asset in use.** `entity.token_forms` (each `imageAssetId`, `json_each`) and `token.form_image_asset_id` join the "in use" holders ([FR-ASSET-64](assets-pipeline.md#6-functional-requirements)): a form's image can't be deleted. | Amends assets-pipeline |
 | FR-FORM-12 | **Visibility.** `tokenForms` and `formId` ride the full character (DM, owner); **not** in the redacted-character whitelist ([FR-CHARX-35](character-sheet-full.md#6-functional-requirements)). Preset `formId`: the preset's rule ([FR-MOD-22](effect-modifiers.md#6-functional-requirements)). `formImageAssetId`: on the token row to everyone who receives the token, only when set. Other players learn the art, never the form's name. | |
-| FR-FORM-13 | **Sheet, DM edit mode.** A **Token forms** row under Portrait: per form a 40 px thumbnail, name Input, **Change…** (asset picker, `context="token"`), remove (×); **Add form** (picker first, name defaults to the image's name, cut to 24). Saves with the sheet's edit (one `forms.put`). Max 6 → Add disabled, Tooltip "Up to 6 forms". | §7 |
-| FR-FORM-14 | **Sheet header.** With ≥ 1 form, DM and owner see a **Form** Select: Base + the forms. While a preset form is shown, the Select shows it, with a muted line "From Rage"; picking another value sets the manual choice, which shows when Rage ends. | |
+| FR-FORM-13 | **Sheet, DM edit mode.** A **Token forms** row under Portrait: per form a 40 px thumbnail, name Input, **Change…** (asset picker, `context="token"`), remove (×); **Add form** (picker first, name defaults to the image's name, cut to 24, made unique: "Raging 2"; "Form" without one). *(Build, 2026-11-13: like the Portrait row, each change sends one `forms.put` at once; a name commits on blur / Enter.)* Max 6 → Add disabled, title "Up to 6 forms". | §7 |
+| FR-FORM-14 | **Sheet header.** With ≥ 1 form, DM and owner see a **Form** Select: Base + the forms. *(Build, 2026-11-13: the Select always shows the hand-picked form, so picking is never undone by Rage.)* While a preset form shows instead, a muted line says "Showing Raging while Rage is on"; the hand-picked form shows when Rage ends. Players get no effect start times, so with two preset forms on the line names the one a token shows. | |
 | FR-FORM-15 | **Token menus.** DM token menu ([FR-MAP-29](scenes-map.md#6-functional-requirements) registry) and the player token menu (owner's own character tokens only) gain **Form ▸** Base / each form, a check on the chosen one. Shown only for a character token with ≥ 1 form. | Append-only registry lines |
-| FR-FORM-16 | **Preset form field.** The preset form ([effect-modifiers §7](effect-modifiers.md#7-uiux-notes)) gains **Token form**: None + the character's forms. Hidden when the character has no forms. The preset row shows a small `Image` icon with the form's name in a Tooltip. | |
+| FR-FORM-16 | **Preset form field.** The preset form ([effect-modifiers §7](effect-modifiers.md#7-uiux-notes)) gains **Token form**: None + the character's forms. Hidden when the character has no forms. The preset row shows a small `Image` icon and "Token form: Raging". | |
 
 ## 7. UI/UX notes
 
@@ -77,7 +77,7 @@ Per [visual-direction](../design/visual-direction.md); shadcn parts only.
 - **Map:** a form change is a plain image swap (no animation); name, ring, turn ring, shape and size unchanged.
 - **States:** disconnected → the Select, menu items and Add disabled, as other intents. A form image that fails to load → the token art fallback, as any token image.
 - **DM view:** all of the above for any character. **Player view:** owner: header Select, token menu Form, the preset's Token form field (while unlocked); others: only the drawn art on the map and in Initiative.
-- Test IDs: `form-row`, `form-row-add`, `form-row-change` / `form-row-remove` (+ `data-record-id` = form id), `form-header-select`, `form-menu-item` (+ `data-record-id`, `base` for Base), `form-preset-select`.
+- Test IDs: `form-row`, `form-row-add`, `form-row-item` / `form-row-name` / `form-row-change` / `form-row-remove` (+ `data-record-id` = form id), `form-header-select`, `form-header-option` (+ `data-value`, `base` for Base), `form-header-preset`, `form-menu` (submenu), `form-menu-item` (+ `data-record-id`, `base` for Base), `form-preset-select`, `form-preset-option`, `form-preset-mark`.
 
 ## 8. Data model
 

@@ -2803,7 +2803,7 @@ From [assets-pipeline](../specs/assets-pipeline.md#65-rename-and-delete-an-image
 | `asset` row delete | `assets.delete`, only when no holder uses it (below); its files go at the next start's sweep (FR-ASSET-07) |
 | `combatant.image_asset_id` → null | `assets.delete`: combatants of **ended** encounters only (history, not synced), same transaction |
 
-- **Holders checked** (derived "in use", never stored): `scene.map_asset_id`, `prop.asset_id`, `token.image_asset_id`, `entity.portrait_asset_id`, `combatant.image_asset_id` (encounter not ended), `handout.image_asset_ids`, `compendium_entry.image_asset_ids` (JSON leaves, `json_each`), `campaign.pause.imageAssetId`. An asset ID belongs to one campaign, so holders are matched by the ID alone.
+- **Holders checked** (derived "in use", never stored): `scene.map_asset_id`, `prop.asset_id`, `token.image_asset_id`, `entity.portrait_asset_id`, `combatant.image_asset_id` (encounter not ended), `handout.image_asset_ids`, `compendium_entry.image_asset_ids` (JSON leaves, `json_each`), `campaign.pause.imageAssetId`; *(token forms, §159)* `token.form_image_asset_id`, `entity.token_forms` (kind `token form`). An asset ID belongs to one campaign, so holders are matched by the ID alone.
 
 ## 147. Tray attacks core (fix/tray-core)
 
@@ -3005,3 +3005,20 @@ From [animated-tokens](../specs/animated-tokens.md) (FR-ANIM-03, -04, -06; [ADR-
 | `token` wire row | + `imageAnimated?: true` (derived, not stored) | `imageAssetId` names an animated asset; absent otherwise; DM and players alike | FR-ANIM-06 |
 | `token-mirror` wire row | + `imageAnimated?: true` (derived) | from the copied `imageAssetId`; never on a player's Shadow | FR-ANIM-06 |
 | Animated-ID set (server memory) | asset IDs whose `mime` is a video | filled at ingest and at start (`assets-pipeline.animated` start hook); read by the token and mirror row builders | FR-ANIM-06 |
+
+## 159. Token forms (build/token-forms)
+
+From [token-forms](../specs/token-forms.md) (FR-FORM-01–12; [ADR-0081](../architecture/adr/0081-token-forms.md)). Added columns only (drizzle push, no FK, no index); `upgrade:check` has nothing to move. No new record type.
+
+| Table / field | Change | Rule | Visibility | Source |
+|---|---|---|---|---|
+| `entity.token_forms` | + **JSON leaf** `{id, name 1–24, imageAssetId}[]` 0–6, not null default `[]` | characters only (others `[]`); names unique per character (case-insensitive); each image an asset reference via `assets.require` (no FK); written only by `forms.put` | DM + owner (full character); **not** in `RedactedCharacter` | FR-FORM-01, -02, -12 |
+| `entity.form_id` | + text, nullable | soft id into `token_forms`: the hand-picked form; null = Base; cleared when its form is removed | DM + owner | FR-FORM-03 |
+| `effect_preset.form_id` | + text, nullable | character presets only (zod refine); soft id into the character's forms; absent on a replace = kept; cleared when its form is removed | the preset's rule (DM, owner) | FR-FORM-04 |
+| `token.form_image_asset_id` | + text, nullable | **display copy** of the character's shown form image (null = Base) on every token with that `character_id`; written by token-forms' writer (`rederiveForms`: form commands, `mod.putPreset` / `mod.deletePreset`, the `effectHooks` line) and at place / `placeTokenIn` / duplicate (scene duplicate copies it); never in an intent. Wire: `formImageAssetId`, only when set | everyone who receives the token | FR-FORM-06, -07 |
+| `token` / `token-mirror` wire rows | `imageAnimated` from the **drawn art** (`formImageAssetId ?? imageAssetId`); a mirror's stored `image_asset_id` copy = the drawn art (FR-MIR-08 `sourceCopies`) | | as the row | FR-FORM-08, FR-ANIM-06 |
+| `combatant.image_asset_id` | the bound token's drawn art (bind at Start, `cbtx.bindToken`, add, summon, join, the combat token-changed hook) | | as today | FR-FORM-09 |
+| Asset "in use" holders | + `token.form_image_asset_id`; + `entity.token_forms` (`json_each` … `json_extract(value, '$.imageAssetId')`), kind **`token form`** (holder name = the character) | | DM | FR-FORM-11 |
+
+- **Derived** (never stored): `shownFormOf(character)` = among the character's active effects whose `preset_key` is one of its presets with a `form_id` naming an existing form, the latest (`created_at`, then `seq`); else `form_id`; else none. `tokenImageOf(token)` (`@shared/scenes-map/schemas`) = `formImageAssetId ?? imageAssetId`.
+- **Snapshot size** (CON-44): 0 B in the heavy scenario (no forms); + ≤ 6 × ≈ 90 B per character with forms (DM, owner) and ≈ 55 B per token while a form shows.
