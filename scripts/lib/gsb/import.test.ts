@@ -57,7 +57,7 @@ async function run(
   ex.write(items);
   return runImport({
     caller,
-    dataset: await readDataset(ex.root),
+    dataset: await readDataset(ex.dataDir),
     target: "verify",
     ledgerDir: opts.dir ?? ledgerDir,
     filters: opts.filters ?? {},
@@ -127,7 +127,7 @@ afterAll(async () => {
   await caller?.close();
   await h?.stop();
   closeDb(db);
-  for (const d of [bundleDir, lockDir, cwd, ledgerDir, ex?.root]) {
+  for (const d of [bundleDir, lockDir, cwd, ledgerDir, ex?.dataDir]) {
     if (d) rmSync(d, { recursive: true, force: true });
   }
 });

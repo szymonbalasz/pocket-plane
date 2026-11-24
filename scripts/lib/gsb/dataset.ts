@@ -1,12 +1,15 @@
-// Griffon's Saddlebag dataset (`bun run gsb:import`): the exporter's `data/manifest.json` and
-// `data/items.json`, read-only. Only the fields the import uses are checked; the rest (and
-// `extra`, `data/raw/`) is ignored. Reference: `<exporter>/schema/item.schema.json`.
+// Griffon's Saddlebag dataset (`bun run gsb:import`): the exporter's data folder (its
+// `GSB_DATA_DIR`, kept outside the exporter repo): `manifest.json` and `items.json`, read-only.
+// Only the fields the import uses are checked; the rest (and `extra`, `raw/`) is ignored.
+// Reference: `<exporter>/schema/item.schema.json`.
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 
-export const EXPORTER_ENV = "GRIFFONS_SADDLEBAG_EXPORTER_PATH";
+export const DATA_ENV = "GRIFFONS_SADDLEBAG_DATA_PATH";
+/** The old variable: the exporter repo root, with the dataset in its `data/`. Now refused with a hint. */
+export const OLD_EXPORTER_ENV = "GRIFFONS_SADDLEBAG_EXPORTER_PATH";
 export const SCHEMA_VERSION = 1;
 
 /** A refusal the CLI prints as is (exit 1). */
@@ -65,23 +68,25 @@ export const Item = z.object({
 export type Item = z.infer<typeof Item>;
 
 export interface Dataset {
-  /** The exporter repo root (absolute). */
-  root: string;
-  /** `<root>/data`: image paths resolve from here. */
+  /** The data folder (absolute): `manifest.json`, `items.json`; image paths resolve from here. */
   dataDir: string;
   manifest: Manifest;
   items: Item[];
 }
 
 const quote = (p: string) => `"${p}"`;
+const envPath = (env: Record<string, string | undefined>, name: string) =>
+  env[name]?.trim().replace(/^"(.*)"$/, "$1");
 
-/** The exporter root from the env, or a refusal that names the variable and `.env`. */
-export function exporterRoot(env: Record<string, string | undefined>, cwd: string): string {
-  const raw = env[EXPORTER_ENV]?.trim().replace(/^"(.*)"$/, "$1");
+/** The data folder from the env, or a refusal that names the variable and `.env`. */
+export function dataRoot(env: Record<string, string | undefined>, cwd: string): string {
+  const raw = envPath(env, DATA_ENV);
   if (!raw) {
+    const old = envPath(env, OLD_EXPORTER_ENV);
     throw new GsbError(
-      `${EXPORTER_ENV} is not set. Put the absolute path of the Griffon's Saddlebag exporter ` +
-        `repo in .env (e.g. ${EXPORTER_ENV}=C:\\path\\to\\GriffonsSaddlebag).`,
+      `${DATA_ENV} is not set. Put the absolute path of the Griffon's Saddlebag data folder ` +
+        `(the one holding manifest.json) in .env (e.g. ${DATA_ENV}=C:\\path\\to\\griffons-saddlebag).` +
+        (old ? ` ${OLD_EXPORTER_ENV} is no longer read: replace it with ${DATA_ENV}.` : ""),
     );
   }
   return path.resolve(cwd, raw);
@@ -89,9 +94,7 @@ export function exporterRoot(env: Record<string, string | undefined>, cwd: strin
 
 async function readJson(file: string, what: string): Promise<unknown> {
   if (!existsSync(file)) {
-    throw new GsbError(
-      `No ${what} at ${quote(file)}. Run the exporter first, or fix ${EXPORTER_ENV}.`,
-    );
+    throw new GsbError(`No ${what} at ${quote(file)}. Run the exporter first, or fix ${DATA_ENV}.`);
   }
   try {
     return JSON.parse(await readFile(file, "utf8"));
@@ -107,8 +110,7 @@ const issueText = (e: z.ZodError, max = 5) =>
     .join("; ");
 
 /** Preflight + read (FR: brief §2): manifest, schema version, items. Writes nothing. */
-export async function readDataset(root: string): Promise<Dataset> {
-  const dataDir = path.join(root, "data");
+export async function readDataset(dataDir: string): Promise<Dataset> {
   const manifestPath = path.join(dataDir, "manifest.json");
   const m = Manifest.safeParse(await readJson(manifestPath, "manifest"));
   if (!m.success) throw new GsbError(`Bad manifest ${quote(manifestPath)}: ${issueText(m.error)}`);
@@ -137,7 +139,7 @@ export async function readDataset(root: string): Promise<Dataset> {
     if (seen.has(it.uid)) throw new GsbError(`Duplicate uid ${it.uid} in ${quote(itemsPath)}`);
     seen.add(it.uid);
   }
-  return { root, dataDir, manifest: m.data, items };
+  return { dataDir, manifest: m.data, items };
 }
 
 /** `<dataDir>/<rel>`, or null when `rel` escapes the data dir. */

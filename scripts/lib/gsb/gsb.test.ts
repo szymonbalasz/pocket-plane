@@ -6,7 +6,7 @@ import path from "node:path";
 import { PutEntryBody } from "@shared/compendium/homebrew";
 import { ENTRY_MAX_BYTES, HOMEBREW_TEXT_MAX } from "@shared/compendium/schemas";
 import { parseFlags } from "../../gsb-import";
-import { EXPORTER_ENV, exporterRoot, GsbError, Item, readDataset } from "./dataset";
+import { DATA_ENV, dataRoot, GsbError, Item, OLD_EXPORTER_ENV, readDataset } from "./dataset";
 import { diff } from "./diff";
 import { emptyLedger, ledgerPath, loadLedger, saveLedger } from "./ledger";
 import { canonicalJson, entryHash, mapItem, TRUNCATED, uniqueNames } from "./map";
@@ -20,46 +20,52 @@ afterAll(() => {
 });
 const exp = () => {
   const e = testExport();
-  dirs.push(e.root);
+  dirs.push(e.dataDir);
   return e;
 };
 const item = (key: string, over = {}) => Item.parse(rawItem(key, over));
 
 describe("GSB preflight", () => {
-  test("GSB unset exporter path names the variable and .env", () => {
-    expect(() => exporterRoot({}, "/x")).toThrow(GsbError);
-    expect(() => exporterRoot({ [EXPORTER_ENV]: "  " }, "/x")).toThrow(
-      new RegExp(`${EXPORTER_ENV} is not set.*\\.env`),
+  test("GSB unset data path names the variable and .env", () => {
+    expect(() => dataRoot({}, "/x")).toThrow(GsbError);
+    expect(() => dataRoot({ [DATA_ENV]: "  " }, "/x")).toThrow(
+      new RegExp(`${DATA_ENV} is not set.*\\.env`),
+    );
+  });
+
+  test("GSB only the old exporter path set: refused, told to replace it", () => {
+    expect(() => dataRoot({ [OLD_EXPORTER_ENV]: "C:\\old\\repo" }, "/x")).toThrow(
+      new RegExp(`${DATA_ENV} is not set.*${OLD_EXPORTER_ENV} is no longer read`),
     );
   });
 
   test("GSB missing manifest prints the quoted path, spaces and all", async () => {
-    const root = mkdtempSync(path.join(os.tmpdir(), "pp gsb empty "));
-    dirs.push(root);
-    const err = await readDataset(root).catch((e) => e);
+    const dir = mkdtempSync(path.join(os.tmpdir(), "pp gsb empty "));
+    dirs.push(dir);
+    const err = await readDataset(dir).catch((e) => e);
     expect(err).toBeInstanceOf(GsbError);
-    expect(err.message).toContain(`"${path.join(root, "data", "manifest.json")}"`);
+    expect(err.message).toContain(`"${path.join(dir, "manifest.json")}"`);
   });
 
   test("GSB a path with spaces (and quotes in .env) reads fine", async () => {
     const e = exp();
     e.write([rawItem("a"), rawItem("b")]);
-    const root = exporterRoot({ [EXPORTER_ENV]: `"${e.root}"` }, "/elsewhere");
-    expect(root).toBe(path.resolve(e.root));
-    const d = await readDataset(root);
+    const dir = dataRoot({ [DATA_ENV]: `"${e.dataDir}"` }, "/elsewhere");
+    expect(dir).toBe(path.resolve(e.dataDir));
+    const d = await readDataset(dir);
     expect(d.items.map((i) => i.uid)).toEqual([uidOf("a"), uidOf("b")]);
   });
 
   test("GSB wrong schemaVersion is refused", async () => {
     const e = exp();
     e.write([rawItem("a")], { schemaVersion: 2 });
-    await expect(readDataset(e.root)).rejects.toThrow(/schemaVersion 2 isn't supported/);
+    await expect(readDataset(e.dataDir)).rejects.toThrow(/schemaVersion 2 isn't supported/);
   });
 
   test("GSB an item off schema is refused with its index", async () => {
     const e = exp();
     e.write([rawItem("a"), rawItem("b", { uid: "nope" })]);
-    await expect(readDataset(e.root)).rejects.toThrow(/#1: uid/);
+    await expect(readDataset(e.dataDir)).rejects.toThrow(/#1: uid/);
   });
 });
 

@@ -56,7 +56,7 @@ export function rawItem(key: string, over: RawItem = {}): RawItem {
 }
 
 export interface TestExport {
-  root: string;
+  /** The data folder (a fresh temp dir): `manifest.json`, `items.json`, `assets/`. */
   dataDir: string;
   /** Writes an image's files under `assets/images/<id>/`; returns the item `images[]` row. */
   image(id: string, seed: number, sizes?: string[]): Promise<RawItem>;
@@ -64,11 +64,8 @@ export interface TestExport {
 }
 
 export function testExport(): TestExport {
-  const root = mkdtempSync(path.join(os.tmpdir(), "pp gsb exporter "));
-  const dataDir = path.join(root, "data");
-  mkdirSync(dataDir, { recursive: true });
+  const dataDir = mkdtempSync(path.join(os.tmpdir(), "pp gsb data "));
   return {
-    root,
     dataDir,
     async image(id, seed, sizes = ["tiny", "medium"]) {
       const files: RawItem = {};

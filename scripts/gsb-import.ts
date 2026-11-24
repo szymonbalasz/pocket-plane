@@ -1,10 +1,10 @@
 // `bun run gsb:import [--profile p | --play] [--apply] [--overwrite] [--json] [filters]`: imports
 // the Griffon's Saddlebag exporter's items as unshared homebrew items, over the stdio MCP server
-// (one session, many calls). Dry run by default. The exporter repo is only ever read.
+// (one session, many calls). Dry run by default. The exporter's data folder is only ever read.
 import path from "node:path";
 import { mcpConfig, parseTargetArgs, targetArgs, UsageError } from "@mcp/args";
 import { ConfigError } from "@server/config";
-import { exporterRoot, GsbError, readDataset } from "./lib/gsb/dataset";
+import { dataRoot, GsbError, readDataset } from "./lib/gsb/dataset";
 import type { Filters } from "./lib/gsb/diff";
 import { BUCKETS, runImport, type Summary } from "./lib/gsb/run";
 import { connectStdio, ToolFailure } from "./lib/gsb/tools";
@@ -124,7 +124,7 @@ async function main(): Promise<number> {
   }
   const say = flags.json ? console.error : console.log;
 
-  const dataset = await readDataset(exporterRoot(process.env, ROOT));
+  const dataset = await readDataset(dataRoot(process.env, ROOT));
   say(`gsb:import: ${dataset.items.length} items in the dataset`);
 
   const env = Object.fromEntries(

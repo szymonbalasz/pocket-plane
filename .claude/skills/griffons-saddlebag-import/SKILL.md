@@ -5,11 +5,11 @@ description: Use when the DM asks to import, refresh or sync Griffon's Saddlebag
 
 # Griffon's Saddlebag import
 
-The DM's Griffon's Saddlebag exporter writes `data/manifest.json`, `data/items.json` and images. `bun run gsb:import` turns them into **unshared homebrew items** in the active campaign, through the stdio MCP server (one session). You drive the script; you never handle the item content yourself.
+The DM's Griffon's Saddlebag exporter writes `manifest.json`, `items.json` and images to its data folder (its `GSB_DATA_DIR`, outside the exporter repo). `bun run gsb:import` turns them into **unshared homebrew items** in the active campaign, through the stdio MCP server (one session). You drive the script; you never handle the item content yourself.
 
 ## Never
 
-- Write to, delete in, or run any command **with the exporter repo as cwd**. It is read-only; only the script reads it.
+- Write to, delete in, or run any command **with the data folder or the exporter repo as cwd**. They are read-only; only the script reads the data folder.
 - Read `items.json` (or the images) into the conversation, or paste item text anywhere. It is paid content: it stays on the DM's machine. Work from the script's counts and names.
 - Share imported entries. They are created DM only; the DM shares in the client.
 - Delete anything. Items gone upstream are only reported.
@@ -20,8 +20,8 @@ The DM's Griffon's Saddlebag exporter writes `data/manifest.json`, `data/items.j
 
 | Check | If missing |
 |---|---|
-| `GRIFFONS_SADDLEBAG_EXPORTER_PATH` in `.env` | The script says so. Ask the DM for the exporter repo's absolute path; they add `GRIFFONS_SADDLEBAG_EXPORTER_PATH=<path>` to `.env` (quotes are fine; spaces are fine) |
-| `<path>/data/manifest.json` | The DM runs the exporter first (in their own terminal, not you) |
+| `GRIFFONS_SADDLEBAG_DATA_PATH` in `.env` | The script says so. Ask the DM for the data folder's absolute path (the exporter's `GSB_DATA_DIR`); they add `GRIFFONS_SADDLEBAG_DATA_PATH=<path>` to `.env` (quotes are fine; spaces are fine). The old `GRIFFONS_SADDLEBAG_EXPORTER_PATH` is no longer read |
+| `<path>/manifest.json` | The DM runs the exporter first (in their own terminal, not you) |
 | `schemaVersion` 1 | Refused: the importer needs an update; report it |
 | The server for the target is running | `server_not_running`: ask the DM to start it (dev: `bun run dev`; real campaign: `bun run play`) |
 | An active campaign | "No active campaign": the DM opens one in the DM client |
@@ -82,5 +82,5 @@ Show the DM **one table**: bucket, count, sample names (from `names`), plus `pla
 
 ## 6. Where data goes
 
-- The script reads the exporter files locally and sends them only to the local Pocket Plane server (over the MCP server on this machine). Its ledger (`data/griffons-saddlebag/<target>-<campaignId>.json`, gitignored) holds ids and hashes, no item content.
+- The script reads the data folder locally and sends them only to the local Pocket Plane server (over the MCP server on this machine). Its ledger (`data/griffons-saddlebag/<target>-<campaignId>.json`, gitignored) holds ids and hashes, no item content.
 - Only the script's counts, names and messages reach the model. Don't ask for more.
