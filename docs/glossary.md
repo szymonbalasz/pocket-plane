@@ -114,6 +114,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **AoE template** | A shape (cone, sphere, cube, line) placed on a scene to show an area of effect, placed freely (Ctrl) or snapped; its affected squares are the cells more than half inside it; ephemeral unless kept ([scene-tools](specs/scene-tools.md)). | Freehand drawing (out of scope) |
 | **Affected squares** | The grid cells more than half inside an AoE template ([scene-tools](specs/scene-tools.md)). | — |
 | **Ephemeral template** | An AoE template sent as a live signal, gone when cleared or its placer leaves; **Keep** saves it as a record. | AoE template |
+| **Template look** | The subtle graphic an AoE template can carry: Mist, Motes, Ground, Glow, Ripple, Swirl or Hatch, with a tint and its own cell opacity; generic, not tied to a spell ([scene-tools](specs/scene-tools.md) FR-SCN-64–73). | Map effect (spells) |
 | **Prop** | A DM-placed image object on a scene's objects layer (barrel, table). | Token |
 | **Wall** | A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight. | Door, Window, One-way wall |
 | **Window** | A wall that blocks player token moves but not sight. | Wall |

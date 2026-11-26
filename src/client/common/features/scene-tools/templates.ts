@@ -15,9 +15,11 @@ import {
   TEMPLATE_WIDTH,
   type TemplateClearData,
   type TemplateGeometry,
+  type TemplateLook,
   type TemplateRecordView,
   type TemplateShape,
   type TemplateSignalData,
+  type TemplateStyle,
 } from "@shared/scene-tools/schemas";
 import { contains, snapAngle, templateArea } from "@shared/scenes-map/area";
 import type { Grid } from "@shared/scenes-map/geometry";
@@ -36,6 +38,25 @@ export const TEMPLATE_TIMEOUT_MS = DRAG_TIMEOUT_MS;
 /** A template as drawn: geometry + label (kept, ephemeral or a local preview). */
 export interface TemplateView extends TemplateGeometry {
   label: string;
+  /** FR-SCN-64 (#466): absent / null = no look, the default opacity. */
+  look?: TemplateLook | null;
+  tint?: string | null;
+  cellOpacity?: number | null;
+}
+
+/** FR-SCN-64: a view's look fields with nulls dropped (place intents and signal frames). */
+export function styleFields(t: Partial<TemplateStyle>): {
+  look?: TemplateLook;
+  tint?: string;
+  cellOpacity?: number;
+} {
+  return {
+    ...(t.look ? { look: t.look } : {}),
+    ...(t.tint ? { tint: t.tint } : {}),
+    ...(t.cellOpacity !== null && t.cellOpacity !== undefined
+      ? { cellOpacity: t.cellOpacity }
+      : {}),
+  };
 }
 
 /** The AoE panel's settings (FR-SCN-22). */
@@ -44,6 +65,10 @@ export interface AoeSettings {
   size: number;
   width: number;
   label: string;
+  /** FR-SCN-66 (#466): the look, tint and cell opacity of the next placement. */
+  look: TemplateLook | null;
+  tint: string | null;
+  cellOpacity: number | null;
 }
 
 /**
@@ -57,6 +82,9 @@ export const DEFAULT_AOE: AoeSettings = {
   size: 20,
   width: TEMPLATE_WIDTH.default,
   label: "",
+  look: null,
+  tint: null,
+  cellOpacity: null,
 };
 
 const norm360 = (a: number) => ((a % 360) + 360) % 360;
@@ -345,6 +373,7 @@ export const keptView = (r: TemplateRecordView): TemplateView => ({
   angle: r.angle,
   ...(r.footprint ? { footprint: r.footprint } : {}),
   label: r.label,
+  ...styleFields(r),
 });
 
 /** FR-SCN-26: the DM edits any kept template; a player only one they placed. */
@@ -579,6 +608,7 @@ export function placeFrame(
     angle: t.angle,
     ...(t.footprint ? { footprint: t.footprint } : {}),
     ...(t.label ? { label: t.label } : {}),
+    ...styleFields(t),
     ...(dmOnly ? { dmOnly: true } : {}),
   };
 }
@@ -712,6 +742,7 @@ export function receiveTemplate(
     angle: d.angle,
     ...(d.footprint ? { footprint: d.footprint } : {}),
     label: d.label ?? "",
+    ...styleFields(d),
   };
   s.setState((st) => ({
     byId: {
