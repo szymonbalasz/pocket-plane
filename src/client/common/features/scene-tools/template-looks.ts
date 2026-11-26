@@ -105,7 +105,7 @@ const mist: TemplateLookDef = {
   draw(ctx, f) {
     const { box, cell, t } = f;
     // A faint body so thin spots still read as cloud.
-    ctx.fillStyle = rgba(f.tint, 0.08);
+    ctx.fillStyle = rgba(f.tint, 0.06);
     ctx.fillRect(box.x, box.y, box.w, box.h);
     for (let i = 0; i < f.count; i++) {
       const u = f.rnd();
@@ -116,8 +116,8 @@ const mist: TemplateLookDef = {
       const spanX = box.w + r * 2;
       const x = box.x - r + wrap(u * spanX + t * speed, spanX);
       const y = box.y + v * box.h + Math.sin(t * 0.25 + phase) * cell * 0.35;
-      const breathe = 0.75 + 0.25 * Math.sin(t * 0.4 + phase);
-      puff(ctx, x, y, r, f.tint, 0.2 * breathe * f.edge(x, y));
+      const breathe = 0.6 + 0.4 * Math.sin(t * 0.4 + phase);
+      puff(ctx, x, y, r, f.tint, 0.27 * breathe * f.edge(x, y));
     }
   },
 };

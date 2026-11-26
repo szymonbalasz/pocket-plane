@@ -3022,3 +3022,17 @@ From [token-forms](../specs/token-forms.md) (FR-FORM-01–12; [ADR-0081](../arch
 
 - **Derived** (never stored): `shownFormOf(character)` = among the character's active effects whose `preset_key` is one of its presets with a `form_id` naming an existing form, the latest (`created_at`, then `seq`); else `form_id`; else none. `tokenImageOf(token)` (`@shared/scenes-map/schemas`) = `formImageAssetId ?? imageAssetId`.
 - **Snapshot size** (CON-44): 0 B in the heavy scenario (no forms); + ≤ 6 × ≈ 90 B per character with forms (DM, owner) and ≈ 55 B per token while a form shows.
+
+## 160. Template looks (build/zone-looks)
+
+From [scene-tools](../specs/scene-tools.md) FR-SCN-64–73 (#466). Added nullable columns only (drizzle push, no index); `upgrade:check` has nothing to move. No new record type.
+
+| Table / field | Change | Rule | Visibility | Source |
+|---|---|---|---|---|
+| `aoe_template.look` | + text enum `mist` \| `motes` \| `ground` \| `glow` \| `ripple` \| `swirl` \| `hatch`, nullable | null = no look | as the row (FR-SCN-27) | FR-SCN-64 |
+| `aoe_template.tint` | + text `#rrggbb` (lower case), nullable | null = the look's own colour; kept but unused without a look | as the row | FR-SCN-64 |
+| `aoe_template.cell_opacity` | + integer 0–50, step 5, nullable | null = 22 % without a look, 10 % with one | as the row | FR-SCN-64 |
+
+- **Wire** (`aoe-template`): `look`, `tint`, `cellOpacity`, each only when set (as `footprint`).
+- **Derived** (never stored): `cellOpacityOf(t)` (`@shared/scene-tools/schemas`); the drawn tint `tint ?? look's colour` (client `template-looks.ts`).
+- **Snapshot size** (CON-44): 0 B for rows without a look; ≤ ≈ 45 B per template with all three set (≤ 900 B per scene at the 20-template cap).

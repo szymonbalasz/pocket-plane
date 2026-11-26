@@ -82,12 +82,12 @@ export function LookFields({
               onChange({ look: v === "none" ? null : (v as TemplateLook) });
             }}
             aria-label="Look"
-            className="flex-wrap justify-start"
+            className="grid grid-cols-4 gap-1"
           >
             <ToggleTip content="No look: the squares only">
               <ToggleGroupItem
                 value="none"
-                className="h-7 px-2 text-xs"
+                className="h-7 w-full px-1 text-xs"
                 data-testid="scn-aoe-look-none"
               >
                 None
@@ -97,7 +97,7 @@ export function LookFields({
               <ToggleTip key={d.key} content={d.examples}>
                 <ToggleGroupItem
                   value={d.key}
-                  className="h-7 px-2 text-xs"
+                  className="h-7 w-full px-1 text-xs"
                   data-testid={`scn-aoe-look-${d.key}`}
                 >
                   {d.label}
