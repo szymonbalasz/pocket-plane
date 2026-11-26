@@ -31,6 +31,7 @@ import {
   ephemeralAt,
   type GridPoint,
   placeFrame,
+  styleFields,
   type TemplateView,
   templateAt,
 } from "./templates";
@@ -121,7 +122,10 @@ export function bindAoe(s: Send, i: Intent): void {
 }
 
 /** Shows (and sends) this connection's ephemeral template. */
-export function showOwn(sceneId: string, template: TemplateView): void {
+export function showOwn(sceneId: string, view: TemplateView): void {
+  // FR-SCN-66, -73 (#466): the panel's look goes with the ephemeral (and so with Keep).
+  const { look, tint, cellOpacity } = useAoe.getState().settings;
+  const template: TemplateView = { ...view, look, tint, cellOpacity };
   useAoe.setState({ own: { sceneId, template } });
   sender.show(placeFrame(sceneId, KEY, template, useAoe.getState().dmOnly));
 }
@@ -151,7 +155,7 @@ function stopOwn(): void {
 export async function keepOwn(): Promise<void> {
   const own = useAoe.getState().own;
   if (!own || !intent) return;
-  const { label, width, ...geo } = own.template;
+  const { label, width, look, tint, cellOpacity, ...geo } = own.template;
   const dmOnly = useAoe.getState().dmOnly;
   try {
     await intent(SCN_INTENTS.placeTemplate, {
@@ -159,6 +163,7 @@ export async function keepOwn(): Promise<void> {
       ...geo,
       ...(geo.shape === "line" && width !== null && width !== undefined ? { width } : {}),
       ...(label ? { label } : {}),
+      ...styleFields({ look, tint, cellOpacity }),
       ...(dmOnly ? { hidden: true } : {}),
     });
     if (useAoe.getState().own === own) endOwn();
@@ -190,7 +195,16 @@ export function requestPlacement(req: PlaceRequest): void {
     request: req,
     selectedId: null,
     gesture: null,
-    settings: { ...st.settings, shape: req.shape, size: req.size, label: req.title },
+    // FR-SCN-72: a Spell FX template draws its preset, not a look.
+    settings: {
+      ...st.settings,
+      shape: req.shape,
+      size: req.size,
+      label: req.title,
+      look: null,
+      tint: null,
+      cellOpacity: null,
+    },
   });
   if (tool !== "aoe") useMapTool.getState().setTool("aoe");
 }

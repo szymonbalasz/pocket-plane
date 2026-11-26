@@ -18,9 +18,15 @@
 // token's footprint) are outlined in this client's colour over the casing: `scn-aoe-origin-cell`
 // (attrs `col`, `row`, `n`); the layer feeds the shown tokens' footprints to the tool's snap.
 // Mounts the right-click menu island (FR-SCN-48; the press routing is MapCanvas', FR-MAP-71).
+// Template looks (FR-SCN-64, -67–71, #466): a template with a look fills its squares in the tint at
+// its cell opacity and draws a thin outline (the cased one while hovered or selected); the look
+// (`scn-template-look`, attrs `look`, `level`) draws clipped to the outline at the FX engine's
+// level and clock, and the layer tells the engine which looks animate (frame loop, budget). The
+// `scn-template` Group gains attrs `look`, `tint`, `cellOpacity`.
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
+  cellOpacityOf,
   type DiagonalRule,
   SCN_SIGNALS,
   TemplateClearData,
@@ -37,6 +43,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { Circle, Group, Line, Rect, Shape } from "react-konva";
 import { useStore } from "zustand";
@@ -55,10 +62,13 @@ import {
   selfOf,
 } from "../../scenes-map/mark-colors";
 import { useLayerToggles } from "../../scenes-map/tool-store";
+import { type FxEngine, fxEngine, type TemplateLookEntry } from "../../spell-fx/engine";
+import type { FxLevel } from "../../spell-fx/prefs";
 import { snapTokens } from "../aoe-snap";
 import { type AoeGesture, templateCleared, useAoe } from "../aoe-store";
 import { diagonalRuleIn } from "../diagonal-rule";
 import { useTemplateMenuIsland } from "../TemplateMenu";
+import { drawTemplateLook, lookCount, lookDef, lookTint, outlineBox } from "../template-looks";
 import {
   canEditTemplate,
   cellsAttr,
@@ -81,6 +91,17 @@ import {
   templateUnder,
 } from "../templates";
 import { removeTemplatePill, setTemplatePill } from "./TemplateLabelsLayer";
+
+/** FR-SCN-70: the level template looks draw at (the FX engine's: Map effects, Effects switch). */
+const useLookLevel = (engine: FxEngine): FxLevel =>
+  useSyncExternalStore(
+    engine.subscribe,
+    engine.getLevel.bind(engine),
+    engine.getLevel.bind(engine),
+  );
+
+/** The engine owner key of this layer's looks (FR-SCN-71). */
+const LOOKS_OWNER = "scn-templates";
 
 interface Drawn {
   id: string;
@@ -181,9 +202,15 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
   }, [shape, x, y, size, width, angle, footprint, cs, gx, gy]);
   // FR-SCN-47: resolved per draw, so a `player` / `campaign` upsert recolours (OQ-CAMP-21).
   const stroke = templateColor(store, d.who, d.hidden, colors.hidden);
+  // FR-SCN-64, -67 (#466): the look, its drawn tint and the cells' opacity.
+  const look = lookDef(t.look);
+  const tint = look ? (lookTint(t.look, t.tint) ?? stroke) : null;
+  const cellAlpha = cellOpacityOf(t);
+  const quiet = look !== null && !hovered && d.selected !== true;
+  const level = useLookLevel(fxEngine());
   const ox = gx + x * cs;
   const oy = gy + y * cs;
-  const swPx = d.selected ? 3 : 1.5;
+  const swPx = d.selected ? 3 : quiet ? 1 : 1.5;
   const sw = swPx / cam.scale;
   const dash = d.hidden || d.ephemeral ? [6 / cam.scale, 4 / cam.scale] : undefined;
   // FR-MAP-72: the coloured outline over an opaque casing (hidden: grey styling, no casing).
@@ -217,12 +244,15 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
       hidden={d.hidden}
       color={stroke}
       by={byAttr(d.who)}
+      look={look?.key ?? "none"}
+      tint={tint ?? ""}
+      cellOpacity={Math.round(cellAlpha * 100)}
       listening={false}
       opacity={d.hidden ? 0.6 : 1}
     >
       <Shape
-        fill={stroke}
-        opacity={0.22}
+        fill={d.hidden ? stroke : (tint ?? stroke)}
+        opacity={cellAlpha}
         sceneFunc={(ctx, shape) => {
           ctx.beginPath();
           for (const [c, r] of cells) {
@@ -231,7 +261,36 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
           ctx.fillShape(shape);
         }}
       />
+      {look && level !== "off" && (
+        <Shape
+          name="scn-template-look"
+          id={d.id}
+          look={look.key}
+          level={level}
+          listening={false}
+          perfectDrawEnabled={false}
+          sceneFunc={(kctx) => {
+            const engine = fxEngine();
+            const lv = engine.getLevel();
+            if (lv === "off") return;
+            drawTemplateLook(kctx._context as unknown as CanvasRenderingContext2D, {
+              def: look,
+              outline,
+              map: { x: 0, y: 0, w: mapWidth, h: mapHeight },
+              origin: { x: ox, y: oy },
+              cell: cs,
+              cells: cells.length,
+              tint: tint ?? stroke,
+              seed: d.recordId ?? d.id,
+              level: lv,
+              t: engine.clockNow(),
+              share: engine.templateLookShare(),
+            });
+          }}
+        />
+      )}
       {!d.hidden &&
+        !quiet &&
         (outline.kind === "circle" ? (
           <Circle
             {...casing}
@@ -322,6 +381,50 @@ function useTemplateHover(
     };
   }, [groupRef]);
   return hovered;
+}
+
+/**
+ * FR-SCN-70, -71: tells the FX engine which drawn templates carry a look (animated or not, their
+ * particles at the current level, a box for the on-screen test), so the frame loop runs while one
+ * animates on screen and the budget is shared.
+ */
+function useLookEntries(drawn: readonly Drawn[], grid: Grid, rule: DiagonalRule): void {
+  const engine = fxEngine();
+  const level = useLookLevel(engine);
+  const sig = drawn
+    .map((d) => {
+      const t = d.template;
+      return `${d.id}|${t.look ?? ""}|${t.shape}|${t.x}|${t.y}|${t.size}|${t.width}|${t.angle}|${t.footprint}`;
+    })
+    .join(";");
+  const latest = useRef({ drawn, grid, rule });
+  latest.current = { drawn, grid, rule };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `sig` stands for the drawn looks.
+  useEffect(() => {
+    const { drawn: list, grid: g, rule: r } = latest.current;
+    const entries: TemplateLookEntry[] = [];
+    if (level !== "off") {
+      for (const d of list) {
+        const def = lookDef(d.template.look);
+        if (!def) continue;
+        const o = templateOutline(d.template, g, r);
+        const b = outlineBox(o);
+        const n = templateCells(
+          d.template,
+          { ...g, mapWidth: 1e9, mapHeight: 1e9 },
+          { cut: false, rule: r },
+        ).length;
+        entries.push({
+          id: d.id,
+          box: { x: b.x, y: b.y, size: Math.max(b.w, b.h) },
+          animated: def.animated,
+          particles: lookCount(def, n, level),
+        });
+      }
+    }
+    engine.setTemplateLooks(LOOKS_OWNER, entries);
+  }, [engine, sig, level]);
+  useEffect(() => () => engine.setTemplateLooks(LOOKS_OWNER, []), [engine]);
 }
 
 export function ScnTemplatesLayer() {
@@ -429,6 +532,7 @@ export function ScnTemplatesLayer() {
     });
   }
   const hovered = useTemplateHover(groupRef, drawn, cam.scale, grid, diagonalRuleIn(store.records));
+  useLookEntries(drawn, grid, diagonalRuleIn(store.records));
   return (
     <Group ref={groupRef} name="scn-templates" listening={false}>
       {drawn.map((d) => (

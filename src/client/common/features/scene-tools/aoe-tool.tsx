@@ -7,7 +7,8 @@
 // at the cursor. Pressing an editable kept
 // template's origin selects it and drags it; the selected one's end handle re-aims it (cone,
 // line, cube) or resizes it (sphere; a cylinder kept before FR-SCN-57 too); release sends one `scn.updateTemplate`
-// (FR-SCN-45). The panel: shape, size / width with ±5 nudges, label, Keep, Clear; for a selected
+// (FR-SCN-45). The panel: shape, size / width with ±5 nudges, label, look / tint / cells
+// (FR-SCN-66, #466), Keep, Clear; for a selected
 // kept template: resize, rotate, Delete and (DM) Hide / Reveal; DM: DM-only and "Clear templates
 // on this scene" (confirm + scope, FR-SCN-44). FR-VFX-40: while a placement request is on (a
 // spell cast into a template), a press always places, the release sends it, and the panel shows
@@ -69,6 +70,7 @@ import {
   useAoe,
 } from "./aoe-store";
 import { FreeChip } from "./free-chip";
+import { LookFields } from "./LookFields";
 import {
   AOE_TOOL_SHAPES,
   type AoeSettings,
@@ -395,6 +397,11 @@ export function AoePanel() {
       <LabelField
         value={selected?.label ?? settings.label}
         onCommit={(label) => (selected ? update({ label }) : applySettings({ label }))}
+      />
+      <LookFields
+        selected={selected}
+        settings={settings}
+        onChange={(patch) => (selected ? update(patch) : applySettings(patch))}
       />
       {selected ? (
         <div

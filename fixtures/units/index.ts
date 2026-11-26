@@ -140,6 +140,7 @@ import scnPropImages from "./scene-tools/scn-prop-images";
 import scnProps from "./scene-tools/scn-props";
 import scnTemplates from "./scene-tools/scn-templates";
 import scnWalls from "./scene-tools/scn-walls";
+import templateLooks from "./scene-tools/template-looks";
 import animatedTown from "./scenes-map/animated-town";
 import battlemap from "./scenes-map/battlemap";
 import mtCrowd from "./scenes-map/mt-crowd";
@@ -380,4 +381,6 @@ export const units: readonly Fixture[] = [
   animatedTown,
   // Token forms (build/token-forms)
   miraForms,
+  // Template looks (build/zone-looks, #466)
+  templateLooks,
 ];

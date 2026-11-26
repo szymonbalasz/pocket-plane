@@ -22,6 +22,17 @@ import { rendererOf } from "./renderers";
 
 const TAU = Math.PI * 2;
 
+/** FR-SCN-70, -71 (#466): a template look as the engine sees it (scene-tools draws it). */
+export interface TemplateLookEntry {
+  /** Template id (an ephemeral: `eph-<key>`). */
+  id: string;
+  /** A box around it (map px), for the on-screen test. */
+  box: DrawnBox;
+  animated: boolean;
+  /** Its particles at the current level before the budget share. */
+  particles: number;
+}
+
 /** FR-VFX-29: live particles per client across every aura and look. */
 export const PARTICLE_BUDGET = 400;
 /** FR-VFX-12: the DM draws a hidden token's aura at the hidden-token opacity (TokensLayer). */
@@ -96,6 +107,8 @@ export class FxEngine {
   private snap: FxSnapshot = { level: "full", auras: [], looks: [] };
   private readonly listeners = new Set<() => void>();
   private readonly wakers = new Set<() => void>();
+  /** FR-SCN-70, -71 (#466): the template looks scene-tools draws on this layer, by owner. */
+  private readonly tplLooks = new Map<string, readonly TemplateLookEntry[]>();
   /** The last cue played, for walkthroughs (`vfx-over` attr `lastHit`). */
   lastHit: string | null = null;
   /** The last poof played, for walkthroughs (`vfx-over` attr `lastPoof`). */
@@ -278,9 +291,48 @@ export class FxEngine {
     if (this.looks.length !== before) this.changed();
   }
 
+  // ---------- template looks (SCN FR-SCN-70, -71; VFX FR-VFX-45) ----------
+
+  /**
+   * The template looks one canvas draws now (`owner` = its scene-tools layer). An animated one on
+   * screen keeps the frame loop running at Full / Reduced; a new one wakes it.
+   */
+  setTemplateLooks(owner: string, looks: readonly TemplateLookEntry[]): void {
+    const before = this.tplLooks.get(owner) ?? [];
+    if (looks.length === 0) this.tplLooks.delete(owner);
+    else this.tplLooks.set(owner, looks);
+    const key = (l: readonly TemplateLookEntry[]) =>
+      l.map((e) => `${e.id}:${e.animated}:${e.particles}`).join("|");
+    if (key(before) !== key(looks)) this.wake();
+  }
+
+  /** The FX clock (seconds) template looks draw at. */
+  clockNow(): number {
+    return this.now;
+  }
+
+  /**
+   * FR-SCN-71: the share (0–1) of their particles the animated template looks may draw: what
+   * FR-VFX-29's budget leaves after auras and hit looks, split evenly.
+   */
+  templateLookShare(): number {
+    let want = 0;
+    for (const list of this.tplLooks.values()) {
+      for (const e of list) if (e.animated) want += e.particles;
+    }
+    if (want === 0) return 1;
+    const left = PARTICLE_BUDGET - this.particles();
+    return Math.max(0, Math.min(1, left / want));
+  }
+
   /** Something moves: an aura at Full / Reduced, a look, a reaction (FR-VFX-26, VFX §12). */
   animating(onScreen: (b: DrawnBox) => boolean = () => true): boolean {
     if (this.level === "off") return false;
+    if (this.level !== "still") {
+      for (const list of this.tplLooks.values()) {
+        if (list.some((e) => e.animated && onScreen(e.box))) return true;
+      }
+    }
     if (this.looks.some((l) => this.lookVisible(l, onScreen))) return true;
     const level = this.drawLevel();
     for (const a of this.auras.values()) {

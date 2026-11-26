@@ -16,6 +16,7 @@ import {
   type AoeTemplateRecord,
   ClearTemplatesInput,
   footprintProblem,
+  NO_TEMPLATE_STYLE,
   PlaceTemplateInput,
   SCN_INTENTS,
   TEMPLATE_WIDTH,
@@ -26,6 +27,7 @@ import {
   TemplateIdInput,
   type TemplateShape,
   type TemplateSignalData,
+  type TemplateStyle,
   UpdateTemplateInput,
 } from "@shared/scene-tools/schemas";
 import { and, count, eq, isNull } from "drizzle-orm";
@@ -139,6 +141,11 @@ export const placeTemplate = defineCommand({
         footprint: input.footprint ?? null,
       },
       label: input.label ?? "",
+      style: {
+        look: input.look ?? null,
+        tint: input.tint ?? null,
+        cellOpacity: input.cellOpacity ?? null,
+      },
       placedBy,
       hidden: env.actor.role === "player" ? false : (input.hidden ?? false),
     });
@@ -151,6 +158,8 @@ export interface KeptPlacement {
   sceneId: string;
   geometry: TemplateGeometry;
   label: string;
+  /** FR-SCN-64 (#466): absent = no look, default opacity. */
+  style?: TemplateStyle;
   /** Null = DM-placed (a fog subject). */
   placedBy: string | null;
   hidden: boolean;
@@ -191,6 +200,7 @@ export function insertKeptTemplate(env: CommandEnv, p: KeptPlacement): string {
       angle: geometry.angle,
       footprint: geometry.footprint ?? null,
       label: p.label,
+      ...(p.style ?? NO_TEMPLATE_STYLE),
       placedByPlayerId: placedBy,
       hidden: p.hidden,
       ...copies,
@@ -248,6 +258,13 @@ export const updateTemplate = defineCommand({
     if (problem) throw invalid("Invalid input", [{ path: ["footprint"], message: problem }]);
     const label = input.label ?? before.label;
     const hidden = input.hidden ?? before.hidden;
+    // FR-SCN-65: `null` clears, absent keeps.
+    const style: TemplateStyle = {
+      look: input.look === undefined ? (before.look ?? null) : input.look,
+      tint: input.tint === undefined ? (before.tint ?? null) : input.tint,
+      cellOpacity:
+        input.cellOpacity === undefined ? (before.cellOpacity ?? null) : input.cellOpacity,
+    };
     const same =
       geometry.footprint === (before.footprint ?? null) &&
       geometry.x === before.x &&
@@ -256,7 +273,10 @@ export const updateTemplate = defineCommand({
       geometry.width === before.width &&
       geometry.angle === before.angle &&
       label === before.label &&
-      hidden === before.hidden;
+      hidden === before.hidden &&
+      style.look === (before.look ?? null) &&
+      style.tint === (before.tint ?? null) &&
+      style.cellOpacity === (before.cellOpacity ?? null);
     if (same) return;
     const s = getScene(tx, before.campaignId, before.sceneId);
     const copies = templateCopies(tx, s, geometry, before.placedByPlayerId);
@@ -270,6 +290,7 @@ export const updateTemplate = defineCommand({
         footprint: geometry.footprint ?? null,
         label,
         hidden,
+        ...style,
         ...copies,
         updatedAt: ctx.clock.iso(),
       })
