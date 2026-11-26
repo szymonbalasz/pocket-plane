@@ -88,7 +88,7 @@ describe("OQ-CBTX-21 token overlay bar + icons", () => {
     expect(g.y + g.height).toBeLessThan(20);
   });
 
-  test("FR-CBTX-29 icons: max 4 left to right below the bar, then +N", () => {
+  test("FR-CBTX-29 icons: 4 slots top to bottom on the left edge below the bar, the last +N on overflow", () => {
     const four = iconRow(
       100,
       ["a", "b", "c", "d"].map((v) => icon(v)),
@@ -100,12 +100,18 @@ describe("OQ-CBTX-21 token overlay bar + icons", () => {
       ["a", "b", "c", "d", "e", "f", "g"].map((v) => icon(v)),
     );
     expect(ICONS_MAX).toBe(4);
-    expect(seven.items.map((c) => c.icon.value)).toEqual(["a", "b", "c", "d"]);
-    expect(seven.more).toMatchObject({ text: "+3", count: 3 });
-    const xs = [...seven.items.map((c) => c.x), seven.more?.x ?? 0];
-    expect(xs).toEqual([...xs].sort((a, b) => a - b));
-    // The whole row fits the footprint, below the bar.
+    expect(seven.items.map((c) => c.icon.value)).toEqual(["a", "b", "c"]);
+    expect(seven.more).toMatchObject({ text: "+4", count: 4 });
+    const cells = [...seven.items, ...(seven.more ? [seven.more] : [])];
+    // One column: same x, y strictly increasing, no overlap.
+    expect(new Set(cells.map((c) => c.x)).size).toBe(1);
+    for (let i = 1; i < cells.length; i++) {
+      const prev = cells[i - 1];
+      expect(cells[i]?.y ?? 0).toBeGreaterThanOrEqual((prev?.y ?? 0) + (prev?.size ?? 0));
+    }
+    // The whole column fits the footprint, below the bar.
     const last = seven.more;
+    expect((last?.y ?? 0) + (last?.size ?? 0)).toBeLessThanOrEqual(100);
     expect((last?.x ?? 0) + (last?.size ?? 0)).toBeLessThanOrEqual(100);
     const bar = barGeometry(100, { id: "b", fraction: 1, tone: "full" });
     expect(seven.items[0]?.y).toBeGreaterThan(bar.y + bar.height);
@@ -126,9 +132,9 @@ describe("OQ-CBTX-21 token overlay bar + icons", () => {
       icon("e", "Poisoned"),
       { ...icon("f", "Bless"), muted: true },
     ]);
-    expect(row.items.map((c) => c.tip)).toEqual(["a", "b", "c", "d"]);
+    expect(row.items.map((c) => c.tip)).toEqual(["a", "b", "c"]);
     expect(row.items.every((c) => c.muted === false)).toBe(true);
-    expect(row.more?.tip).toBe("Poisoned\nBless");
+    expect(row.more?.tip).toBe("d\nPoisoned\nBless");
     expect(iconRow(100, [{ ...icon("x"), muted: true }]).items[0]?.muted).toBe(true);
   });
 });
@@ -174,8 +180,8 @@ describe("FR-MAP-57 generic icon restyle (seams S9)", () => {
       "test-token-effect",
       TOKEN_TRIGGER_ID,
     ]);
-    expect(r?.x).toBeCloseTo(
-      (row.items[1]?.x ?? 0) + (row.items[1]?.x ?? 0) - (row.items[0]?.x ?? 0),
+    expect(r?.y).toBeCloseTo(
+      (row.items[1]?.y ?? 0) + (row.items[1]?.y ?? 0) - (row.items[0]?.y ?? 0),
     );
     expect(r?.text).toBe("↯");
     expect(r?.tip.split("\n")).toEqual([

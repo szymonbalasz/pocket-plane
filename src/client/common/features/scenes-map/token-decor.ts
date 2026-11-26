@@ -1,6 +1,6 @@
 // Bar + icon row geometry for token overlays (OQ-CBTX-21: `bar`, `icons`), in token-group
 // coordinates (origin = footprint top-left, `side` = footprint px). Bar on the top edge; icons in
-// a row below it, top-left; at most `ICONS_MAX`, then a "+N" chip; each one's hover tooltip and
+// a column below it on the left edge; `ICONS_MAX` slots, the last a "+N" chip on overflow; each one's hover tooltip and
 // muted tone (FR-MAP-57, S9: generic, so R's trigger icon keeps its own). Cue ring + bell (FR-MAP-49).
 // Turn ring (FR-MAP-108 / -109). DOM-free (tested under bun).
 import type { TokenShape } from "@shared/scenes-map/schemas";
@@ -66,7 +66,7 @@ export interface IconCell {
 
 export interface IconRow {
   items: IconCell[];
-  /** "+N" for the icons past `ICONS_MAX`; null when all fit. */
+  /** "+N" in the last slot when there are more icons than `ICONS_MAX`; null when all fit. */
   more: { text: string; count: number; tip: string; x: number; y: number; size: number } | null;
 }
 
@@ -104,31 +104,34 @@ export function cuePulse(ms: number, reducedMotion: boolean): { opacity: number;
   return { opacity: 1 - 0.65 * k, scale: 1 + 0.12 * k };
 }
 
-/** FR-CBTX-29: max 4 icons left to right below the bar, then "+N". */
+/**
+ * FR-CBTX-29: icons top to bottom in a column on the left edge, below the bar; `ICONS_MAX` slots
+ * (the column then still fits the footprint). More icons than slots → the last slot is "+N".
+ */
 export function iconRow(side: number, icons: readonly TokenIcon[]): IconRow {
   const size = side * ICON_SIZE;
   const step = size + side * ICON_GAP;
-  const y = side * (BAR_TOP + BAR_HEIGHT + ICON_GAP);
-  const x0 = side * ICON_GAP;
-  const shown = icons.slice(0, ICONS_MAX);
+  const y0 = side * (BAR_TOP + BAR_HEIGHT + ICON_GAP);
+  const x = side * ICON_GAP;
+  const shown = icons.length > ICONS_MAX ? icons.slice(0, ICONS_MAX - 1) : icons;
   const items = shown.map((icon, i) => ({
     icon,
     text: iconText(icon.label),
     tip: icon.label,
     muted: icon.muted === true,
-    x: x0 + i * step,
-    y,
+    x,
+    y: y0 + i * step,
     size,
   }));
-  const hidden = icons.slice(ICONS_MAX);
+  const hidden = icons.slice(shown.length);
   const more =
     hidden.length > 0
       ? {
           text: `+${hidden.length}`,
           count: hidden.length,
           tip: hidden.map((i) => i.label).join("\n"),
-          x: x0 + shown.length * step,
-          y,
+          x,
+          y: y0 + shown.length * step,
           size,
         }
       : null;

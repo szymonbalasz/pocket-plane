@@ -61,7 +61,8 @@ export interface TokenBar {
 }
 
 /**
- * A small icon in a row below the bar, top-left (FR-CBTX-29). At most 4 are drawn, then "+N".
+ * A small icon in a column below the bar, on the left edge (FR-CBTX-29). 4 slots, the last "+N"
+ * when there are more.
  * Konva `name` = `id`, `id` attr = token id, attrs `value`, `icon`, `tone`, `label`, `muted`;
  * hovering it shows `label` as a tooltip (FR-MAP-57, S9).
  */
