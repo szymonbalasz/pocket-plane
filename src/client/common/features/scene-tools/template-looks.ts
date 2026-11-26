@@ -4,7 +4,7 @@
 // viewer draws the same pattern (seeded by the template id, or an ephemeral's key) and a Still
 // frame is a fixed time. `drawTemplateLook` clips to the template's true outline and the map,
 // fades particles near the edge (≈ ⅓ cell) and keeps the peak alpha low. DOM-free.
-import type { TemplateLook } from "@shared/scene-tools/schemas";
+import { cellOpacityOf, type TemplateLook } from "@shared/scene-tools/schemas";
 import { STILL_T } from "../spell-fx/aura-types";
 import type { FxLevel } from "../spell-fx/prefs";
 import { seededRandom } from "../spell-fx/prng";
@@ -156,17 +156,17 @@ const ground: TemplateLookDef = {
   examples: "Thorns, rubble, ice, grease, difficult terrain",
   tint: "#7a8a4a",
   animated: false,
-  particles: (cells) => capped(cells, 3, 1.5),
+  particles: (cells) => capped(cells, 4, 2.2),
   draw(ctx, f) {
     const { box, cell } = f;
     ctx.lineCap = "round";
-    ctx.lineWidth = Math.max(1, cell * 0.05);
+    ctx.lineWidth = Math.max(1.5, cell * 0.07);
     for (let i = 0; i < f.count; i++) {
       const x = box.x + f.rnd() * box.w;
       const y = box.y + f.rnd() * box.h;
-      const len = cell * (0.14 + f.rnd() * 0.14);
+      const len = cell * (0.16 + f.rnd() * 0.16);
       const rot = f.rnd() * Math.PI * 2;
-      const a = 0.38 * f.edge(x, y);
+      const a = LOOK_ALPHA_MAX * f.edge(x, y);
       if (a <= 0.003) continue;
       ctx.strokeStyle = rgba(f.tint, a);
       ctx.beginPath();
@@ -240,7 +240,7 @@ const swirl: TemplateLookDef = {
     const { box, origin, cell, t } = f;
     const far = Math.max(box.w, box.h) * 0.75;
     ctx.lineCap = "round";
-    ctx.lineWidth = Math.max(1, cell * 0.06);
+    ctx.lineWidth = Math.max(1.5, cell * 0.09);
     for (let i = 0; i < f.count; i++) {
       const rho = cell * 0.3 + f.rnd() * far;
       const start = f.rnd() * Math.PI * 2;
@@ -250,7 +250,7 @@ const swirl: TemplateLookDef = {
       const a0 = start + t * w;
       const mx = origin.x + Math.cos(a0 + span / 2) * rho;
       const my = origin.y + Math.sin(a0 + span / 2) * rho;
-      const a = 0.32 * f.edge(mx, my);
+      const a = 0.42 * f.edge(mx, my);
       if (a <= 0.003) continue;
       ctx.strokeStyle = rgba(f.tint, a);
       ctx.beginPath();
@@ -302,6 +302,27 @@ export const lookDef = (key: string | null | undefined): TemplateLookDef | null 
 /** FR-SCN-64: the drawn tint: the template's, else the look's own colour. */
 export const lookTint = (look: string | null | undefined, tint: string | null | undefined) =>
   tint ?? lookDef(look)?.tint ?? null;
+
+/**
+ * FR-SCN-67: how a template draws its squares and outline. With a look: squares in the tint
+ * (`tint` ?? the look's colour) at the cell opacity, a quiet outline (thin, no casing) unless
+ * hovered or selected. Without: the placer's colour `stroke` at the cell opacity. Hidden: the
+ * hidden styling (`stroke` is then the hidden grey) wins for the squares.
+ */
+export function templateStyleOf(
+  t: { look?: string | null; tint?: string | null; cellOpacity?: number | null },
+  stroke: string,
+  s: { hidden: boolean; hovered: boolean; selected: boolean },
+): { tint: string | null; cellFill: string; cellAlpha: number; quiet: boolean } {
+  const def = lookDef(t.look);
+  const tint = def ? (t.tint ?? def.tint) : null;
+  return {
+    tint,
+    cellFill: s.hidden ? stroke : (tint ?? stroke),
+    cellAlpha: cellOpacityOf({ look: def ? def.key : null, cellOpacity: t.cellOpacity }),
+    quiet: def !== null && !s.hovered && !s.selected,
+  };
+}
 
 /** FR-SCN-70, -71: the particles a look draws at `level`, given the budget `share` (0–1). */
 export function lookCount(
@@ -362,6 +383,20 @@ export function edgeDistance(o: TemplateOutline, x: number, y: number): number {
     if (d < best) best = d;
   }
   return best;
+}
+
+/**
+ * FR-SCN-69: where Glow, Ripple and Swirl centre: a cube's middle (its origin is a corner); a
+ * sphere's, cone's or line's origin (centre, apex, start).
+ */
+export function lookCentre(
+  shape: string,
+  outline: TemplateOutline,
+  origin: { x: number; y: number },
+): { x: number; y: number } {
+  if (shape !== "cube") return origin;
+  const b = outlineBox(outline);
+  return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
 }
 
 function outlinePath(ctx: CanvasRenderingContext2D, o: TemplateOutline): void {

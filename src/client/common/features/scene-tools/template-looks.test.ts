@@ -12,6 +12,7 @@ import {
   edgeDistance,
   LOOK_PARTICLES_MAX,
   LOOK_REDUCED_SHARE,
+  lookCentre,
   lookCount,
   lookDef,
   lookTint,
@@ -125,6 +126,12 @@ describe("FR-SCN-69 every look draws", () => {
     expect(lookTint("mist", "#123456")).toBe("#123456");
     expect(lookTint(null, "#123456")).toBe("#123456");
     expect(lookTint(null, null)).toBeNull();
+  });
+
+  test("FR-SCN-69 Glow / Ripple / Swirl centre: a cube's middle, a sphere's or cone's origin", () => {
+    expect(lookCentre("cube", cube, { x: 200, y: 500 })).toEqual({ x: 250, y: 550 });
+    expect(lookCentre("sphere", circle, { x: 500, y: 350 })).toEqual({ x: 500, y: 350 });
+    expect(lookCentre("cone", cube, { x: 200, y: 500 })).toEqual({ x: 200, y: 500 });
   });
 
   test("FR-SCN-68 edge fade: the box and distance to the outline", () => {

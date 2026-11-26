@@ -26,7 +26,6 @@
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
-  cellOpacityOf,
   type DiagonalRule,
   SCN_SIGNALS,
   TemplateClearData,
@@ -68,7 +67,14 @@ import { snapTokens } from "../aoe-snap";
 import { type AoeGesture, templateCleared, useAoe } from "../aoe-store";
 import { diagonalRuleIn } from "../diagonal-rule";
 import { useTemplateMenuIsland } from "../TemplateMenu";
-import { drawTemplateLook, lookCount, lookDef, lookTint, outlineBox } from "../template-looks";
+import {
+  drawTemplateLook,
+  lookCentre,
+  lookCount,
+  lookDef,
+  outlineBox,
+  templateStyleOf,
+} from "../template-looks";
 import {
   canEditTemplate,
   cellsAttr,
@@ -204,9 +210,11 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
   const stroke = templateColor(store, d.who, d.hidden, colors.hidden);
   // FR-SCN-64, -67 (#466): the look, its drawn tint and the cells' opacity.
   const look = lookDef(t.look);
-  const tint = look ? (lookTint(t.look, t.tint) ?? stroke) : null;
-  const cellAlpha = cellOpacityOf(t);
-  const quiet = look !== null && !hovered && d.selected !== true;
+  const { tint, cellFill, cellAlpha, quiet } = templateStyleOf(t, stroke, {
+    hidden: d.hidden,
+    hovered,
+    selected: d.selected === true,
+  });
   const level = useLookLevel(fxEngine());
   const ox = gx + x * cs;
   const oy = gy + y * cs;
@@ -251,7 +259,7 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
       opacity={d.hidden ? 0.6 : 1}
     >
       <Shape
-        fill={d.hidden ? stroke : (tint ?? stroke)}
+        fill={cellFill}
         opacity={cellAlpha}
         sceneFunc={(ctx, shape) => {
           ctx.beginPath();
@@ -277,7 +285,7 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
               def: look,
               outline,
               map: { x: 0, y: 0, w: mapWidth, h: mapHeight },
-              origin: { x: ox, y: oy },
+              origin: lookCentre(t.shape, outline, { x: ox, y: oy }),
               cell: cs,
               cells: cells.length,
               tint: tint ?? stroke,

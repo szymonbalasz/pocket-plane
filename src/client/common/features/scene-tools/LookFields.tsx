@@ -10,7 +10,7 @@ import {
   type TemplateLook,
   type TemplateRecordView,
 } from "@shared/scene-tools/schemas";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Slider, ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
 import { Label } from "../../components/ui/primitives";
 import { Tip } from "../../components/ui/tip";
@@ -33,12 +33,65 @@ export const TINT_SWATCHES = [
 
 type Style = Pick<AoeSettings, "look" | "tint" | "cellOpacity">;
 
-/** FR-SCN-72: the Spell FX preset drawing on this template, else null. */
+/**
+ * FR-SCN-66: any colour. The browser fires `input` on every move inside its picker: the next
+ * placement follows it live (`live`, the ephemeral is throttled), a kept template gets one
+ * `scn.updateTemplate` when the picker closes (the native `change` event).
+ */
+function CustomTint({
+  value,
+  live,
+  onPick,
+}: {
+  value: string;
+  live: boolean;
+  onPick(c: string): void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState<string | null>(null);
+  const latest = useRef({ live, onPick });
+  latest.current = { live, onPick };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a stored value ends the draft.
+  useEffect(() => setDraft(null), [value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const done = () => {
+      if (!latest.current.live) latest.current.onPick(el.value.toLowerCase());
+    };
+    el.addEventListener("change", done);
+    return () => el.removeEventListener("change", done);
+  }, []);
+  return (
+    <input
+      ref={ref}
+      type="color"
+      aria-label="Any colour"
+      data-testid="scn-aoe-tint-custom"
+      className="size-6 cursor-pointer rounded border bg-transparent p-0"
+      value={draft ?? value}
+      onChange={(e) => {
+        const c = e.target.value.toLowerCase();
+        setDraft(c);
+        if (live) onPick(c);
+      }}
+    />
+  );
+}
+
+/** FR-SCN-72: the label of the Spell FX preset drawing on template `templateId`, else null. */
+export function anchoredPreset(
+  auras: readonly { templateId: string | null; preset: { label: string } }[],
+  templateId: string | null,
+): string | null {
+  if (!templateId) return null;
+  return auras.find((a) => a.templateId === templateId)?.preset.label ?? null;
+}
+
 function useAnchoredPreset(templateId: string | null): string | null {
   const engine = fxEngine();
   const snap = useSyncExternalStore(engine.subscribe, engine.snapshot, engine.snapshot);
-  if (!templateId) return null;
-  return snap.auras.find((a) => a.templateId === templateId)?.preset.label ?? null;
+  return anchoredPreset(snap.auras, templateId);
 }
 
 export function LookFields({
@@ -134,13 +187,10 @@ export function LookFields({
               );
             })}
             <Tip content="Any colour">
-              <input
-                type="color"
-                aria-label="Any colour"
-                data-testid="scn-aoe-tint-custom"
-                className="size-6 cursor-pointer rounded border bg-transparent p-0"
+              <CustomTint
                 value={tint ?? def.tint}
-                onChange={(e) => onChange({ tint: e.target.value.toLowerCase() })}
+                live={!selected}
+                onPick={(c) => onChange({ tint: c })}
               />
             </Tip>
           </div>

@@ -52,6 +52,23 @@ const lookNodes = (page: Page) =>
     return (K?.stages[0]?.find(".scn-template-look") ?? []).map((n) => n.id()).sort();
   });
 
+/** FR-VFX-27: the FX loop's median frame (set on every FX frame), or null before any. */
+const frameMs = (page: Page) =>
+  page.evaluate(() => {
+    type KNode = { getAttr(a: string): unknown };
+    type KStage = { find(s: string): KNode[] };
+    const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
+    const v = K?.stages[0]?.find(".vfx-over-pass")[0]?.getAttr("frameMs");
+    return typeof v === "number" ? v : null;
+  });
+
+/** A screenshot of the map inside Caustic smoke's circle (grid 8.2–11.8 × 7.2–8.8). */
+async function smokeShot(page: Page): Promise<Buffer> {
+  const a = await gridPoint(page, 8.2, 7.2);
+  const b = await gridPoint(page, 11.8, 8.8);
+  return page.screenshot({ clip: { x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y } });
+}
+
 const byLabel = async (page: Page, label: string) =>
   (await templates(page)).find((t) => !t.ephemeral && t.text?.startsWith(`${label} · `));
 
@@ -105,6 +122,13 @@ test("FR-SCN-64–73 template looks: kept looks reach the player, a second templ
     await expect.poll(() => lookNodes(p)).toContain(id);
   }
 
+  // FR-SCN-70: at Full the looks move with no aura on the map: the FX loop runs, frames differ.
+  await dm.mouse.move(2, 2);
+  await expect.poll(() => frameMs(dm)).not.toBeNull();
+  const full1 = await smokeShot(dm);
+  await dm.waitForTimeout(900);
+  expect((await smokeShot(dm)).equals(full1)).toBe(false);
+
   // FR-SCN-66: the DM places a Ripple sphere "Silence" with 20 % cells, keeps it.
   await dm.getByTestId("map-tool-aoe").click();
   await expect(dm.getByTestId("scn-aoe-panel")).toBeVisible();
@@ -156,10 +180,18 @@ test("FR-SCN-64–73 template looks: kept looks reach the player, a second templ
     await expect.poll(async () => (await byLabel(p, "Caustic smoke"))?.tint).toBe("#6f9a3a");
   }
 
-  // FR-SCN-70: Map effects ▸ Off on the DM: no look graphics, the templates stay; Full again.
+  // FR-SCN-70: Map effects ▸ Still: one fixed frame. Off: no look graphics, the templates stay.
   await dm.keyboard.press("Escape");
   await dm.getByTestId("ui-prefs-open").click();
   const prefs = shellWindow(dm, "shell.prefs");
+  await prefs.getByTestId("vfx-pref-level-still").click();
+  await prefs.getByTestId("ui-window-close").click();
+  await dm.mouse.move(2, 2);
+  await dm.waitForTimeout(300);
+  const still1 = await smokeShot(dm);
+  await dm.waitForTimeout(900);
+  expect((await smokeShot(dm)).equals(still1)).toBe(true);
+  await dm.getByTestId("ui-prefs-open").click();
   await prefs.getByTestId("vfx-pref-level-off").click();
   await expect.poll(() => lookNodes(dm)).toEqual([]);
   expect((await byLabel(dm, "Caustic smoke"))?.look).toBe("mist");
