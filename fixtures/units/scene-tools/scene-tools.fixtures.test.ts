@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb } from "@server/db/client";
 import { aoeTemplate, player, scene, sceneStructure } from "@server/db/schema";
+import { NO_TEMPLATE_STYLE as NO_STYLE } from "@shared/scene-tools/schemas";
 import { asc } from "drizzle-orm";
 import { loadBundle } from "../../index";
 
@@ -50,6 +51,7 @@ describe("scene-tools fixtures (SCN §13)", () => {
         angle: 0,
         footprint: null,
         label: "Spirit Guardians",
+        ...NO_STYLE,
         placedByPlayerId: p1?.id as string,
         hidden: false,
         fogged: false,
@@ -64,6 +66,7 @@ describe("scene-tools fixtures (SCN §13)", () => {
         angle: 0,
         footprint: null,
         label: "Glyph",
+        ...NO_STYLE,
         placedByPlayerId: null,
         hidden: true,
         fogged: false,

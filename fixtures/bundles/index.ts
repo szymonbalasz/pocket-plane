@@ -157,6 +157,7 @@ import tableTools from "./table-tools";
 import tableToolsE2e from "./table-tools-e2e";
 import tableToolsPaused from "./table-tools-paused";
 import tableToolsPausedE2e from "./table-tools-paused-e2e";
+import templateLooks from "./template-looks";
 import themeGilt from "./theme-gilt";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
@@ -437,4 +438,6 @@ export const bundles: readonly Bundle[] = [
   animatedTokens,
   // Token forms (build/token-forms)
   tokenForms,
+  // Template looks (build/zone-looks, #466)
+  templateLooks,
 ];

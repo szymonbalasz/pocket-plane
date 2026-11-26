@@ -72,6 +72,10 @@ export function toTemplateRecord(r: TemplateRow): AoeTemplateRecord {
     angle: r.angle,
     ...(r.footprint !== null ? { footprint: r.footprint } : {}),
     label: r.label,
+    // FR-SCN-64: absent on the wire when null (compact, as footprint).
+    ...(r.look !== null ? { look: r.look } : {}),
+    ...(r.tint !== null ? { tint: r.tint } : {}),
+    ...(r.cellOpacity !== null ? { cellOpacity: r.cellOpacity } : {}),
     placedByPlayerId: r.placedByPlayerId,
     hidden: r.hidden,
   };

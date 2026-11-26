@@ -4690,3 +4690,17 @@ From [token-forms](../specs/token-forms.md) FR-FORM-01–16 ([ADR-0081](../archi
 | Fixtures | unit `mira-forms` (assets `tokens/mira-raging.svg`, `tokens/mira-enlarged.svg`); bundle `token-forms` |
 | Client registries | DM token menu `forms.form` (order 27); player token menu `forms.form` (order 20); the player registry's `available(t, store?)` gains the client's records (`playerMenuFor(t, entries, store)`) |
 | Test IDs | `form-row`, `form-row-add`, `form-row-item`, `form-row-name`, `form-row-change`, `form-row-remove`, `form-header-select`, `form-header-option`, `form-header-preset`, `form-menu`, `form-menu-item`, `form-preset-select`, `form-preset-option`, `form-preset-mark` |
+
+## 207. Template looks (build/zone-looks)
+
+From [scene-tools](../specs/scene-tools.md) FR-SCN-64–73, [spell-fx](../specs/spell-fx.md) FR-VFX-45 (#466). No new intent, event, route or record type. Data side: [data model §160](../data-model/README.md#160-template-looks-buildzone-looks).
+
+| Surface | Change |
+|---|---|
+| `scn.placeTemplate` (DM and player schemas) | + `look?`, `tint?` (`#rrggbb`, lower-cased), `cellOpacity?` (0–50, step 5); a bad value → `invalid` |
+| `scn.updateTemplate` | + `look?`, `tint?`, `cellOpacity?`, each nullable (`null` clears; absent keeps); placer or DM as today (another player's → `forbidden`); unchanged values → ack, no event |
+| Signal `scn.template` (place frame) | + `look?`, `tint?`, `cellOpacity?`; the `end` frame takes none (strict) |
+| `aoe-template` record | + `look?`, `tint?`, `cellOpacity?` (only when set) |
+| Fixtures | unit `template-looks` (a DM Mist sphere "Caustic smoke", a `player-1` Ground cube "Spike Growth"); bundle `template-looks` = `scene-tools` + it |
+| Client | registry `src/client/common/features/scene-tools/template-looks.ts` (append-only, one look per key); FX engine `setTemplateLooks(owner, entries)`, `templateLookShare()`, `clockNow()` (FR-SCN-70, -71) |
+| Test IDs | `scn-aoe-looks`, `scn-aoe-look-<none\|mist\|motes\|ground\|glow\|ripple\|swirl\|hatch>`, `scn-aoe-look-anchored`, `scn-aoe-tint-swatch` (`data-value`, `data-default`), `scn-aoe-tint-custom`, `scn-aoe-cells` (`data-value`); Konva `scn-template` attrs `look`, `tint`, `cellOpacity`; `scn-template-look` (id = template id or `eph-<key>`; attrs `look`, `level`) |

@@ -62,6 +62,22 @@ export const TEMPLATE_LABEL_MAX = 40;
 export const TEMPLATE_SIZE = { min: 5, max: 300, step: 5 } as const;
 export const TEMPLATE_WIDTH = { min: 5, max: 60, step: 5, default: 5 } as const;
 export const TEMPLATE_ANGLE = { min: 0, max: 360, step: 15 } as const;
+/**
+ * FR-SCN-64 (#466): a template look, its tint and its cell opacity (0–50 %, step 5). Null opacity =
+ * the default: 22 % without a look (as before), 10 % with one.
+ */
+export const TEMPLATE_LOOKS = [
+  "mist",
+  "motes",
+  "ground",
+  "glow",
+  "ripple",
+  "swirl",
+  "hatch",
+] as const;
+export const CELL_OPACITY = { min: 0, max: 50, step: 5 } as const;
+export const CELL_OPACITY_DEFAULT = 22;
+export const CELL_OPACITY_LOOK_DEFAULT = 10;
 /** Grid coordinates on the wire; commands check the map's range (FR-SCN-07, -16). */
 export const COORD_MAX = 10_000;
 
@@ -195,6 +211,36 @@ const footprintFits = (
   if (message) ctx.addIssue({ code: "custom", path: ["footprint"], message });
 };
 export const TemplateLabel = z.string().max(TEMPLATE_LABEL_MAX);
+/** FR-SCN-64 (#466). */
+export const TemplateLook = z.enum(TEMPLATE_LOOKS);
+export type TemplateLook = z.infer<typeof TemplateLook>;
+/** FR-SCN-64: `#rrggbb`, stored lower case. */
+export const TemplateTint = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, "A colour as #rrggbb")
+  .transform((v) => v.toLowerCase());
+export const TemplateCellOpacity = stepped(CELL_OPACITY);
+/** FR-SCN-64: the look fields of a kept template, a placement or a signal frame. */
+const templateLookFields = {
+  look: TemplateLook.optional(),
+  tint: TemplateTint.optional(),
+  cellOpacity: TemplateCellOpacity.optional(),
+};
+/** FR-SCN-64: a template's look fields as stored (null = none / default). */
+export interface TemplateStyle {
+  look: TemplateLook | null;
+  tint: string | null;
+  cellOpacity: number | null;
+}
+export const NO_TEMPLATE_STYLE: TemplateStyle = { look: null, tint: null, cellOpacity: null };
+/** FR-SCN-67: the drawn cell opacity (0–1) of a template's look fields. */
+export function cellOpacityOf(t: {
+  look?: TemplateLook | null;
+  cellOpacity?: number | null;
+}): number {
+  const pct = t.cellOpacity ?? (t.look ? CELL_OPACITY_LOOK_DEFAULT : CELL_OPACITY_DEFAULT);
+  return pct / 100;
+}
 
 /** FR-SCN-29 (#145, OQ-SCN-04): 5/10/5 (default) or 5 ft per diagonal step. */
 export const DIAGONAL_RULES = ["5-10-5", "5"] as const;
@@ -277,6 +323,8 @@ export const AoeTemplateRecord = z.object({
   /** #377: the snapped origin block (sphere / cylinder); absent = the exact rule. */
   footprint: TemplateFootprint.optional(),
   label: z.string(),
+  /** FR-SCN-64 (#466): absent = none / default. */
+  ...templateLookFields,
   /** Null = DM-placed (a fog subject); a player's are never fog-hidden (FR-SCN-27). */
   placedByPlayerId: z.string().nullable(),
   hidden: z.boolean(),
@@ -401,6 +449,8 @@ const templateFields = {
   /** #377 (sphere / cylinder, the origin the block's centre). */
   footprint: TemplateFootprint.optional(),
   label: TemplateLabel.optional(),
+  /** FR-SCN-65 (#466). */
+  ...templateLookFields,
 };
 /** DM schema: may set `hidden` and `placedByPlayerId` (FR-SCN-25). */
 export const PlaceTemplateInput = z
@@ -423,6 +473,10 @@ export const UpdateTemplateInput = z.strictObject({
   /** #377: set (a snapped origin move) or `null` (a Ctrl move: the exact rule); absent = kept. */
   footprint: TemplateFootprint.nullable().optional(),
   label: TemplateLabel.optional(),
+  /** FR-SCN-65 (#466): `null` clears to none / the default; absent = kept. */
+  look: TemplateLook.nullable().optional(),
+  tint: TemplateTint.nullable().optional(),
+  cellOpacity: TemplateCellOpacity.nullable().optional(),
   /** DM only. */
   hidden: z.boolean().optional(),
 });
@@ -448,6 +502,8 @@ export const TemplateSignalPlace = z
     /** #377 (sphere / cylinder, the origin the block's centre). */
     footprint: TemplateFootprint.optional(),
     label: TemplateLabel.optional(),
+    /** FR-SCN-73 (#466): the ephemeral's look. */
+    ...templateLookFields,
     /** DM only: route to DM tabs (FR-SCN-24). */
     dmOnly: z.boolean().optional(),
   })

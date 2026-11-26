@@ -111,6 +111,7 @@ phase: post-mvp
 | FR-VFX-27 | **Slow frames**: while anything FX is animating, a median FX frame > 33 ms over 2 s drops one tier (Full → Reduced → Still, never to Off) for the rest of the page's life; the section shows "Lowered to ‹tier› on this device: slow frames". | As FR-DICEX-23 |
 | FR-VFX-28 | DM Layers popover switch **Effects** (toggle key `vfx`, kind `hide`): off hides both passes and cues on the DM's screen only, like the other switches (FR-SCN-05). | |
 | FR-VFX-29 | Budget: ≤ 400 live particles per client across every aura and look; past it, the oldest looks end early. | §12 |
+| FR-VFX-45 | *(#466)* **Template looks** ([scene-tools FR-SCN-68–71](scene-tools.md#6-functional-requirements)) share the FX clock, the Map effects level (FR-VFX-25–27, slow-frame drop included) and this budget; the DM's **Effects** switch (FR-VFX-28) hides them too. They are not effects: no `fx`, no preset, no reactions. | Template looks |
 
 ### 6.6 Template anchors (Black Tentacles, #456)
 

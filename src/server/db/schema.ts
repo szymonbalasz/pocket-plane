@@ -50,7 +50,13 @@ import { NOTE_CATEGORIES } from "@shared/linked-notes/schemas";
 import type { ItemKind, ItemStyle, MiniatureShape } from "@shared/overview-scenes/schemas";
 import type { SharedWith } from "@shared/party-board/schemas";
 import type { ReminderRoll } from "@shared/reminders/schemas";
-import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
+import {
+  DIAGONAL_RULES,
+  type Door,
+  TEMPLATE_LOOKS,
+  TEMPLATE_SHAPES,
+  type Wall,
+} from "@shared/scene-tools/schemas";
 import type { TokenTrail } from "@shared/scenes-map/schemas";
 import type { FxRecord } from "@shared/spell-fx/fx";
 import type { Facility, Staff } from "@shared/strongholds/schemas";
@@ -1626,6 +1632,12 @@ export const aoeTemplate = sqliteTable(
     /** DM #377: a snapped sphere / cylinder's origin block (1–4 cells per side); null = exact rule. */
     footprint: integer("footprint"),
     label: text("label").notNull().default(""),
+    /** FR-SCN-64 (#466): template look; null = none. Added columns (ADR-0076: add, never rename). */
+    look: text("look", { enum: TEMPLATE_LOOKS }),
+    /** FR-SCN-64: `#rrggbb`; null = the look's own colour. */
+    tint: text("tint"),
+    /** FR-SCN-64: 0–50 (%); null = the default (22, or 10 with a look). */
+    cellOpacity: integer("cell_opacity"),
     /** Null = DM-placed (fog subject); else the placing player (FR-SCN-25, -27). */
     placedByPlayerId: text("placed_by_player_id").references((): AnySQLiteColumn => player.id),
     hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
